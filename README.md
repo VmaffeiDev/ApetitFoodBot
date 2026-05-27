@@ -46,7 +46,7 @@ No Telegram, abra o bot e envie:
 /start
 ```
 
-O bot vai pedir nome, empresa/setor e restricao alimentar antes de liberar cardapio, recomendacoes ou pedidos.
+O bot vai pedir nome, telefone, endereco/bairro e restricao alimentar antes de liberar cardapio, recomendacoes ou pedidos.
 Para refazer o cadastro, envie:
 
 ```text
