@@ -24,7 +24,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-USER_NAME = os.getenv("APETIT_USER_NAME", "Mariana")
+DEFAULT_USER_NAME = os.getenv("APETIT_USER_NAME", "Mariana")
+REGISTRATION_STEP = "registration_step"
+
+ORDER_ACTIONS = {
+    "menu_today",
+    "recommend",
+    "no_meat",
+    "lasagna",
+    "fish",
+    "soup",
+    "diet_fit",
+    "other_options",
+}
+
+RESTRICTIONS = {
+    "restriction_none": "Sem restricoes",
+    "restriction_gluten": "Sem gluten",
+    "restriction_lactose": "Sem lactose",
+    "restriction_vegetarian": "Vegetariana",
+    "restriction_seafood": "Sem frutos do mar",
+}
 
 
 def normalize(text: str) -> str:
@@ -36,6 +56,53 @@ def kb(rows: list[list[tuple[str, str]]]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [[InlineKeyboardButton(label, callback_data=data) for label, data in row] for row in rows]
     )
+
+
+def profile(context: ContextTypes.DEFAULT_TYPE) -> dict:
+    return context.user_data.setdefault("profile", {})
+
+
+def is_registered(context: ContextTypes.DEFAULT_TYPE) -> bool:
+    user_profile = profile(context)
+    return bool(user_profile.get("registered"))
+
+
+def user_name(context: ContextTypes.DEFAULT_TYPE | None = None) -> str:
+    if context:
+        saved_name = profile(context).get("name")
+        if saved_name:
+            return saved_name
+    return DEFAULT_USER_NAME
+
+
+def render(template: str, context: ContextTypes.DEFAULT_TYPE | None = None) -> str:
+    return template.format(name=escape(user_name(context)))
+
+
+def registration_restriction_buttons() -> list[list[tuple[str, str]]]:
+    return [
+        [("\u2705 Nenhuma restricao", "restriction_none")],
+        [("\U0001f33e Sem gluten", "restriction_gluten"), ("\U0001f95b Sem lactose", "restriction_lactose")],
+        [("\U0001f969 Vegetariana", "restriction_vegetarian"), ("\U0001f420 Sem frutos do mar", "restriction_seafood")],
+    ]
+
+
+def build_profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
+    user_profile = profile(context)
+    name = escape(user_profile.get("name", user_name(context)))
+    company = escape(user_profile.get("company", "Nao informado"))
+    restriction = escape(user_profile.get("restriction", "Nao informado"))
+
+    return {
+        "text": (
+            f"\U0001f464 <b>Seu perfil:</b>\n\n"
+            f"<b>Nome:</b> {name}\n"
+            f"<b>Empresa/setor:</b> {company}\n"
+            f"<b>Restricao alimentar:</b> {restriction}\n\n"
+            "Posso atualizar alguma informacao?"
+        ),
+        "buttons": [[("\u270f\ufe0f Atualizar cadastro", "restart_registration"), ("\u2705 Esta correto", "thanks")]],
+    }
 
 
 FLOWS = {
@@ -71,8 +138,8 @@ FLOWS = {
             "Hoje temos duas op\u00e7\u00f5es sem carne:\n\n"
             "\U0001f957 <b>Lasanha de Legumes</b> - sem gl\u00faten \u2705\n"
             "\U0001f344 <b>Estrogonofe de Cogumelos</b> - cont\u00e9m lactose \u26a0\ufe0f\n\n"
-            "Como voc\u00ea prefere pratos com pouco queijo, a <b>lasanha</b> parece a melhor op\u00e7\u00e3o hoje \U0001f60a\n\n"
-            "Quer saber se ela se encaixa na sua dieta?"
+            "Como voc\u00ea informou sua restri\u00e7\u00e3o no cadastro, vou considerar isso antes de recomendar qualquer prato.\n\n"
+            "Quer saber se a lasanha se encaixa na sua dieta?"
         ),
         "buttons": [
             [("\u2705 Quero a lasanha", "lasagna"), ("\u274c Ver outras", "other_options")],
@@ -82,8 +149,8 @@ FLOWS = {
     "recommend": {
         "text": (
             "Hoje recomendo o <b>\U0001f41f Peixe Assado com Legumes</b>!\n\n"
-            "Voc\u00ea avaliou pratos parecidos muito bem e ainda n\u00e3o escolheu peixe esta semana. "
-            "\u00c9 uma op\u00e7\u00e3o leve, proteica e alinhada com seus objetivos \U0001f33f"
+            "Considerei seu cadastro e o card\u00e1pio do dia antes de sugerir essa op\u00e7\u00e3o. "
+            "\u00c9 uma escolha leve, proteica e alinhada com seus objetivos \U0001f33f"
         ),
         "buttons": [[("\U0001f44d Gostei, vou de peixe!", "fish"), ("\U0001f504 Ver outras op\u00e7\u00f5es", "other_options")]],
     },
@@ -109,11 +176,11 @@ FLOWS = {
     "restriction": {
         "text": (
             "\u26a0\ufe0f <b>Aten\u00e7\u00e3o, {name}!</b>\n\n"
-            "O estrogonofe de cogumelos <b>cont\u00e9m lactose</b>, e seu perfil indica intoler\u00e2ncia.\n\n"
-            "N\u00e3o encontrei confirma\u00e7\u00e3o de compatibilidade com sua dieta registrada.\n\n"
+            "O estrogonofe de cogumelos <b>cont\u00e9m lactose</b>.\n\n"
+            "Antes de confirmar qualquer pedido, eu cruzo essa informa\u00e7\u00e3o com o seu cadastro.\n\n"
             "Que tal a <b>lasanha de legumes</b>? Ela \u00e9 sem gl\u00faten e sem lactose \u2705"
         ),
-        "buttons": [[("\U0001f957 Ver lasanha", "lasagna"), ("\u270f\ufe0f Atualizar meu perfil", "update_profile")]],
+        "buttons": [[("\U0001f957 Ver lasanha", "lasagna"), ("\u270f\ufe0f Atualizar cadastro", "restart_registration")]],
     },
 }
 
@@ -124,7 +191,7 @@ RESPONSES = {
             "\u00d3tima escolha! \U0001f33f\n\n"
             "A <b>Lasanha de Legumes</b> de hoje \u00e9 sem gl\u00faten, sem carne e preparada com pouco queijo. "
             "Combina\u00e7\u00e3o perfeita para voc\u00ea!\n\n"
-            "Bom apetite, {name} \U0001f60a"
+            "Pedido registrado para <b>{name}</b>. Bom apetite \U0001f60a"
         ),
         "buttons": [[("\u2b50 Avaliar depois", "rate_later"), ("\U0001f514 Me lembrar amanh\u00e3", "remind_tomorrow")]],
     },
@@ -132,7 +199,7 @@ RESPONSES = {
         "text": (
             "\U0001f41f \u00d3tima escolha!\n\n"
             "O <b>Peixe Assado</b> \u00e9 rico em \u00f4mega-3 e vai te deixar com energia para a tarde toda.\n\n"
-            "Bom almo\u00e7o! \U0001f60a"
+            "Pedido registrado. Bom almo\u00e7o! \U0001f60a"
         ),
         "buttons": [[("\u2b50 Avaliar depois", "rate_later")]],
     },
@@ -140,7 +207,7 @@ RESPONSES = {
         "text": (
             "\U0001f958 A <b>Sopa de Lentilha</b> \u00e9 vegana, sem gl\u00faten e super nutritiva. "
             "Uma escolha leve e equilibrada!\n\n"
-            "Bom almo\u00e7o \U0001f60a"
+            "Pedido registrado. Bom almo\u00e7o \U0001f60a"
         ),
         "buttons": [[("\u2b50 Avaliar depois", "rate_later")]],
     },
@@ -150,7 +217,7 @@ RESPONSES = {
             "- Sem gl\u00faten \u2705\n"
             "- Vegetariana \u2705\n"
             "- Preparada com pouco queijo \u2705\n\n"
-            "Atende todas as suas restri\u00e7\u00f5es registradas no perfil \U0001f33f"
+            "Atende as principais restri\u00e7\u00f5es registradas no seu cadastro \U0001f33f"
         ),
         "buttons": [[("\U0001f957 Perfeito, vou de lasanha!", "lasagna")]],
     },
@@ -191,26 +258,9 @@ RESPONSES = {
         ),
         "buttons": [[("\U0001f957 Ver card\u00e1pio de hoje", "menu_today")]],
     },
-    "profile": {
-        "text": (
-            "\U0001f464 <b>Seu perfil, {name}:</b>\n\n"
-            "\u2705 Vegetariana\n"
-            "\u2705 Sem gl\u00faten\n"
-            "\u26a0\ufe0f Prefere pouco queijo\n"
-            "\u26a0\ufe0f Prefere pratos leves\n\n"
-            "Posso atualizar alguma informa\u00e7\u00e3o?"
-        ),
-        "buttons": [[("\u270f\ufe0f Atualizar", "update_profile"), ("\u2705 Est\u00e1 correto", "thanks")]],
-    },
     "update_profile": {
-        "text": (
-            "\u270f\ufe0f Claro! Vou te fazer algumas perguntas para atualizar seu perfil nutricional.\n\n"
-            "Voc\u00ea tem alguma dessas restri\u00e7\u00f5es?"
-        ),
-        "buttons": [
-            [("\U0001f33e Sem gl\u00faten", "profile_gluten"), ("\U0001f95b Sem lactose", "profile_lactose")],
-            [("\U0001f969 Vegetariana", "profile_vegetarian"), ("\U0001f420 Sem frutos do mar", "profile_seafood")],
-        ],
+        "text": "\u270f\ufe0f Vamos atualizar seu cadastro. Para come\u00e7ar, qual \u00e9 o seu nome completo?",
+        "buttons": [],
     },
     "rate_later": {"text": "Perfeito! Te mando um lembrete para avaliar ap\u00f3s o almo\u00e7o \U0001f514", "buttons": []},
     "remind_tomorrow": {"text": "\U0001f514 Combinado! Te aviso amanh\u00e3 com o card\u00e1pio fresquinho \U0001f60a", "buttons": []},
@@ -218,24 +268,22 @@ RESPONSES = {
         "text": "Sempre que precisar estou aqui \U0001f33f Bom almo\u00e7o!",
         "buttons": [[("\U0001f957 Ver card\u00e1pio", "menu_today")]],
     },
-    "profile_gluten": {"text": "Registrado: restri\u00e7\u00e3o a gl\u00faten \u2705", "buttons": [[("\U0001f464 Ver perfil", "profile")]]},
-    "profile_lactose": {"text": "Registrado: restri\u00e7\u00e3o a lactose \u2705", "buttons": [[("\U0001f464 Ver perfil", "profile")]]},
-    "profile_vegetarian": {"text": "Registrado: prefer\u00eancia vegetariana \u2705", "buttons": [[("\U0001f464 Ver perfil", "profile")]]},
-    "profile_seafood": {"text": "Registrado: sem frutos do mar \u2705", "buttons": [[("\U0001f464 Ver perfil", "profile")]]},
 }
 
 
-def render(template: str) -> str:
-    return template.format(name=escape(USER_NAME))
-
-
-async def send_payload(update: Update, payload: dict, edit: bool = False) -> None:
-    text = render(payload["text"])
-    reply_markup = kb(payload.get("buttons", [])) if payload.get("buttons") else None
+async def send_text(
+    update: Update,
+    text: str,
+    context: ContextTypes.DEFAULT_TYPE,
+    buttons: list[list[tuple[str, str]]] | None = None,
+    edit: bool = False,
+) -> None:
+    reply_markup = kb(buttons) if buttons else None
+    rendered_text = render(text, context)
 
     if edit and update.callback_query:
         await update.callback_query.edit_message_text(
-            text=text,
+            text=rendered_text,
             parse_mode=ParseMode.HTML,
             reply_markup=reply_markup,
         )
@@ -243,19 +291,144 @@ async def send_payload(update: Update, payload: dict, edit: bool = False) -> Non
 
     if update.effective_message:
         await update.effective_message.reply_text(
-            text=text,
+            text=rendered_text,
             parse_mode=ParseMode.HTML,
             reply_markup=reply_markup,
         )
 
 
+async def send_payload(
+    update: Update,
+    payload: dict,
+    context: ContextTypes.DEFAULT_TYPE,
+    edit: bool = False,
+) -> None:
+    await send_text(update, payload["text"], context, payload.get("buttons"), edit)
+
+
+async def ask_registration_name(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    edit: bool = False,
+) -> None:
+    context.user_data[REGISTRATION_STEP] = "name"
+    await send_text(
+        update,
+        (
+            "\U0001f37d\ufe0f <b>Antes de iniciar seu pedido, preciso fazer um cadastro r\u00e1pido.</b>\n\n"
+            "Assim consigo considerar suas restri\u00e7\u00f5es e identificar seu pedido corretamente.\n\n"
+            "Qual \u00e9 o seu nome completo?"
+        ),
+        context,
+        edit=edit,
+    )
+
+
+async def ask_company(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data[REGISTRATION_STEP] = "company"
+    await send_text(
+        update,
+        "Obrigado, {name}! Agora me diga sua empresa, unidade ou setor.",
+        context,
+    )
+
+
+async def ask_restriction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data[REGISTRATION_STEP] = "restriction"
+    await send_text(
+        update,
+        "Perfeito. Para sua seguran\u00e7a alimentar, selecione sua principal restri\u00e7\u00e3o:",
+        context,
+        registration_restriction_buttons(),
+    )
+
+
+async def finish_registration(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    restriction: str,
+    edit: bool = False,
+) -> None:
+    user_profile = profile(context)
+    user_profile["restriction"] = restriction
+    user_profile["registered"] = True
+    context.user_data.pop(REGISTRATION_STEP, None)
+
+    await send_text(
+        update,
+        (
+            "\u2705 <b>Cadastro conclu\u00eddo!</b>\n\n"
+            "<b>Nome:</b> {name}\n"
+            f"<b>Empresa/setor:</b> {escape(user_profile.get('company', 'Nao informado'))}\n"
+            f"<b>Restricao alimentar:</b> {escape(restriction)}\n\n"
+            "Agora sim, posso te ajudar com o card\u00e1pio e seus pedidos."
+        ),
+        context,
+        FLOWS["start"]["buttons"],
+        edit=edit,
+    )
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await send_payload(update, FLOWS["start"])
+    if is_registered(context):
+        await send_payload(update, FLOWS["start"], context)
+        return
+    await ask_registration_name(update, context)
+
+
+async def reset_registration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data.clear()
+    await ask_registration_name(update, context)
+
+
+async def handle_registration_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    step = context.user_data.get(REGISTRATION_STEP)
+    if not step:
+        return False
+
+    text = (update.message.text or "").strip()
+    if len(text) < 2:
+        await send_text(update, "Me envie uma resposta um pouquinho mais completa, por favor.", context)
+        return True
+
+    user_profile = profile(context)
+    if step == "name":
+        user_profile["name"] = text
+        await ask_company(update, context)
+        return True
+
+    if step == "company":
+        user_profile["company"] = text
+        await ask_restriction(update, context)
+        return True
+
+    await ask_restriction(update, context)
+    return True
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
+
+    if query.data in {"start_register", "restart_registration", "update_profile"}:
+        profile(context).pop("registered", None)
+        await ask_registration_name(update, context, edit=True)
+        return
+
+    if query.data in RESTRICTIONS:
+        await finish_registration(update, context, RESTRICTIONS[query.data], edit=True)
+        return
+
+    if query.data == "profile":
+        if not is_registered(context):
+            await ask_registration_name(update, context, edit=True)
+            return
+        await send_payload(update, build_profile_payload(context), context, edit=True)
+        return
+
+    if query.data in ORDER_ACTIONS and not is_registered(context):
+        await ask_registration_name(update, context, edit=True)
+        return
 
     payload = RESPONSES.get(query.data) or FLOWS.get(query.data)
     if not payload:
@@ -264,39 +437,45 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             "buttons": FLOWS["start"]["buttons"],
         }
 
-    await send_payload(update, payload, edit=True)
+    await send_payload(update, payload, context, edit=True)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if await handle_registration_message(update, context):
+        return
+
     text = normalize(update.message.text or "")
 
+    if not is_registered(context):
+        await ask_registration_name(update, context)
+        return
+
     if any(term in text for term in ["sem carne", "vegetariano", "vegetariana"]):
-        await send_payload(update, FLOWS["no_meat"])
+        await send_payload(update, FLOWS["no_meat"], context)
     elif any(term in text for term in ["recomenda", "sugere", "melhor opcao"]):
-        await send_payload(update, FLOWS["recommend"])
+        await send_payload(update, FLOWS["recommend"], context)
     elif any(term in text for term in ["fria", "frio", "ruim", "reclamacao", "problema"]):
-        await send_payload(update, FLOWS["complaint"])
+        await send_payload(update, FLOWS["complaint"], context)
     elif any(term in text for term in ["gostei", "bom", "otimo", "excelente"]):
-        await send_payload(update, FLOWS["feedback"])
+        await send_payload(update, FLOWS["feedback"], context)
     elif any(term in text for term in ["estrogonofe", "lactose", "restricao"]):
-        await send_payload(update, FLOWS["restriction"])
+        await send_payload(update, FLOWS["restriction"], context)
     elif any(term in text for term in ["cardapio", "tem hoje", "o que tem"]):
-        await send_payload(update, FLOWS["menu_today"])
-    elif "perfil" in text:
-        await send_payload(update, RESPONSES["profile"])
+        await send_payload(update, FLOWS["menu_today"], context)
+    elif "perfil" in text or "cadastro" in text:
+        await send_payload(update, build_profile_payload(context), context)
     else:
-        await send_payload(
+        await send_text(
             update,
-            {
-                "text": (
-                    "Vamos juntos encontrar a melhor op\u00e7\u00e3o para voc\u00ea \U0001f60a\n\n"
-                    "Quer ver o card\u00e1pio de hoje ou prefere uma recomenda\u00e7\u00e3o personalizada?"
-                ),
-                "buttons": [
-                    [("\U0001f957 Card\u00e1pio", "menu_today"), ("\u2b50 Recomenda\u00e7\u00e3o", "recommend")],
-                    [("\U0001f464 Meu perfil", "profile")],
-                ],
-            },
+            (
+                "Vamos juntos encontrar a melhor op\u00e7\u00e3o para voc\u00ea \U0001f60a\n\n"
+                "Quer ver o card\u00e1pio de hoje ou prefere uma recomenda\u00e7\u00e3o personalizada?"
+            ),
+            context,
+            [
+                [("\U0001f957 Card\u00e1pio", "menu_today"), ("\u2b50 Recomenda\u00e7\u00e3o", "recommend")],
+                [("\U0001f464 Meu perfil", "profile")],
+            ],
         )
 
 
@@ -307,6 +486,7 @@ def main() -> None:
 
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("recadastrar", reset_registration))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
