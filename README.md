@@ -143,6 +143,12 @@ Para listar o cardapio cadastrado:
 /cardapio_list
 ```
 
+Para ver um resumo administrativo com clientes, pedidos, favoritos e pratos mais pedidos:
+
+```text
+/relatorio
+```
+
 ## Atualizar cardapio semanal
 
 Envie o comando abaixo no Telegram para registrar os pratos da semana e avisar clientes que aguardam algum deles ou ja pediram o prato varias vezes:
