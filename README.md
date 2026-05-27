@@ -4,6 +4,7 @@ MVP de bot Telegram da Apetit com fluxos inspirados no simulador HTML:
 
 - boas-vindas com `/start`
 - cadastro obrigatorio antes de pedidos
+- banco SQLite com clientes e historico de pedidos
 - cardapio do dia
 - cardapio sem carne
 - recomendacao inteligente
@@ -50,6 +51,40 @@ Para refazer o cadastro, envie:
 
 ```text
 /recadastrar
+```
+
+Para ver o historico de pedidos:
+
+```text
+/historico
+```
+
+## Banco de dados
+
+O bot cria automaticamente o arquivo `apetit.db` com:
+
+- clientes cadastrados
+- historico de pedidos
+- pratos favoritos/aguardados
+- atualizacoes de cardapio semanal
+
+Esse arquivo fica fora do Git por seguranca e privacidade.
+
+## Atualizar cardapio semanal
+
+Envie o comando abaixo no Telegram para registrar os pratos da semana e avisar clientes que aguardam algum deles ou ja pediram o prato varias vezes:
+
+```text
+/cardapio_semana Lasanha de Legumes
+Peixe Assado com Legumes
+Sopa de Lentilha
+```
+
+Para restringir esse comando a administradores, configure no `.env`:
+
+```env
+ADMIN_TELEGRAM_IDS=123456789,987654321
+APETIT_DB_PATH=apetit.db
 ```
 
 ## Exemplos de frases
