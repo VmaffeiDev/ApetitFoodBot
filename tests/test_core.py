@@ -72,6 +72,39 @@ class CoreLogicTest(unittest.TestCase):
         self.assertEqual(report["goals"][0]["goal"], "Perder peso")
         self.assertEqual(report["top"][0]["dish_name"], "Sopa de Lentilha")
 
+    def test_client_consent_is_stored_with_timestamp(self):
+        user_id = 987
+        consented_at = "2026-05-27T10:00:00+00:00"
+
+        bot.save_client(
+            user_id,
+            999,
+            "Cliente LGPD",
+            "11988887777",
+            "Centro",
+            "Sem restricoes",
+            "Manter equilibrio",
+            True,
+            consented_at,
+        )
+
+        client = bot.load_client(user_id)
+
+        self.assertEqual(client["consent_accepted"], 1)
+        self.assertEqual(client["consented_at"], consented_at)
+
+    def test_delete_client_data_removes_profile_history_and_favorites(self):
+        user_id = 654
+        bot.save_client(user_id, 999, "Cliente Delete", "11977776666", "Bairro", "Sem restricoes", "Perder peso")
+        bot.record_order(user_id, "soup")
+        bot.add_favorite_waitlist(user_id, "soup")
+
+        bot.delete_client_data(user_id)
+
+        self.assertIsNone(bot.load_client(user_id))
+        self.assertEqual(bot.recent_orders(user_id), [])
+        self.assertEqual(bot.favorite_items(user_id), [])
+
 
 if __name__ == "__main__":
     unittest.main()
