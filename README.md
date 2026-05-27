@@ -5,6 +5,7 @@ MVP de bot Telegram da Apetit com fluxos inspirados no simulador HTML:
 - boas-vindas com `/start`
 - cadastro obrigatorio antes de pedidos
 - banco SQLite com clientes e historico de pedidos
+- cardapio real no banco com preco, dia, ingredientes, alergenicos e tags
 - cardapio do dia
 - cardapio sem carne
 - recomendacao inteligente
@@ -59,16 +60,43 @@ Para ver o historico de pedidos:
 /historico
 ```
 
+Para ver o cardapio disponivel:
+
+```text
+/cardapio
+```
+
 ## Banco de dados
 
 O bot cria automaticamente o arquivo `apetit.db` com:
 
 - clientes cadastrados
 - historico de pedidos
+- pratos cadastrados no cardapio
 - pratos favoritos/aguardados
 - atualizacoes de cardapio semanal
 
 Esse arquivo fica fora do Git por seguranca e privacidade.
+
+## Cadastrar pratos
+
+Administradores podem cadastrar ou atualizar pratos assim:
+
+```text
+/cardapio_add Nome do prato | 29,90 | segunda | ingredientes | alergenicos | tags | disponivel
+```
+
+Exemplo:
+
+```text
+/cardapio_add Frango Grelhado | 31,90 | quinta | frango, arroz, legumes | nenhum | proteico, caseiro | sim
+```
+
+Para listar o cardapio cadastrado:
+
+```text
+/cardapio_list
+```
 
 ## Atualizar cardapio semanal
 
