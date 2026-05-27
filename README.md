@@ -4,8 +4,10 @@ MVP de bot Telegram da Apetit com fluxos inspirados no simulador HTML:
 
 - boas-vindas com `/start`
 - cadastro obrigatorio antes de pedidos
+- aceite LGPD antes de salvar dados pessoais
 - objetivo do cliente no cadastro: perder peso, ganhar massa, manter equilibrio, alimentacao saudavel ou praticidade
 - banco SQLite com clientes e historico de pedidos
+- comandos `/meus_dados` e `/excluir_dados`
 - cardapio real no banco com preco, dia, ingredientes, alergenicos e tags
 - cardapio do dia
 - cardapio sem carne
@@ -35,6 +37,7 @@ Edite o arquivo `.env` e coloque o token novo:
 ```env
 TELEGRAM_BOT_TOKEN=seu_token_novo
 APETIT_USER_NAME=Mariana
+APETIT_DB_PATH=apetit.db
 ```
 
 Depois inicie:
@@ -55,7 +58,7 @@ No Telegram, abra o bot e envie:
 /start
 ```
 
-O bot vai pedir nome, telefone, endereco/bairro, objetivo alimentar e restricao alimentar antes de liberar cardapio, recomendacoes ou pedidos.
+O bot vai pedir nome, telefone, endereco/bairro, objetivo alimentar, restricao alimentar e aceite LGPD antes de liberar cardapio, recomendacoes ou pedidos.
 Quando o cliente escolhe um prato, o bot confere os alergenicos, ingredientes e tags antes de registrar o pedido. Se houver conflito com a restricao cadastrada, o pedido nao e gravado e o bot sugere alternativas mais seguras.
 As recomendacoes consideram o objetivo do cliente e o historico de pedidos.
 
@@ -77,11 +80,19 @@ Para ver o cardapio disponivel:
 /cardapio
 ```
 
+Para consultar ou excluir os dados do cliente:
+
+```text
+/meus_dados
+/excluir_dados
+```
+
 ## Banco de dados
 
 O bot cria automaticamente o arquivo `apetit.db` com:
 
 - clientes cadastrados
+- aceite LGPD e data do consentimento
 - historico de pedidos
 - pratos cadastrados no cardapio
 - pratos favoritos/aguardados
@@ -89,19 +100,34 @@ O bot cria automaticamente o arquivo `apetit.db` com:
 
 Esse arquivo fica fora do Git por seguranca e privacidade.
 
+## LGPD e consentimento
+
+Como o bot guarda telefone, endereco/bairro, historico e preferencias, o cadastro so e concluido depois do aceite do cliente.
+
+O cliente pode:
+
+- ver os dados salvos com `/meus_dados`
+- excluir cadastro, historico e favoritos com `/excluir_dados`
+- refazer o cadastro com `/recadastrar`
+
+O banco guarda `consent_accepted` e `consented_at`. Se o cliente nao aceitar, o bot nao conclui o cadastro nem libera pedidos.
+
 ## Grafo do fluxo
 
 ```mermaid
 flowchart TD
     A["Cliente abre o bot no Telegram"] --> B{Cliente ja tem cadastro?}
     B -- "Nao" --> C["Cadastro obrigatorio: nome, telefone, endereco/bairro, objetivo e restricao alimentar"]
-    C --> D["Salvar cliente no SQLite"]
+    C --> LGPD{Cliente aceita guardar dados?}
+    LGPD -- "Nao" --> X["Bot nao conclui cadastro nem libera pedidos"]
+    LGPD -- "Sim" --> D["Salvar cliente no SQLite com data do consentimento"]
     B -- "Sim" --> E["Menu principal"]
     D --> E
 
     E --> F["Ver cardapio"]
     E --> G["Receber recomendacao"]
     E --> H["Ver perfil e historico"]
+    E --> LGPD2["/meus_dados ou /excluir_dados"]
 
     F --> I["Bot lista pratos com preco, dia, tags e alergenicos"]
     G --> J["Bot cruza objetivo + restricao + historico + cardapio disponivel"]
@@ -111,10 +137,10 @@ flowchart TD
 
     L --> M{Prato conflita com restricao?}
     M -- "Sim" --> N["Pedido nao e registrado"]
-    N --> O["Bot avisa o motivo e sugere alternativas seguras 🌿"]
+    N --> O["Bot avisa o motivo e sugere alternativas seguras"]
     O --> L
     M -- "Nao" --> P["Registrar pedido no historico"]
-    P --> Q["Oferecer aviso quando o prato voltar 🔔"]
+    P --> Q["Oferecer aviso quando o prato voltar"]
     Q --> R{Cliente quer ser avisado?}
     R -- "Sim" --> S["Salvar prato em favoritos/aguardados"]
     R -- "Nao" --> E
@@ -122,7 +148,7 @@ flowchart TD
 
     T["Admin atualiza cardapio semanal"] --> U["Salvar semana no SQLite"]
     U --> V["Buscar clientes com prato favorito ou recorrente"]
-    V --> W["Enviar alerta no Telegram quando o prato voltar 🔔"]
+    V --> W["Enviar alerta no Telegram quando o prato voltar"]
 ```
 
 ## Cadastrar pratos
@@ -168,13 +194,54 @@ ADMIN_TELEGRAM_IDS=123456789,987654321
 APETIT_DB_PATH=apetit.db
 ```
 
+## Deploy
+
+Para operar de verdade, use webhook em producao e deixe polling apenas para testes locais.
+
+Variaveis recomendadas:
+
+```env
+TELEGRAM_BOT_TOKEN=seu_token_novo
+ADMIN_TELEGRAM_IDS=123456789
+APETIT_DB_PATH=apetit.db
+TELEGRAM_WEBHOOK_URL=https://seu-app.onrender.com
+TELEGRAM_WEBHOOK_PATH=telegram-webhook
+TELEGRAM_WEBHOOK_SECRET_TOKEN=um-segredo-forte
+PORT=8000
+```
+
+Com `TELEGRAM_WEBHOOK_URL` preenchido, o bot sobe com webhook automaticamente. Sem essa variavel, ele continua usando polling.
+
+Opcoes de hospedagem:
+
+- Render, Railway ou Fly para uma primeira versao gerenciada
+- VPS quando voce quiser mais controle de sistema, disco e backups
+- SQLite funciona para MVP; para escala maior, considere migrar para PostgreSQL
+
+Backup do banco:
+
+```powershell
+python scripts/backup_db.py
+```
+
+O script cria uma copia em `backups/`. Em producao, agende esse comando no provedor ou na VPS e guarde copias fora da maquina principal.
+
+Logs e monitoramento:
+
+- os logs saem no stdout do processo, que Render/Railway/Fly/VPS conseguem capturar
+- monitore reinicios, erros de webhook e espaco em disco
+- mantenha um alerta simples para queda do servico e falhas de backup
+
 ## Checklist antes de usar com clientes
 
 - gerar um token novo no BotFather se o token antigo foi exposto
 - preencher `TELEGRAM_BOT_TOKEN` no `.env`
 - configurar `ADMIN_TELEGRAM_IDS` para proteger comandos administrativos
+- preencher `TELEGRAM_WEBHOOK_URL` em producao
+- configurar rotina de backup do banco
 - cadastrar pratos reais com ingredientes, alergenicos e tags
 - testar um cadastro novo com `/start`
+- testar aceite LGPD, `/meus_dados` e `/excluir_dados`
 - testar objetivos diferentes, como perder peso e ganhar massa
 - testar uma restricao alimentar e confirmar que prato incompatavel e bloqueado
 - testar `/cardapio_semana` com um prato favorito para confirmar o alerta
