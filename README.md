@@ -4,6 +4,7 @@ MVP de bot Telegram da Apetit com fluxos inspirados no simulador HTML:
 
 - boas-vindas com `/start`
 - cadastro obrigatorio antes de pedidos
+- objetivo do cliente no cadastro: perder peso, ganhar massa, manter equilibrio, alimentacao saudavel ou praticidade
 - banco SQLite com clientes e historico de pedidos
 - cardapio real no banco com preco, dia, ingredientes, alergenicos e tags
 - cardapio do dia
@@ -54,8 +55,9 @@ No Telegram, abra o bot e envie:
 /start
 ```
 
-O bot vai pedir nome, telefone, endereco/bairro e restricao alimentar antes de liberar cardapio, recomendacoes ou pedidos.
+O bot vai pedir nome, telefone, endereco/bairro, objetivo alimentar e restricao alimentar antes de liberar cardapio, recomendacoes ou pedidos.
 Quando o cliente escolhe um prato, o bot confere os alergenicos, ingredientes e tags antes de registrar o pedido. Se houver conflito com a restricao cadastrada, o pedido nao e gravado e o bot sugere alternativas mais seguras.
+As recomendacoes consideram o objetivo do cliente e o historico de pedidos.
 
 Para refazer o cadastro, envie:
 
@@ -92,7 +94,7 @@ Esse arquivo fica fora do Git por seguranca e privacidade.
 ```mermaid
 flowchart TD
     A["Cliente abre o bot no Telegram"] --> B{Cliente ja tem cadastro?}
-    B -- "Nao" --> C["Cadastro obrigatorio: nome, telefone, endereco/bairro e restricao alimentar"]
+    B -- "Nao" --> C["Cadastro obrigatorio: nome, telefone, endereco/bairro, objetivo e restricao alimentar"]
     C --> D["Salvar cliente no SQLite"]
     B -- "Sim" --> E["Menu principal"]
     D --> E
@@ -102,7 +104,7 @@ flowchart TD
     E --> H["Ver perfil e historico"]
 
     F --> I["Bot lista pratos com preco, dia, tags e alergenicos"]
-    G --> J["Bot cruza restricao + historico + cardapio disponivel"]
+    G --> J["Bot cruza objetivo + restricao + historico + cardapio disponivel"]
     J --> K["Sugere prato compativel"]
     K --> L["Cliente escolhe prato"]
     I --> L
@@ -173,6 +175,7 @@ APETIT_DB_PATH=apetit.db
 - configurar `ADMIN_TELEGRAM_IDS` para proteger comandos administrativos
 - cadastrar pratos reais com ingredientes, alergenicos e tags
 - testar um cadastro novo com `/start`
+- testar objetivos diferentes, como perder peso e ganhar massa
 - testar uma restricao alimentar e confirmar que prato incompatavel e bloqueado
 - testar `/cardapio_semana` com um prato favorito para confirmar o alerta
 
