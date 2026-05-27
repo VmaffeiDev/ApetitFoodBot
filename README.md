@@ -8,7 +8,8 @@ MVP de bot Telegram da Apetit com fluxos inspirados no simulador HTML:
 - cardapio real no banco com preco, dia, ingredientes, alergenicos e tags
 - cardapio do dia
 - cardapio sem carne
-- recomendacao inteligente
+- recomendacao inteligente baseada no cadastro e historico do cliente
+- bloqueio de pedido incompatavel com restricao alimentar cadastrada
 - reclamacao com escuta empatica
 - feedback positivo
 - alerta de restricao alimentar
@@ -48,6 +49,8 @@ No Telegram, abra o bot e envie:
 ```
 
 O bot vai pedir nome, telefone, endereco/bairro e restricao alimentar antes de liberar cardapio, recomendacoes ou pedidos.
+Quando o cliente escolhe um prato, o bot confere os alergenicos, ingredientes e tags antes de registrar o pedido. Se houver conflito com a restricao cadastrada, o pedido nao e gravado e o bot sugere alternativas mais seguras.
+
 Para refazer o cadastro, envie:
 
 ```text
@@ -77,6 +80,42 @@ O bot cria automaticamente o arquivo `apetit.db` com:
 - atualizacoes de cardapio semanal
 
 Esse arquivo fica fora do Git por seguranca e privacidade.
+
+## Grafo do fluxo
+
+```mermaid
+flowchart TD
+    A["Cliente abre o bot no Telegram"] --> B{Cliente ja tem cadastro?}
+    B -- "Nao" --> C["Cadastro obrigatorio: nome, telefone, endereco/bairro e restricao alimentar"]
+    C --> D["Salvar cliente no SQLite"]
+    B -- "Sim" --> E["Menu principal"]
+    D --> E
+
+    E --> F["Ver cardapio"]
+    E --> G["Receber recomendacao"]
+    E --> H["Ver perfil e historico"]
+
+    F --> I["Bot lista pratos com preco, dia, tags e alergenicos"]
+    G --> J["Bot cruza restricao + historico + cardapio disponivel"]
+    J --> K["Sugere prato compativel"]
+    K --> L["Cliente escolhe prato"]
+    I --> L
+
+    L --> M{Prato conflita com restricao?}
+    M -- "Sim" --> N["Pedido nao e registrado"]
+    N --> O["Bot avisa o motivo e sugere alternativas seguras 🌿"]
+    O --> L
+    M -- "Nao" --> P["Registrar pedido no historico"]
+    P --> Q["Oferecer aviso quando o prato voltar 🔔"]
+    Q --> R{Cliente quer ser avisado?}
+    R -- "Sim" --> S["Salvar prato em favoritos/aguardados"]
+    R -- "Nao" --> E
+    S --> E
+
+    T["Admin atualiza cardapio semanal"] --> U["Salvar semana no SQLite"]
+    U --> V["Buscar clientes com prato favorito ou recorrente"]
+    V --> W["Enviar alerta no Telegram quando o prato voltar 🔔"]
+```
 
 ## Cadastrar pratos
 
