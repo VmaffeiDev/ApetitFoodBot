@@ -42,6 +42,12 @@ Depois inicie:
 python bot.py
 ```
 
+Para rodar os testes:
+
+```powershell
+python -m unittest discover -s tests
+```
+
 No Telegram, abra o bot e envie:
 
 ```text
@@ -153,6 +159,16 @@ Para restringir esse comando a administradores, configure no `.env`:
 ADMIN_TELEGRAM_IDS=123456789,987654321
 APETIT_DB_PATH=apetit.db
 ```
+
+## Checklist antes de usar com clientes
+
+- gerar um token novo no BotFather se o token antigo foi exposto
+- preencher `TELEGRAM_BOT_TOKEN` no `.env`
+- configurar `ADMIN_TELEGRAM_IDS` para proteger comandos administrativos
+- cadastrar pratos reais com ingredientes, alergenicos e tags
+- testar um cadastro novo com `/start`
+- testar uma restricao alimentar e confirmar que prato incompatavel e bloqueado
+- testar `/cardapio_semana` com um prato favorito para confirmar o alerta
 
 ## Exemplos de frases
 
