@@ -40,9 +40,15 @@ class CoreLogicTest(unittest.TestCase):
         bot.record_order(user_id, "fish")
         bot.record_order(user_id, "lasagna")
 
-        recommended = bot.recommend_item(user_id, "Vegetariana")
+        recommended = bot.recommend_item(user_id, "Vegetariana", "Manter equilibrio")
 
         self.assertEqual(recommended["dish_key"], "lasagna")
+
+    def test_recommendation_uses_customer_goal(self):
+        recommended = bot.recommend_item(None, "Sem restricoes", "Ganhar massa")
+
+        self.assertGreater(bot.goal_score("Ganhar massa", recommended), 0)
+        self.assertIn("proteico", bot.item_search_text(recommended))
 
     def test_recent_orders_include_keys_for_recommendation_flow(self):
         user_id = 456
@@ -54,7 +60,7 @@ class CoreLogicTest(unittest.TestCase):
 
     def test_admin_report_counts_clients_orders_and_favorites(self):
         user_id = 789
-        bot.save_client(user_id, 999, "Cliente Teste", "11999999999", "Centro", "Sem restricoes")
+        bot.save_client(user_id, 999, "Cliente Teste", "11999999999", "Centro", "Sem restricoes", "Perder peso")
         bot.record_order(user_id, "soup")
         bot.add_favorite_waitlist(user_id, "soup")
 
@@ -63,6 +69,7 @@ class CoreLogicTest(unittest.TestCase):
         self.assertEqual(report["totals"]["clients"], 1)
         self.assertEqual(report["totals"]["orders"], 1)
         self.assertEqual(report["totals"]["favorites"], 1)
+        self.assertEqual(report["goals"][0]["goal"], "Perder peso")
         self.assertEqual(report["top"][0]["dish_name"], "Sopa de Lentilha")
 
 
