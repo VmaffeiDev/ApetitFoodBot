@@ -401,24 +401,24 @@ async def send_payload(update: Update, payload: dict, context: ContextTypes.DEFA
 
 def main_buttons() -> list[list[tuple[str, str]]]:
     return [
-        [("Ver cardapio", "menu_today"), ("Me recomendar algo", "recommend")],
-        [("Meu perfil", "profile")],
+        [("\U0001f957 Ver cardapio", "menu_today"), ("\u2b50 Me recomendar algo", "recommend")],
+        [("\U0001f464 Meu perfil", "profile")],
     ]
 
 
 def restriction_buttons() -> list[list[tuple[str, str]]]:
     return [
-        [("Nenhuma restricao", "restriction_none")],
-        [("Sem gluten", "restriction_gluten"), ("Sem lactose", "restriction_lactose")],
-        [("Vegetariana", "restriction_vegetarian"), ("Sem frutos do mar", "restriction_seafood")],
+        [("\u2705 Nenhuma restricao", "restriction_none")],
+        [("\U0001f33e Sem gluten", "restriction_gluten"), ("\U0001f95b Sem lactose", "restriction_lactose")],
+        [("\U0001f969 Vegetariana", "restriction_vegetarian"), ("\U0001f420 Sem frutos do mar", "restriction_seafood")],
     ]
 
 
 def menu_payload(day: str | None = None) -> dict:
     items = list_menu_items(day)
     if not items:
-        return {"text": "Ainda nao temos pratos disponiveis para esse dia.", "buttons": [[("Ver cardapio completo", "menu_today")]]}
-    lines = ["<b>Cardapio disponivel:</b>"]
+        return {"text": "\U0001f614 Ainda nao temos pratos disponiveis para esse dia.", "buttons": [[("\U0001f957 Ver cardapio completo", "menu_today")]]}
+    lines = ["\U0001f957 <b>Cardapio disponivel:</b>"]
     buttons = []
     for item in items:
         tags = f" - {escape(item['tags'])}" if item["tags"] else ""
@@ -427,24 +427,24 @@ def menu_payload(day: str | None = None) -> dict:
             f"<b>{escape(item['dish_name'])}</b> - {format_price(item['price_cents'])}\n"
             f"Dia: {escape(item['day_of_week'])}{tags}{allergens}"
         )
-        buttons.append([(f"Pedir {item['dish_name'][:30]}", f"dish:{item['dish_key']}")])
+        buttons.append([(f"\U0001f37d Pedir {item['dish_name'][:30]}", f"dish:{item['dish_key']}")])
     return {"text": "\n\n".join(lines), "buttons": buttons}
 
 
 def order_payload(dish_key: str) -> dict:
     item = load_menu_item(dish_key)
     if not item:
-        return {"text": "Nao encontrei esse prato no cardapio atual.", "buttons": [[("Ver cardapio", "menu_today")]]}
+        return {"text": "\U0001f614 Nao encontrei esse prato no cardapio atual.", "buttons": [[("\U0001f957 Ver cardapio", "menu_today")]]}
     allergens = f"\nAlergenicos: {escape(item['allergens'])}" if item["allergens"] else ""
     return {
         "text": (
-            f"Pedido registrado para <b>{{name}}</b>.\n\n"
+            f"\u2705 Pedido registrado para <b>{{name}}</b>.\n\n"
             f"<b>{escape(item['dish_name'])}</b>\n"
             f"Valor: {format_price(item['price_cents'])}\n"
             f"Dia: {escape(item['day_of_week'])}{allergens}\n\n"
-            "Bom apetite."
+            "Bom apetite \U0001f60a"
         ),
-        "buttons": [[("Avaliar depois", "rate_later")], [("Me avise quando voltar", "favorite_last_order")]],
+        "buttons": [[("\u2b50 Avaliar depois", "rate_later")], [("\U0001f514 Me avise quando voltar", "favorite_last_order")]],
     }
 
 
@@ -462,7 +462,7 @@ def profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
             recent_text = "\n".join(f"- {escape(row['dish_name'])}" for row in recent)
     return {
         "text": (
-            "<b>Seu perfil:</b>\n\n"
+            "\U0001f464 <b>Seu perfil:</b>\n\n"
             f"<b>Nome:</b> {escape(data.get('name', DEFAULT_USER_NAME))}\n"
             f"<b>Telefone:</b> {escape(data.get('phone', 'Nao informado'))}\n"
             f"<b>Endereco/bairro:</b> {escape(data.get('address', 'Nao informado'))}\n"
@@ -470,7 +470,7 @@ def profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
             f"<b>Mais pedidos:</b>\n{top_text}\n\n"
             f"<b>Historico recente:</b>\n{recent_text}"
         ),
-        "buttons": [[("Atualizar cadastro", "restart_registration"), ("Esta correto", "thanks")]],
+        "buttons": [[("\u270f\ufe0f Atualizar cadastro", "restart_registration"), ("\u2705 Esta correto", "thanks")]],
     }
 
 
@@ -479,8 +479,8 @@ async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: boo
     await send_text(
         update,
         (
-            "<b>Antes de iniciar seu pedido, preciso fazer um cadastro rapido.</b>\n\n"
-            "Assim consigo considerar suas restricoes e identificar seu pedido corretamente.\n\n"
+            "\U0001f37d\ufe0f <b>Antes de iniciar seu pedido, preciso fazer um cadastro rapido.</b>\n\n"
+            "Assim consigo considerar suas restricoes e identificar seu pedido corretamente \U0001f33f\n\n"
             "Qual e o seu nome completo?"
         ),
         context,
@@ -490,17 +490,17 @@ async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: boo
 
 async def ask_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data[REGISTRATION_STEP] = "phone"
-    await send_text(update, "Obrigado, {name}! Agora me envie seu telefone para contato.", context)
+    await send_text(update, "Obrigado, {name}! \U0001f60a Agora me envie seu telefone para contato.", context)
 
 
 async def ask_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data[REGISTRATION_STEP] = "address"
-    await send_text(update, "Perfeito. Agora me informe seu endereco ou bairro de entrega.", context)
+    await send_text(update, "Perfeito \U0001f4cd Agora me informe seu endereco ou bairro de entrega.", context)
 
 
 async def ask_restriction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data[REGISTRATION_STEP] = "restriction"
-    await send_text(update, "Para sua seguranca alimentar, selecione sua principal restricao:", context, restriction_buttons())
+    await send_text(update, "\U0001f33f Para sua seguranca alimentar, selecione sua principal restricao:", context, restriction_buttons())
 
 
 async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE, restriction: str, edit: bool = False) -> None:
@@ -524,12 +524,12 @@ async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE
     await send_text(
         update,
         (
-            "<b>Cadastro concluido!</b>\n\n"
+            "\u2705 <b>Cadastro concluido!</b>\n\n"
             "<b>Nome:</b> {name}\n"
             f"<b>Telefone:</b> {escape(data.get('phone', 'Nao informado'))}\n"
             f"<b>Endereco/bairro:</b> {escape(data.get('address', 'Nao informado'))}\n"
             f"<b>Restricao alimentar:</b> {escape(restriction)}\n\n"
-            "Agora posso te ajudar com o cardapio e seus pedidos."
+            "Agora posso te ajudar com o cardapio e seus pedidos \U0001f60a"
         ),
         context,
         main_buttons(),
@@ -543,8 +543,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await send_text(
             update,
             (
-                "<b>Ola, {name}!</b>\n\n"
-                "Sou o bot da Apetit. Posso te ajudar com cardapio, pedidos, recomendacoes e avisos de pratos favoritos."
+                "\U0001f37d\ufe0f <b>Ola, {name}!</b>\n\n"
+                "Sou o bot da Apetit. Posso te ajudar com cardapio, pedidos, recomendacoes e avisos de pratos favoritos \U0001f33f"
             ),
             context,
             main_buttons(),
@@ -566,9 +566,9 @@ async def show_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     rows = recent_orders(user_id, 10)
     if not rows:
-        await send_text(update, "Voce ainda nao tem pedidos registrados.", context, main_buttons())
+        await send_text(update, "\U0001f4cb Voce ainda nao tem pedidos registrados.", context, main_buttons())
         return
-    await send_text(update, "<b>Seu historico de pedidos:</b>\n\n" + "\n".join(f"- {escape(row['dish_name'])}" for row in rows), context, main_buttons())
+    await send_text(update, "\U0001f4cb <b>Seu historico de pedidos:</b>\n\n" + "\n".join(f"- {escape(row['dish_name'])}" for row in rows), context, main_buttons())
 
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -585,7 +585,7 @@ def is_admin(user_id: int | None) -> bool:
 
 async def add_menu_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_admin(tg_id(update)):
-        await update.effective_message.reply_text("Apenas administradores podem cadastrar pratos.")
+        await update.effective_message.reply_text("\U0001f512 Apenas administradores podem cadastrar pratos.")
         return
     text = update.effective_message.text or ""
     raw = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
@@ -601,16 +601,16 @@ async def add_menu_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     name, price, day, ingredients, allergens, tags = parts[:6]
     available = len(parts) < 7 or normalize(parts[6]) not in {"nao", "no", "false", "0", "esgotado"}
     key = upsert_menu_item(name, price_to_cents(price), day, ingredients, allergens, tags, available)
-    await update.effective_message.reply_text(f"Prato cadastrado/atualizado: {name} ({key}).")
+    await update.effective_message.reply_text(f"\u2705 Prato cadastrado/atualizado: {name} ({key}).")
 
 
 async def list_admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     day = " ".join(context.args).strip() if context.args else None
     items = list_menu_items(day, only_available=False)
     if not items:
-        await update.effective_message.reply_text("Nenhum prato cadastrado.")
+        await update.effective_message.reply_text("\U0001f614 Nenhum prato cadastrado.")
         return
-    lines = ["Cardapio cadastrado:"]
+    lines = ["\U0001f957 Cardapio cadastrado:"]
     for item in items:
         status = "disponivel" if item["available"] else "esgotado"
         lines.append(f"- {item['dish_name']} | {format_price(item['price_cents'])} | {item['day_of_week']} | {status} | {item['tags']}")
@@ -628,7 +628,7 @@ def parse_weekly_menu(raw: str) -> list[tuple[str, str]]:
 
 async def update_weekly_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_admin(tg_id(update)):
-        await update.effective_message.reply_text("Apenas administradores podem atualizar o cardapio semanal.")
+        await update.effective_message.reply_text("\U0001f512 Apenas administradores podem atualizar o cardapio semanal.")
         return
     text = update.effective_message.text or ""
     raw = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
@@ -642,16 +642,16 @@ async def update_weekly_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await context.bot.send_message(
                 chat_id=row["chat_id"],
                 text=(
-                    f"Ola, {escape(row['name'])}! Tem prato que aparece no seu historico/favoritos no cardapio desta semana:\n\n"
+                    f"\U0001f514 Ola, {escape(row['name'])}! Tem prato que aparece no seu historico/favoritos no cardapio desta semana:\n\n"
                     f"<b>{escape(row['dishes'])}</b>"
                 ),
                 parse_mode=ParseMode.HTML,
-                reply_markup=keyboard([[("Ver cardapio", "menu_today")]]),
+                reply_markup=keyboard([[("\U0001f957 Ver cardapio", "menu_today")]]),
             )
             notified += 1
         except Exception:
             logger.exception("Falha ao notificar cliente %s", row["telegram_id"])
-    await update.effective_message.reply_text(f"Cardapio semanal atualizado. Clientes notificados: {notified}.")
+    await update.effective_message.reply_text(f"\u2705 Cardapio semanal atualizado. Clientes notificados: {notified}.")
 
 
 async def handle_registration_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -660,7 +660,7 @@ async def handle_registration_message(update: Update, context: ContextTypes.DEFA
         return False
     text = (update.message.text or "").strip()
     if len(text) < 2:
-        await send_text(update, "Me envie uma resposta um pouco mais completa, por favor.", context)
+        await send_text(update, "Me envie uma resposta um pouco mais completa, por favor \U0001f60a", context)
         return True
     data = profile(context)
     if step == "name":
@@ -718,14 +718,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         last = context.user_data.get("last_order")
         if user_id and last:
             add_favorite_waitlist(user_id, last)
-            await send_text(update, "Combinado! Vou te avisar quando esse prato voltar ao cardapio.", context, main_buttons(), edit=True)
+            await send_text(update, "\u2705 Combinado! Vou te avisar quando esse prato voltar ao cardapio \U0001f514", context, main_buttons(), edit=True)
         else:
-            await send_text(update, "Escolha um prato primeiro para eu acompanhar.", context, main_buttons(), edit=True)
+            await send_text(update, "Escolha um prato primeiro para eu acompanhar \U0001f60a", context, main_buttons(), edit=True)
         return
     if data == "recommend":
-        await send_text(update, "Minha sugestao de hoje e ver o cardapio disponivel e escolher uma opcao alinhada ao seu cadastro.", context, [[("Ver cardapio", "menu_today")]], edit=True)
+        await send_text(update, "\u2b50 Minha sugestao de hoje e ver o cardapio disponivel e escolher uma opcao alinhada ao seu cadastro.", context, [[("\U0001f957 Ver cardapio", "menu_today")]], edit=True)
         return
-    await send_text(update, "Como posso ajudar?", context, main_buttons(), edit=True)
+    await send_text(update, "Como posso ajudar? \U0001f60a", context, main_buttons(), edit=True)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -750,7 +750,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     elif "historico" in text:
         await show_history(update, context)
     else:
-        await send_text(update, "Quer ver o cardapio ou acessar seu perfil?", context, main_buttons())
+        await send_text(update, "Quer ver o cardapio ou acessar seu perfil? \U0001f60a", context, main_buttons())
 
 
 def main() -> None:
