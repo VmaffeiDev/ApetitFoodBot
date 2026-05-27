@@ -52,6 +52,19 @@ class CoreLogicTest(unittest.TestCase):
 
         self.assertEqual(rows[0]["dish_key"], "soup")
 
+    def test_admin_report_counts_clients_orders_and_favorites(self):
+        user_id = 789
+        bot.save_client(user_id, 999, "Cliente Teste", "11999999999", "Centro", "Sem restricoes")
+        bot.record_order(user_id, "soup")
+        bot.add_favorite_waitlist(user_id, "soup")
+
+        report = bot.admin_report_data()
+
+        self.assertEqual(report["totals"]["clients"], 1)
+        self.assertEqual(report["totals"]["orders"], 1)
+        self.assertEqual(report["totals"]["favorites"], 1)
+        self.assertEqual(report["top"][0]["dish_name"], "Sopa de Lentilha")
+
 
 if __name__ == "__main__":
     unittest.main()
