@@ -83,7 +83,8 @@ def init_db() -> None:
                 telegram_id INTEGER PRIMARY KEY,
                 chat_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
-                company TEXT NOT NULL,
+                phone TEXT NOT NULL DEFAULT '',
+                address TEXT NOT NULL DEFAULT '',
                 restriction TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -117,6 +118,11 @@ def init_db() -> None:
             );
             """
         )
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(clients)").fetchall()}
+        if "phone" not in columns:
+            conn.execute("ALTER TABLE clients ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
+        if "address" not in columns:
+            conn.execute("ALTER TABLE clients ADD COLUMN address TEXT NOT NULL DEFAULT ''")
 
 
 def now_iso() -> str:
@@ -145,21 +151,50 @@ def load_client(telegram_id: int) -> sqlite3.Row | None:
         ).fetchone()
 
 
-def save_client(telegram_id: int, chat_id: int, name: str, company: str, restriction: str) -> None:
+def save_client(
+    telegram_id: int,
+    chat_id: int,
+    name: str,
+    phone: str,
+    address: str,
+    restriction: str,
+) -> None:
     timestamp = now_iso()
     with db() as conn:
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(clients)").fetchall()}
+        if "company" in columns:
+            conn.execute(
+                """
+                INSERT INTO clients (
+                    telegram_id, chat_id, name, company, phone, address, restriction, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(telegram_id) DO UPDATE SET
+                    chat_id = excluded.chat_id,
+                    name = excluded.name,
+                    company = excluded.company,
+                    phone = excluded.phone,
+                    address = excluded.address,
+                    restriction = excluded.restriction,
+                    updated_at = excluded.updated_at
+                """,
+                (telegram_id, chat_id, name, address, phone, address, restriction, timestamp, timestamp),
+            )
+            return
+
         conn.execute(
             """
-            INSERT INTO clients (telegram_id, chat_id, name, company, restriction, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO clients (telegram_id, chat_id, name, phone, address, restriction, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(telegram_id) DO UPDATE SET
                 chat_id = excluded.chat_id,
                 name = excluded.name,
-                company = excluded.company,
+                phone = excluded.phone,
+                address = excluded.address,
                 restriction = excluded.restriction,
                 updated_at = excluded.updated_at
             """,
-            (telegram_id, chat_id, name, company, restriction, timestamp, timestamp),
+            (telegram_id, chat_id, name, phone, address, restriction, timestamp, timestamp),
         )
 
 
@@ -289,7 +324,8 @@ def hydrate_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         {
             "telegram_id": client["telegram_id"],
             "name": client["name"],
-            "company": client["company"],
+            "phone": client["phone"],
+            "address": client["address"],
             "restriction": client["restriction"],
             "registered": True,
         }
@@ -325,7 +361,8 @@ def build_profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
     user_profile = profile(context)
     telegram_id_value = user_profile.get("telegram_id")
     name = escape(user_profile.get("name", user_name(context)))
-    company = escape(user_profile.get("company", "Nao informado"))
+    phone = escape(user_profile.get("phone", "Nao informado"))
+    address = escape(user_profile.get("address", "Nao informado"))
     restriction = escape(user_profile.get("restriction", "Nao informado"))
     favorites_text = "Ainda sem historico de pedidos."
     history_text = "Ainda sem pedidos registrados."
@@ -344,7 +381,8 @@ def build_profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
         "text": (
             f"\U0001f464 <b>Seu perfil:</b>\n\n"
             f"<b>Nome:</b> {name}\n"
-            f"<b>Empresa/setor:</b> {company}\n"
+            f"<b>Telefone:</b> {phone}\n"
+            f"<b>Endereco/bairro:</b> {address}\n"
             f"<b>Restricao alimentar:</b> {restriction}\n\n"
             f"<b>Mais pedidos:</b>\n{favorites_text}\n\n"
             f"<b>Historico recente:</b>\n{history_text}\n\n"
@@ -583,11 +621,20 @@ async def ask_registration_name(
     )
 
 
-async def ask_company(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    context.user_data[REGISTRATION_STEP] = "company"
+async def ask_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data[REGISTRATION_STEP] = "phone"
     await send_text(
         update,
-        "Obrigado, {name}! Agora me diga sua empresa, unidade ou setor.",
+        "Obrigado, {name}! Agora me envie seu telefone para contato.",
+        context,
+    )
+
+
+async def ask_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data[REGISTRATION_STEP] = "address"
+    await send_text(
+        update,
+        "Perfeito. Agora me informe seu endereco ou bairro de entrega.",
         context,
     )
 
@@ -620,7 +667,8 @@ async def finish_registration(
             user_id,
             current_chat_id,
             user_profile.get("name", DEFAULT_USER_NAME),
-            user_profile.get("company", "Nao informado"),
+            user_profile.get("phone", "Nao informado"),
+            user_profile.get("address", "Nao informado"),
             restriction,
         )
     context.user_data.pop(REGISTRATION_STEP, None)
@@ -630,7 +678,8 @@ async def finish_registration(
         (
             "\u2705 <b>Cadastro conclu\u00eddo!</b>\n\n"
             "<b>Nome:</b> {name}\n"
-            f"<b>Empresa/setor:</b> {escape(user_profile.get('company', 'Nao informado'))}\n"
+            f"<b>Telefone:</b> {escape(user_profile.get('phone', 'Nao informado'))}\n"
+            f"<b>Endereco/bairro:</b> {escape(user_profile.get('address', 'Nao informado'))}\n"
             f"<b>Restricao alimentar:</b> {escape(restriction)}\n\n"
             "Agora sim, posso te ajudar com o card\u00e1pio e seus pedidos."
         ),
@@ -739,11 +788,16 @@ async def handle_registration_message(update: Update, context: ContextTypes.DEFA
     user_profile = profile(context)
     if step == "name":
         user_profile["name"] = text
-        await ask_company(update, context)
+        await ask_phone(update, context)
         return True
 
-    if step == "company":
-        user_profile["company"] = text
+    if step == "phone":
+        user_profile["phone"] = text
+        await ask_address(update, context)
+        return True
+
+    if step == "address":
+        user_profile["address"] = text
         await ask_restriction(update, context)
         return True
 
