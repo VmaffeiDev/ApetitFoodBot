@@ -1,7 +1,10 @@
 import logging
 import os
+import sqlite3
 import unicodedata
+from datetime import date, datetime
 from html import escape
+from pathlib import Path
 
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -26,6 +29,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_USER_NAME = os.getenv("APETIT_USER_NAME", "Mariana")
 REGISTRATION_STEP = "registration_step"
+DB_PATH = Path(os.getenv("APETIT_DB_PATH", "apetit.db"))
+ADMIN_TELEGRAM_IDS = {
+    int(value.strip())
+    for value in os.getenv("ADMIN_TELEGRAM_IDS", "").split(",")
+    if value.strip().isdigit()
+}
 
 ORDER_ACTIONS = {
     "menu_today",
@@ -46,10 +55,207 @@ RESTRICTIONS = {
     "restriction_seafood": "Sem frutos do mar",
 }
 
+DISHES = {
+    "lasagna": "Lasanha de Legumes",
+    "fish": "Peixe Assado com Legumes",
+    "soup": "Sopa de Lentilha",
+}
+
+ORDER_CALLBACKS = set(DISHES)
+
 
 def normalize(text: str) -> str:
     without_accents = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     return without_accents.lower().strip()
+
+
+def db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db() -> None:
+    with db() as conn:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS clients (
+                telegram_id INTEGER PRIMARY KEY,
+                chat_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                company TEXT NOT NULL,
+                restriction TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                telegram_id INTEGER NOT NULL,
+                dish_key TEXT NOT NULL,
+                dish_name TEXT NOT NULL,
+                ordered_at TEXT NOT NULL,
+                FOREIGN KEY (telegram_id) REFERENCES clients (telegram_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS favorite_waitlist (
+                telegram_id INTEGER NOT NULL,
+                dish_key TEXT NOT NULL,
+                dish_name TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (telegram_id, dish_key),
+                FOREIGN KEY (telegram_id) REFERENCES clients (telegram_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS weekly_menu (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week_start TEXT NOT NULL,
+                dish_key TEXT NOT NULL,
+                dish_name TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE (week_start, dish_key)
+            );
+            """
+        )
+
+
+def now_iso() -> str:
+    return datetime.utcnow().isoformat(timespec="seconds")
+
+
+def dish_key_from_name(dish_name: str) -> str:
+    normalized = normalize(dish_name)
+    for key, name in DISHES.items():
+        if normalize(name) == normalized:
+            return key
+    return normalized.replace(" ", "_")[:64]
+
+
+def current_week_start() -> str:
+    today = date.today()
+    monday = today.fromordinal(today.toordinal() - today.weekday())
+    return monday.isoformat()
+
+
+def load_client(telegram_id: int) -> sqlite3.Row | None:
+    with db() as conn:
+        return conn.execute(
+            "SELECT * FROM clients WHERE telegram_id = ?",
+            (telegram_id,),
+        ).fetchone()
+
+
+def save_client(telegram_id: int, chat_id: int, name: str, company: str, restriction: str) -> None:
+    timestamp = now_iso()
+    with db() as conn:
+        conn.execute(
+            """
+            INSERT INTO clients (telegram_id, chat_id, name, company, restriction, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(telegram_id) DO UPDATE SET
+                chat_id = excluded.chat_id,
+                name = excluded.name,
+                company = excluded.company,
+                restriction = excluded.restriction,
+                updated_at = excluded.updated_at
+            """,
+            (telegram_id, chat_id, name, company, restriction, timestamp, timestamp),
+        )
+
+
+def record_order(telegram_id: int, dish_key: str) -> None:
+    dish_name = DISHES[dish_key]
+    with db() as conn:
+        conn.execute(
+            """
+            INSERT INTO orders (telegram_id, dish_key, dish_name, ordered_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (telegram_id, dish_key, dish_name, now_iso()),
+        )
+
+
+def add_favorite_waitlist(telegram_id: int, dish_key: str) -> None:
+    dish_name = DISHES[dish_key]
+    with db() as conn:
+        conn.execute(
+            """
+            INSERT INTO favorite_waitlist (telegram_id, dish_key, dish_name, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(telegram_id, dish_key) DO NOTHING
+            """,
+            (telegram_id, dish_key, dish_name, now_iso()),
+        )
+
+
+def top_dishes_for_client(telegram_id: int, limit: int = 3) -> list[sqlite3.Row]:
+    with db() as conn:
+        return conn.execute(
+            """
+            SELECT dish_key, dish_name, COUNT(*) AS total
+            FROM orders
+            WHERE telegram_id = ?
+            GROUP BY dish_key, dish_name
+            ORDER BY total DESC, MAX(ordered_at) DESC
+            LIMIT ?
+            """,
+            (telegram_id, limit),
+        ).fetchall()
+
+
+def recent_orders_for_client(telegram_id: int, limit: int = 5) -> list[sqlite3.Row]:
+    with db() as conn:
+        return conn.execute(
+            """
+            SELECT dish_name, ordered_at
+            FROM orders
+            WHERE telegram_id = ?
+            ORDER BY ordered_at DESC
+            LIMIT ?
+            """,
+            (telegram_id, limit),
+        ).fetchall()
+
+
+def save_weekly_menu(dishes: list[tuple[str, str]]) -> list[sqlite3.Row]:
+    week_start = current_week_start()
+    timestamp = now_iso()
+    with db() as conn:
+        for dish_key, dish_name in dishes:
+            conn.execute(
+                """
+                INSERT INTO weekly_menu (week_start, dish_key, dish_name, created_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(week_start, dish_key) DO UPDATE SET
+                    dish_name = excluded.dish_name,
+                    created_at = excluded.created_at
+                """,
+                (week_start, dish_key, dish_name, timestamp),
+            )
+
+        placeholders = ",".join("?" for _ in dishes)
+        if not placeholders:
+            return []
+
+        dish_keys = [dish_key for dish_key, _ in dishes]
+        return conn.execute(
+            f"""
+            SELECT c.telegram_id, c.chat_id, c.name, GROUP_CONCAT(wm.dish_name, ', ') AS dishes
+            FROM weekly_menu wm
+            JOIN (
+                SELECT telegram_id, dish_key FROM favorite_waitlist
+                UNION
+                SELECT telegram_id, dish_key
+                FROM orders
+                GROUP BY telegram_id, dish_key
+                HAVING COUNT(*) >= 2
+            ) interest ON interest.dish_key = wm.dish_key
+            JOIN clients c ON c.telegram_id = interest.telegram_id
+            WHERE wm.week_start = ? AND wm.dish_key IN ({placeholders})
+            GROUP BY c.telegram_id, c.chat_id, c.name
+            """,
+            (week_start, *dish_keys),
+        ).fetchall()
 
 
 def kb(rows: list[list[tuple[str, str]]]) -> InlineKeyboardMarkup:
@@ -60,6 +266,34 @@ def kb(rows: list[list[tuple[str, str]]]) -> InlineKeyboardMarkup:
 
 def profile(context: ContextTypes.DEFAULT_TYPE) -> dict:
     return context.user_data.setdefault("profile", {})
+
+
+def telegram_id(update: Update) -> int | None:
+    return update.effective_user.id if update.effective_user else None
+
+
+def chat_id(update: Update) -> int | None:
+    return update.effective_chat.id if update.effective_chat else None
+
+
+def hydrate_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = telegram_id(update)
+    if not user_id or profile(context).get("registered"):
+        return
+
+    client = load_client(user_id)
+    if not client:
+        return
+
+    profile(context).update(
+        {
+            "telegram_id": client["telegram_id"],
+            "name": client["name"],
+            "company": client["company"],
+            "restriction": client["restriction"],
+            "registered": True,
+        }
+    )
 
 
 def is_registered(context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -89,9 +323,22 @@ def registration_restriction_buttons() -> list[list[tuple[str, str]]]:
 
 def build_profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
     user_profile = profile(context)
+    telegram_id_value = user_profile.get("telegram_id")
     name = escape(user_profile.get("name", user_name(context)))
     company = escape(user_profile.get("company", "Nao informado"))
     restriction = escape(user_profile.get("restriction", "Nao informado"))
+    favorites_text = "Ainda sem historico de pedidos."
+    history_text = "Ainda sem pedidos registrados."
+
+    if telegram_id_value:
+        top_dishes = top_dishes_for_client(telegram_id_value)
+        recent_orders = recent_orders_for_client(telegram_id_value)
+        if top_dishes:
+            favorites_text = "\n".join(
+                f"- {escape(row['dish_name'])}: {row['total']} pedido(s)" for row in top_dishes
+            )
+        if recent_orders:
+            history_text = "\n".join(f"- {escape(row['dish_name'])}" for row in recent_orders)
 
     return {
         "text": (
@@ -99,6 +346,8 @@ def build_profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
             f"<b>Nome:</b> {name}\n"
             f"<b>Empresa/setor:</b> {company}\n"
             f"<b>Restricao alimentar:</b> {restriction}\n\n"
+            f"<b>Mais pedidos:</b>\n{favorites_text}\n\n"
+            f"<b>Historico recente:</b>\n{history_text}\n\n"
             "Posso atualizar alguma informacao?"
         ),
         "buttons": [[("\u270f\ufe0f Atualizar cadastro", "restart_registration"), ("\u2705 Esta correto", "thanks")]],
@@ -193,7 +442,10 @@ RESPONSES = {
             "Combina\u00e7\u00e3o perfeita para voc\u00ea!\n\n"
             "Pedido registrado para <b>{name}</b>. Bom apetite \U0001f60a"
         ),
-        "buttons": [[("\u2b50 Avaliar depois", "rate_later"), ("\U0001f514 Me lembrar amanh\u00e3", "remind_tomorrow")]],
+        "buttons": [
+            [("\u2b50 Avaliar depois", "rate_later"), ("\U0001f514 Me lembrar amanh\u00e3", "remind_tomorrow")],
+            [("\U0001f514 Me avise quando voltar", "favorite_last_order")],
+        ],
     },
     "fish": {
         "text": (
@@ -201,7 +453,7 @@ RESPONSES = {
             "O <b>Peixe Assado</b> \u00e9 rico em \u00f4mega-3 e vai te deixar com energia para a tarde toda.\n\n"
             "Pedido registrado. Bom almo\u00e7o! \U0001f60a"
         ),
-        "buttons": [[("\u2b50 Avaliar depois", "rate_later")]],
+        "buttons": [[("\u2b50 Avaliar depois", "rate_later"), ("\U0001f514 Me avise quando voltar", "favorite_last_order")]],
     },
     "soup": {
         "text": (
@@ -209,7 +461,7 @@ RESPONSES = {
             "Uma escolha leve e equilibrada!\n\n"
             "Pedido registrado. Bom almo\u00e7o \U0001f60a"
         ),
-        "buttons": [[("\u2b50 Avaliar depois", "rate_later")]],
+        "buttons": [[("\u2b50 Avaliar depois", "rate_later"), ("\U0001f514 Me avise quando voltar", "favorite_last_order")]],
     },
     "diet_fit": {
         "text": (
@@ -257,6 +509,13 @@ RESPONSES = {
             "\u00c9 sempre bom saber que nosso trabalho faz diferen\u00e7a no seu dia \U0001f33f"
         ),
         "buttons": [[("\U0001f957 Ver card\u00e1pio de hoje", "menu_today")]],
+    },
+    "favorite_saved": {
+        "text": (
+            "\u2705 Combinado! Registrei esse prato como favorito.\n\n"
+            "Quando ele aparecer em uma nova atualiza\u00e7\u00e3o do card\u00e1pio semanal, eu te aviso por aqui \U0001f514"
+        ),
+        "buttons": [[("\U0001f957 Ver card\u00e1pio", "menu_today")]],
     },
     "update_profile": {
         "text": "\u270f\ufe0f Vamos atualizar seu cadastro. Para come\u00e7ar, qual \u00e9 o seu nome completo?",
@@ -350,8 +609,20 @@ async def finish_registration(
     edit: bool = False,
 ) -> None:
     user_profile = profile(context)
+    user_id = telegram_id(update)
+    current_chat_id = chat_id(update)
     user_profile["restriction"] = restriction
     user_profile["registered"] = True
+    if user_id:
+        user_profile["telegram_id"] = user_id
+    if user_id and current_chat_id:
+        save_client(
+            user_id,
+            current_chat_id,
+            user_profile.get("name", DEFAULT_USER_NAME),
+            user_profile.get("company", "Nao informado"),
+            restriction,
+        )
     context.user_data.pop(REGISTRATION_STEP, None)
 
     await send_text(
@@ -370,6 +641,7 @@ async def finish_registration(
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    hydrate_profile(update, context)
     if is_registered(context):
         await send_payload(update, FLOWS["start"], context)
         return
@@ -379,6 +651,79 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def reset_registration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
     await ask_registration_name(update, context)
+
+
+async def show_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    hydrate_profile(update, context)
+    user_id = telegram_id(update)
+    if not user_id or not is_registered(context):
+        await ask_registration_name(update, context)
+        return
+
+    recent_orders = recent_orders_for_client(user_id, limit=10)
+    if not recent_orders:
+        await send_text(update, "Voce ainda nao tem pedidos registrados.", context, FLOWS["start"]["buttons"])
+        return
+
+    lines = "\n".join(f"- {escape(row['dish_name'])}" for row in recent_orders)
+    await send_text(
+        update,
+        f"\U0001f4cb <b>Seu historico de pedidos:</b>\n\n{lines}",
+        context,
+        FLOWS["start"]["buttons"],
+    )
+
+
+def parse_weekly_menu(raw_text: str) -> list[tuple[str, str]]:
+    dishes = []
+    for line in raw_text.splitlines():
+        dish_name = line.strip(" -\t")
+        if not dish_name:
+            continue
+        dishes.append((dish_key_from_name(dish_name), dish_name))
+    return dishes
+
+
+async def update_weekly_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = telegram_id(update)
+    if ADMIN_TELEGRAM_IDS and user_id not in ADMIN_TELEGRAM_IDS:
+        await update.effective_message.reply_text("Apenas administradores podem atualizar o cardapio semanal.")
+        return
+
+    message_text = update.effective_message.text or ""
+    parts = message_text.split(maxsplit=1)
+    raw_text = parts[1].strip() if len(parts) > 1 else ""
+    if not raw_text:
+        await update.effective_message.reply_text(
+            "Envie assim:\n\n"
+            "/cardapio_semana Lasanha de Legumes\n"
+            "Peixe Assado com Legumes\n"
+            "Sopa de Lentilha"
+        )
+        return
+
+    dishes = parse_weekly_menu(raw_text)
+    matches = save_weekly_menu(dishes)
+    notified = 0
+    for row in matches:
+        try:
+            await context.bot.send_message(
+                chat_id=row["chat_id"],
+                text=(
+                    f"\U0001f514 Oi, {escape(row['name'])}! "
+                    f"Tem prato que aparece no seu historico/favoritos no cardapio desta semana:\n\n"
+                    f"<b>{escape(row['dishes'])}</b>"
+                ),
+                parse_mode=ParseMode.HTML,
+                reply_markup=kb([[("\U0001f957 Ver cardapio", "menu_today")]]),
+            )
+            notified += 1
+        except Exception:
+            logger.exception("Falha ao notificar cliente %s", row["telegram_id"])
+
+    await update.effective_message.reply_text(
+        f"Cardapio semanal atualizado com {len(dishes)} prato(s). Clientes notificados: {notified}."
+    )
 
 
 async def handle_registration_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -407,6 +752,7 @@ async def handle_registration_message(update: Update, context: ContextTypes.DEFA
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    hydrate_profile(update, context)
     query = update.callback_query
     await query.answer()
 
@@ -417,6 +763,22 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if query.data in RESTRICTIONS:
         await finish_registration(update, context, RESTRICTIONS[query.data], edit=True)
+        return
+
+    if query.data in {"favorite_last_order", "notify_me"}:
+        last_order = context.user_data.get("last_order")
+        user_id = telegram_id(update)
+        if last_order and user_id:
+            add_favorite_waitlist(user_id, last_order)
+            await send_payload(update, RESPONSES["favorite_saved"], context, edit=True)
+        else:
+            await send_text(
+                update,
+                "Me diga primeiro qual prato voce quer acompanhar, escolhendo uma opcao do cardapio.",
+                context,
+                FLOWS["start"]["buttons"],
+                edit=True,
+            )
         return
 
     if query.data == "profile":
@@ -430,6 +792,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await ask_registration_name(update, context, edit=True)
         return
 
+    if query.data in ORDER_CALLBACKS:
+        user_id = telegram_id(update)
+        if user_id:
+            record_order(user_id, query.data)
+            context.user_data["last_order"] = query.data
+
     payload = RESPONSES.get(query.data) or FLOWS.get(query.data)
     if not payload:
         payload = {
@@ -441,6 +809,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    hydrate_profile(update, context)
     if await handle_registration_message(update, context):
         return
 
@@ -452,6 +821,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if any(term in text for term in ["sem carne", "vegetariano", "vegetariana"]):
         await send_payload(update, FLOWS["no_meat"], context)
+    elif "lasanha" in text:
+        user_id = telegram_id(update)
+        if user_id:
+            record_order(user_id, "lasagna")
+            context.user_data["last_order"] = "lasagna"
+        await send_payload(update, RESPONSES["lasagna"], context)
+    elif "peixe" in text:
+        user_id = telegram_id(update)
+        if user_id:
+            record_order(user_id, "fish")
+            context.user_data["last_order"] = "fish"
+        await send_payload(update, RESPONSES["fish"], context)
+    elif "sopa" in text:
+        user_id = telegram_id(update)
+        if user_id:
+            record_order(user_id, "soup")
+            context.user_data["last_order"] = "soup"
+        await send_payload(update, RESPONSES["soup"], context)
     elif any(term in text for term in ["recomenda", "sugere", "melhor opcao"]):
         await send_payload(update, FLOWS["recommend"], context)
     elif any(term in text for term in ["fria", "frio", "ruim", "reclamacao", "problema"]):
@@ -484,9 +871,13 @@ def main() -> None:
     if not token:
         raise RuntimeError("Defina TELEGRAM_BOT_TOKEN no arquivo .env antes de iniciar o bot.")
 
+    init_db()
+
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("recadastrar", reset_registration))
+    app.add_handler(CommandHandler("historico", show_history))
+    app.add_handler(CommandHandler("cardapio_semana", update_weekly_menu))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
