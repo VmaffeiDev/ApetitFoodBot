@@ -3,6 +3,7 @@
 MVP de bot Telegram da Apetit com fluxos inspirados no simulador HTML:
 
 - boas-vindas com `/start`
+- cadastro obrigatorio antes de pedidos
 - cardapio do dia
 - cardapio sem carne
 - recomendacao inteligente
@@ -42,6 +43,13 @@ No Telegram, abra o bot e envie:
 
 ```text
 /start
+```
+
+O bot vai pedir nome, empresa/setor e restricao alimentar antes de liberar cardapio, recomendacoes ou pedidos.
+Para refazer o cadastro, envie:
+
+```text
+/recadastrar
 ```
 
 ## Exemplos de frases
