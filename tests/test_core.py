@@ -26,59 +26,78 @@ class CoreLogicTest(unittest.TestCase):
         except PermissionError:
             pass
 
-    def test_price_to_cents_accepts_brazilian_format(self):
-        self.assertEqual(bot.price_to_cents("R$ 29,90"), 2990)
-        self.assertEqual(bot.format_price(2990), "R$ 29,90")
+    def test_cotton_menu_seeds_22_business_days(self):
+        with closing(sqlite3.connect(bot.DB_PATH)) as conn:
+            total = conn.execute("SELECT COUNT(DISTINCT menu_day) FROM daily_menu_components").fetchone()[0]
+            incomplete = conn.execute(
+                """
+                SELECT menu_day
+                FROM daily_menu_components
+                GROUP BY menu_day
+                HAVING COUNT(*) <> 14
+                """
+            ).fetchall()
+
+        self.assertEqual(total, 22)
+        self.assertEqual(incomplete, [])
+        self.assertEqual(len(bot.list_daily_menu("01/09")), 14)
 
     def test_http_client_logs_do_not_expose_bot_token_at_info_level(self):
         self.assertGreaterEqual(logging.getLogger("httpx").level, logging.WARNING)
         self.assertGreaterEqual(logging.getLogger("httpcore").level, logging.WARNING)
 
-    def test_restriction_conflict_blocks_unsafe_items(self):
-        fish = bot.load_menu_item("fish")
-        lasagna = bot.load_menu_item("lasagna")
+    def test_menu_payload_has_full_meal_without_price_or_purchase(self):
+        payload = bot.menu_payload(menu_date="01/09", restriction="Sem restricoes")
 
-        self.assertEqual(bot.restriction_conflict("Vegetariana", fish), "nao esta marcado como vegetariano")
-        self.assertEqual(bot.restriction_conflict("Sem lactose", lasagna), "contem lactose ou derivados de leite")
-        self.assertIsNone(bot.restriction_conflict("Sem gluten", lasagna))
+        self.assertIn("Strogonoff de carne", payload["text"])
+        self.assertIn("Farofa brasileira", payload["text"])
+        self.assertIn("nao ha pagamento", payload["text"])
+        self.assertNotIn("R$", payload["text"])
+        self.assertNotIn("Pedir", str(payload["buttons"]))
 
-    def test_recommendation_respects_restriction_and_history(self):
-        user_id = 123
-        bot.record_order(user_id, "fish")
-        bot.record_order(user_id, "fish")
-        bot.record_order(user_id, "lasagna")
+    def test_vegetarian_recommendation_uses_egg_option(self):
+        recommended = bot.recommend_daily_component("01/09", "Vegetariana", "Manter equilibrio")
 
-        recommended = bot.recommend_item(user_id, "Vegetariana", "Manter equilibrio")
-
-        self.assertEqual(recommended["dish_key"], "lasagna")
+        self.assertEqual(recommended["category"], "main_option")
+        self.assertEqual(recommended["item_name"], "Ovo cozido - 1")
 
     def test_recommendation_uses_employee_goal(self):
-        recommended = bot.recommend_item(None, "Sem restricoes", "Ganhar massa")
+        recommended = bot.recommend_daily_component("01/09", "Sem restricoes", "Ganhar massa")
 
-        self.assertGreater(bot.goal_score("Ganhar massa", recommended), 0)
-        self.assertIn("proteico", bot.item_search_text(recommended))
+        self.assertEqual(recommended["item_name"], "Bife suino ao molho barbecue")
+        self.assertEqual(recommended["protein_grams"], 37)
 
-    def test_recent_orders_include_keys_for_recommendation_flow(self):
+    def test_meal_selection_is_upserted_per_employee_and_day(self):
         user_id = 456
-        bot.record_order(user_id, "soup")
+        bot.record_meal_selection(user_id, "01/09", "main_1")
+        bot.record_meal_selection(user_id, "01/09", "main_option")
 
-        rows = bot.recent_orders(user_id)
+        rows = bot.recent_meals(user_id)
 
-        self.assertEqual(rows[0]["dish_key"], "soup")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["item_name"], "Ovo cozido - 1")
 
-    def test_admin_report_counts_employees_orders_and_favorites(self):
+    def test_admin_can_update_daily_component_without_price(self):
+        bot.upsert_daily_menu_component("01/09", "main_1", "Prato ajustado", 180, 25)
+
+        component = bot.load_daily_menu_component("01/09", "main_1")
+
+        self.assertEqual(component["item_name"], "Prato ajustado")
+        self.assertEqual(component["calories"], 180)
+        self.assertNotIn("price", component.keys())
+
+    def test_admin_report_counts_employees_meals_and_menu_days(self):
         user_id = 789
         bot.save_employee(user_id, 999, "Colaborador Teste", "", "", "Sem restricoes", "Perder peso", company="Empresa A", department="Operacoes")
-        bot.record_order(user_id, "soup")
-        bot.add_favorite_waitlist(user_id, "soup")
+        bot.record_meal_selection(user_id, "01/09", "main_1")
 
         report = bot.admin_report_data()
 
         self.assertEqual(report["totals"]["employees"], 1)
-        self.assertEqual(report["totals"]["orders"], 1)
-        self.assertEqual(report["totals"]["favorites"], 1)
+        self.assertEqual(report["totals"]["meals"], 1)
+        self.assertEqual(report["totals"]["menu_days"], 22)
         self.assertEqual(report["goals"][0]["goal"], "Perder peso")
-        self.assertEqual(report["top"][0]["dish_name"], "Sopa de Lentilha")
+        self.assertEqual(report["top"][0]["item_name"], "Strogonoff de carne")
 
     def test_employee_consent_is_stored_with_timestamp(self):
         user_id = 987
@@ -108,13 +127,13 @@ class CoreLogicTest(unittest.TestCase):
     def test_delete_employee_data_removes_profile_history_and_favorites(self):
         user_id = 654
         bot.save_employee(user_id, 999, "Colaborador Delete", "", "", "Sem restricoes", "Perder peso", company="Empresa A", department="Operacoes")
-        bot.record_order(user_id, "soup")
+        bot.record_meal_selection(user_id, "01/09", "main_1")
         bot.add_favorite_waitlist(user_id, "soup")
 
         bot.delete_employee_data(user_id)
 
         self.assertIsNone(bot.load_employee(user_id))
-        self.assertEqual(bot.recent_orders(user_id), [])
+        self.assertEqual(bot.recent_meals(user_id), [])
         self.assertEqual(bot.favorite_items(user_id), [])
 
     def test_init_db_migrates_legacy_client_schema(self):
@@ -213,18 +232,11 @@ class CoreLogicTest(unittest.TestCase):
         self.assertIsNone(bot.load_nutrition_profile(user_id))
         self.assertEqual(bot.gamification_summary(user_id)["points"], 0)
 
-    def test_menu_exposes_nutrition_traffic_light(self):
-        payload = bot.menu_payload(restriction="Sem restricoes", goal="Ganhar massa")
-
-        self.assertIn("Semaforo:", payload["text"])
-        self.assertIn("Boa aderencia", payload["text"])
-
-    def test_order_gamification_requires_nutrition_consent(self):
+    def test_meal_gamification_requires_nutrition_consent(self):
         user_id = 963
-        context = SimpleNamespace(user_data={"nutrition_recommendation": "soup"})
-        item = bot.load_menu_item("soup")
+        context = SimpleNamespace(user_data={"nutrition_recommendation": "09-01:main_1"})
 
-        awards = bot.award_order_gamification(user_id, item, context)
+        awards = bot.award_meal_gamification(user_id, "01/09", "main_1", context)
 
         self.assertEqual(awards, [])
         self.assertEqual(bot.gamification_summary(user_id)["points"], 0)

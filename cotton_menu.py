@@ -1,0 +1,222 @@
+"""Cardapio mensal Cotton transcrito do PDF fornecido pela operacao.
+
+As datas sao recorrentes (mes-dia), pois o documento nao informa o ano.
+Cada item traz kcal e, quando disponivel no documento, proteina em gramas.
+"""
+
+MENU_LABEL = "Cotton - Setembro"
+
+DAYS = (
+    "09-01", "09-02", "09-03", "09-04", "09-05",
+    "09-08", "09-09", "09-10", "09-11", "09-12",
+    "09-15", "09-16", "09-17", "09-18", "09-19",
+    "09-22", "09-23", "09-24", "09-25", "09-26",
+    "09-29", "09-30",
+)
+
+CATEGORY_LABELS = {
+    "main_1": "Prato principal 1",
+    "main_2": "Prato principal 2",
+    "main_option": "Opcao ao prato principal",
+    "side_1": "Guarnicao 1",
+    "side_2": "Guarnicao 2",
+    "salad_1": "Salada 1",
+    "salad_2": "Salada 2",
+    "salad_3": "Salada 3",
+    "dessert": "Sobremesa",
+    "fruit": "Fruta",
+    "rice_1": "Arroz 1",
+    "rice_2": "Arroz 2",
+    "beans": "Feijao",
+    "drink": "Bebida",
+}
+
+# Tuplas: (nome, kcal, proteina_g). Valores ausentes no PDF sao None.
+COLUMNS = {
+    "main_1": (
+        ("Strogonoff de carne", 134, 12),
+        ("File de frango grelhado", 150, 32),
+        ("File de frango ao molho de mostarda", 124, 26),
+        ("File de peixe a milanesa", 210, 17),
+        ("Posta assada ao molho escuro", 192, 6.7),
+        ("File de frango a pomodoro", 127, 25),
+        ("Bife suino ao molho barbecue", 215, 37),
+        ("Bife de panela", 145, 21),
+        ("Strogonoff de frango", 152, 18),
+        ("Feijoada", 131, 9.6),
+        ("Iscas suina a milanesa", 268, 19),
+        ("Linguica toscana assada", 267, 20),
+        ("Carne moida com batata", 169, 19),
+        ("File de frango a pomodoro", 127, 25),
+        ("File de frango grelhado", 150, 32),
+        ("Carne moida com batata", 169, 19),
+        ("Fricasse de frango com batata palha", 143, 15),
+        ("Strogonoff de carne", 134, 12),
+        ("File de frango ao bechamel", 125, 21),
+        ("Bife de panela", 145, 21),
+        ("Strogonoff de carne", 134, 12),
+        ("Frango ao sugo", 101, 20),
+    ),
+    "main_2": (
+        ("Bife suino ao molho barbecue", 215, 37),
+        ("Picado misto", None, None),
+        ("Cubos de pernil acebolado", 202, 26),
+        ("File de frango ao sugo", 101, 20),
+        ("File de frango a milanesa", 284, 26),
+        ("Iscas suinas acebolada", 209, 22),
+        ("Strogonoff de carne", 151, 14),
+        ("Linguica calabresa grelhada", 294, 15),
+        ("Bolinho de carne", 245, 30),
+        ("File de frango acebolado", 161, 30),
+        ("Frango ao sugo", 101, 20),
+        ("Bife de panela", 145, 21),
+        ("Bife de pernil a milanesa", 268, 19),
+        ("Iscas de figado acebolado", 154, 17),
+        ("Cupim assado ao molho escuro", 281, 23),
+        ("Frango ao sugo", 101, 20),
+        ("Posta branca assada", 172, 25),
+        ("Frango assado", 252, 29),
+        ("Cubos de pernil com batata", None, None),
+        ("File de frango acebolado", 161, 30),
+        ("Bife suino ao molho barbecue", 215, 37),
+        ("Bolinho de carne", 245, 30),
+    ),
+    "main_option": tuple(
+        ("Ovo cozido - 1", 62, 10) if index % 2 == 0 else ("Ovo frito - 1", 116, 7.8)
+        for index in range(22)
+    ),
+    "side_1": (
+        ("Macarrao espaguete alho e oleo", 126, 2.5),
+        ("Pure de batata", 27.2, 0.7),
+        ("Abobora a chinesa", 32, 0.7),
+        ("Macarrao parafuso gratinado", 103, 4.4),
+        ("Macarrao espaguete com ervas", 40.4, 1.5),
+        ("Farofa caseira", 196, 1),
+        ("Macarrao espaguete alho e oleo", 72, 1.5),
+        ("Polenta cremosa", 41, 0.9),
+        ("Batata doce assada", 144, 2.2),
+        ("Batata palito frita", 248, 4),
+        ("Cuscuz de milho", 43, 0.9),
+        ("Tutu de feijao", 61, 3),
+        ("Batata rustica", 53, 0.7),
+        ("Macarrao espaguete alho e oleo", 126, 2.5),
+        ("Farofa caseira", 196, 1),
+        ("Macarrao espaguete alho e oleo", 126, 2.5),
+        ("Polenta cremosa", 41, 0.9),
+        ("Macarrao alho e oleo", 126, 2.5),
+        ("Macarrao espaguete ao molho branco", 111, 3),
+        ("Batata frita", 248, 4),
+        ("Pure de batata", 27.2, 0.7),
+        ("Macarrao espaguete a bolonhesa", 86, 3.1),
+    ),
+    "side_2": (
+        ("Farofa brasileira", 195, 2.8), ("Canja", 26, 3),
+        ("Risoto de calabresa", 132, 5.2), ("Batata bolinha corada", 67, 1.3),
+        ("Farofa caseira", 196, 1), ("Creme de milho", 62, 1.9),
+        ("Batata palha", 135, 1.4), ("Bolinho de arroz", 101, 2.6),
+        ("Macarrao parafuso gratinado", 62, 3.3), ("Macarrao espaguete alho e oleo", 72, 1.5),
+        ("Pure de batata", 27.2, 0.7), ("Mandioca ao alho", 127, 0.4),
+        ("Polenta ao sugo", 35.5, 0.9), ("Creme de milho", 62, 1.9),
+        ("Macarrao espaguete com ervas", 40.4, 1.5), ("Cuscuz de milho", 87, 1.7),
+        ("Sopa creme de abobora com calabresa", 44, 7.6), ("Batata palha", 135, 1.4),
+        ("Farofa brasileira", 195, 2.8), ("Arroz carreteiro", None, None),
+        ("Farofa brasileira", 195, 2.8), ("Sopa de legumes", 6, 0.6),
+    ),
+    "salad_1": (
+        ("Mix de alface", 4, 0.5), ("Mix de alface", 4, 0.5),
+        ("Mix de alface", 4, 0.5), ("Mix de alface", 4, 0.5),
+        ("Alface com manga", 4, 0.5), ("Folhas verdes", 4, 0.5),
+        ("Folhas verdes", 4, 0.5), ("Mix de alface", 4, 0.5),
+        ("Mix de alface", 4, 0.5), ("Alface", 10.4, 0.1),
+        ("Mix de alface", 4, 0.5), ("Mix de alface", 4, 0.5),
+        ("Mix de alface", 4, 0.5), ("Mix de alface", 4, 0.5),
+        ("Mix de alface", 4, 0.5), ("Mix de alface", 4, 0.5),
+        ("Mix de alface", 4, 0.5), ("Mix de alface", 4, 0.5),
+        ("Mix de alface", 4, 0.5), ("Mix de alface", 4, 0.5),
+        ("Mix de alface", 4, 0.5), ("Mix de alface", 4, 0.5),
+    ),
+    "salad_2": (
+        ("Cenoura cozida", 6.8, 0.2), ("Grao de bico com vinagrete", 51, 3.4),
+        ("Pepino com tomate", 4, 0.3), ("Feijao fradinho com vinagrete", 36.4, 2),
+        ("Batata com maionese", 64.8, 0.7), ("Repolho refogado", 14, 0.4),
+        ("Cenoura ralada", 12.4, 0.4), ("Nabo com vinagrete", 23, 0.5),
+        ("Soja ao vinagrete", 46, 3.1), ("Repolho refogado", 14, 0.4),
+        ("Cenoura cozida", 12.4, 0.4), ("Feijao fradinho com vinagrete", 36.4, 2),
+        ("Soja ao vinagrete", 48.8, 4.1), ("Beterraba ralada", 18.4, 0.8),
+        ("Batata com maionese", 64.8, 0.7), ("Feijao fradinho", 38.8, 1.9),
+        ("Grao de bico com vinagrete", 51, 3.4), ("Feijao branco com vinagrete", 56, 3.2),
+        ("Chuchu com brocolis", 8, 0.5), ("Soja ao vinagrete", 46, 3.1),
+        ("Cenoura cozida", 6.8, 0.2), ("Grao de bico com vinagrete", 51, 3.4),
+    ),
+    "salad_3": (
+        ("Nabo", 7, 0.4), ("Beterraba ralada", 18.4, 0.8),
+        ("Cenoura ralada", 12.4, 0.4), ("Repolho agridoce", 8, 0.6),
+        ("Vinagrete", 40, 0.4), ("Pepino", 4, 0.3),
+        ("Abobrinha a brasileira", 16.5, 1.3), ("Beterraba cozida", 10.8, 0.5),
+        ("Cenoura cozida", 6.8, 0.2), ("Vinagrete", 40, 0.4),
+        ("Pepino com tomate", 4, 0.3), ("Beterraba cozida", 10.8, 0.5),
+        ("Cenoura ralada", 12.4, 0.4), ("Abobrinha", 16.5, 1.3),
+        ("Vinagrete", 40, 0.4), ("Repolho refogado", 14, 0.4),
+        ("Pepino chines", 4, 0), ("Abobrinha", 16.5, 1.3),
+        ("Cenoura ralada", 12.4, 0.4), ("Vinagrete", 40, 0.4),
+        ("Nabo", 7, 0.4), ("Beterraba ralada", 18.4, 0.8),
+    ),
+    "dessert": (
+        ("Geleia de goma", 65.4, 0.9), ("Pudim de baunilha com calda de caramelo", 375, 1.6),
+        ("Pudim de baunilha com calda de abacaxi ao vinho", 355, 0.4),
+        ("Pudim de baunilha com calda de abacaxi ao vinho", 355, 0.4),
+        ("Gelatina de framboesa com creme", 182, 3.9), ("Pacoca rolha", 96, 2.8),
+        ("Sagu de leite", 122, 0), ("Canjica com coco", 113, 2.4),
+        ("Pudim de baunilha com calda de abacaxi ao vinho", 355, 0.4),
+        ("Pudim de chocolate com calda", 378, 2.4), ("Geleia de goma", 65.4, 0.9),
+        ("Gelatina de abacaxi com creme", 182, 3.9), ("Geleia de goma", 65.4, 0.9),
+        ("Sagu de uva com creme", 116, 0), ("Canjica com coco", 113, 2.4),
+        ("Pacoca rolha", 96, 2.8),
+        ("Pudim de baunilha com calda de abacaxi ao vinho", 355, 0.4),
+        ("Gelatina de abacaxi com creme", 182, 3.9),
+        ("Pudim de chocolate com calda", 378, 2.4), ("Canjica com coco", 113, 2.4),
+        ("Geleia de goma", 65.4, 0.9), ("Pudim de baunilha com calda de caramelo", 375, 1.6),
+    ),
+    "fruit": (
+        ("Laranja lima", 43, 1), ("Cubos de maca", 59, 0.3),
+        ("Cubos de abacaxi refrescante", 50, 0.7), ("Banana", 91, 1.3),
+        ("Mamao", 47, 0.8), ("Cubos de abacaxi refrescante", 50, 0.7),
+        ("Cubos de laranja", 37, 0.9), ("Banana", 91, 1.3),
+        ("Cubos de maca", 59, 0.3), ("Cubos de melao", 24, 0.6),
+        ("Cubos de melancia", 29, 0.7), ("Abacaxi", 50, 0.7),
+        ("Laranja", 37, 0.9), ("Banana", 91, 1.3),
+        ("Mamao com laranja", 42, 0.8), ("Laranja lima", 43, 1),
+        ("Abacaxi", 50, 0.7), ("Melancia", 29, 0.7),
+        ("Banana", 91, 1.3), ("Melao", 24, 0.6),
+        ("Laranja lima", 43, 1), ("Cubos de maca", 59, 0.3),
+    ),
+    "beans": (
+        ("Feijao preto", 29.2, 1.8), ("Feijao carioca", 31.6, 1.9),
+        ("Feijao preto", 29.2, 1.8), ("Feijao preto", 29.2, 1.8),
+        ("Feijao carioca - mix", 31.6, 1.9), ("Feijao preto", 29.2, 1.8),
+        ("Feijao carioca - mix", 31.6, 1.9), ("Feijao preto", 29.2, 1.8),
+        ("Feijao preto", 29.2, 1.8), ("Feijao carioca - mix", 31.6, 1.9),
+        ("Feijao carioca - mix", 31.6, 1.9), ("Feijao preto", 29.2, 1.8),
+        ("Feijao carioca - mix", 31.6, 1.9), ("Feijao preto", 29.2, 1.8),
+        ("Feijao preto", 29.2, 1.8), ("Feijao carioca - mix", 31.6, 1.9),
+        ("Feijao preto", 29.2, 1.8), ("Feijao carioca - mix", 31.6, 1.9),
+        ("Feijao preto", 29.2, 1.8), ("Feijao preto", 29.2, 1.8),
+        ("Feijao preto", 29.2, 1.8), ("Feijao carioca", 31.6, 1.9),
+    ),
+}
+
+REPEATED_COMPONENTS = (
+    ("rice_1", "Arroz parboilizado", 138, 2.4),
+    ("rice_2", "Arroz integral", 46.4, 0.9),
+    ("drink", "Refresco", 14.4, 0.2),
+)
+
+
+def iter_components():
+    """Entrega os componentes normalizados para carga no SQLite."""
+    for index, menu_day in enumerate(DAYS):
+        for category, values in COLUMNS.items():
+            name, calories, protein = values[index]
+            yield menu_day, category, name, calories, protein
+        for category, name, calories, protein in REPEATED_COMPONENTS:
+            yield menu_day, category, name, calories, protein

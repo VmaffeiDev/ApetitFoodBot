@@ -21,6 +21,7 @@ from telegram.ext import (
 )
 
 import nutrition
+import cotton_menu
 
 load_dotenv()
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
@@ -125,6 +126,25 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 UNIQUE (week_start, dish_key)
             );
+            CREATE TABLE IF NOT EXISTS daily_menu_components (
+                menu_day TEXT NOT NULL,
+                category TEXT NOT NULL,
+                item_name TEXT NOT NULL,
+                calories REAL,
+                protein_grams REAL,
+                menu_label TEXT NOT NULL,
+                source TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (menu_day, category)
+            );
+            CREATE TABLE IF NOT EXISTS meal_selections (
+                telegram_id INTEGER NOT NULL,
+                menu_day TEXT NOT NULL,
+                category TEXT NOT NULL,
+                item_name TEXT NOT NULL,
+                selected_at TEXT NOT NULL,
+                PRIMARY KEY (telegram_id, menu_day)
+            );
             CREATE TABLE IF NOT EXISTS menu_items (
                 dish_key TEXT PRIMARY KEY,
                 dish_name TEXT NOT NULL,
@@ -199,6 +219,30 @@ def init_db() -> None:
         if "consented_at" not in nutrition_columns:
             conn.execute("ALTER TABLE nutrition_profiles ADD COLUMN consented_at TEXT NOT NULL DEFAULT ''")
         seed_default_menu(conn)
+        seed_cotton_menu(conn)
+
+
+def seed_cotton_menu(conn: sqlite3.Connection) -> None:
+    timestamp = now_iso()
+    for menu_day, category, item_name, calories, protein_grams in cotton_menu.iter_components():
+        conn.execute(
+            """
+            INSERT INTO daily_menu_components (
+                menu_day, category, item_name, calories, protein_grams, menu_label, source, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(menu_day, category) DO NOTHING
+            """,
+            (
+                menu_day,
+                category,
+                item_name,
+                calories,
+                protein_grams,
+                cotton_menu.MENU_LABEL,
+                "Cardapio_Cotton_Setembro kcal-1.pdf",
+                timestamp,
+            ),
+        )
 
 
 def dish_key_from_name(name: str) -> str:
@@ -404,6 +448,163 @@ def current_week_start() -> str:
 
 def current_day_name() -> str:
     return ("segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo")[date.today().weekday()]
+
+
+def menu_day_key(value: date | str | None = None) -> str:
+    if value is None:
+        return date.today().strftime("%m-%d")
+    if isinstance(value, date):
+        return value.strftime("%m-%d")
+    raw = value.strip().lower().replace("set", "09")
+    if len(raw) == 10:
+        try:
+            return date.fromisoformat(raw).strftime("%m-%d")
+        except ValueError:
+            pass
+    if "/" in raw:
+        day_value, month_value = raw.split("/", 1)
+        return f"{int(month_value):02d}-{int(day_value):02d}"
+    month_value, day_value = raw.split("-", 1)
+    return f"{int(month_value):02d}-{int(day_value):02d}"
+
+
+def menu_day_label(value: date | str | None = None) -> str:
+    month_value, day_value = menu_day_key(value).split("-", 1)
+    return f"{day_value}/{month_value}"
+
+
+def list_daily_menu(menu_date: date | str | None = None) -> list[sqlite3.Row]:
+    key = menu_day_key(menu_date)
+    category_order = tuple(cotton_menu.CATEGORY_LABELS)
+    order_sql = "CASE category " + " ".join(
+        f"WHEN '{category}' THEN {index}" for index, category in enumerate(category_order)
+    ) + " ELSE 999 END"
+    with db() as conn:
+        return conn.execute(
+            f"SELECT * FROM daily_menu_components WHERE menu_day = ? ORDER BY {order_sql}",
+            (key,),
+        ).fetchall()
+
+
+def load_daily_menu_component(menu_date: date | str, category: str) -> sqlite3.Row | None:
+    with db() as conn:
+        return conn.execute(
+            "SELECT * FROM daily_menu_components WHERE menu_day = ? AND category = ?",
+            (menu_day_key(menu_date), category),
+        ).fetchone()
+
+
+def upsert_daily_menu_component(
+    menu_date: date | str,
+    category: str,
+    item_name: str,
+    calories: float | None,
+    protein_grams: float | None,
+    menu_label: str = "Cardapio da unidade",
+) -> None:
+    if category not in cotton_menu.CATEGORY_LABELS:
+        raise ValueError("Categoria de cardapio invalida.")
+    with db() as conn:
+        conn.execute(
+            """
+            INSERT INTO daily_menu_components (
+                menu_day, category, item_name, calories, protein_grams, menu_label, source, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(menu_day, category) DO UPDATE SET
+                item_name = excluded.item_name,
+                calories = excluded.calories,
+                protein_grams = excluded.protein_grams,
+                menu_label = excluded.menu_label,
+                source = excluded.source,
+                updated_at = excluded.updated_at
+            """,
+            (
+                menu_day_key(menu_date), category, item_name, calories, protein_grams,
+                menu_label, "Cadastro administrativo", now_iso(),
+            ),
+        )
+
+
+def daily_main_choices(menu_date: date | str | None = None) -> list[sqlite3.Row]:
+    return [row for row in list_daily_menu(menu_date) if row["category"] in {"main_1", "main_2", "main_option"}]
+
+
+def recommend_daily_component(
+    menu_date: date | str | None,
+    restriction: str,
+    goal: str,
+) -> sqlite3.Row | None:
+    choices = daily_main_choices(menu_date)
+    if not choices:
+        return None
+    restriction_key = normalize(restriction)
+    if "vegetariana" in restriction_key:
+        choices = [row for row in choices if row["category"] == "main_option"]
+    elif "frutos do mar" in restriction_key:
+        choices = [row for row in choices if not any(term in normalize(row["item_name"]) for term in ("peixe", "tilapia"))]
+    if not choices:
+        return None
+
+    goal_key = normalize(goal)
+    if "ganhar massa" in goal_key:
+        return max(choices, key=lambda row: (row["protein_grams"] or -1, -(row["calories"] or 10_000)))
+    if "perder peso" in goal_key or "mais saudavel" in goal_key:
+        known = [row for row in choices if row["calories"] is not None]
+        return min(known or choices, key=lambda row: row["calories"] or 10_000)
+    if "manter equilibrio" in goal_key:
+        return max(
+            choices,
+            key=lambda row: (row["protein_grams"] or 0) / max(row["calories"] or 1, 1),
+        )
+    return choices[0]
+
+
+def record_meal_selection(telegram_id: int, menu_date: date | str, category: str) -> sqlite3.Row:
+    component = load_daily_menu_component(menu_date, category)
+    if not component or category not in {"main_1", "main_2", "main_option"}:
+        raise ValueError("Opcao de refeicao indisponivel para essa data.")
+    with db() as conn:
+        conn.execute(
+            """
+            INSERT INTO meal_selections (telegram_id, menu_day, category, item_name, selected_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(telegram_id, menu_day) DO UPDATE SET
+                category = excluded.category,
+                item_name = excluded.item_name,
+                selected_at = excluded.selected_at
+            """,
+            (telegram_id, menu_day_key(menu_date), category, component["item_name"], now_iso()),
+        )
+    return component
+
+
+def recent_meals(telegram_id: int, limit: int = 5) -> list[sqlite3.Row]:
+    with db() as conn:
+        return conn.execute(
+            """
+            SELECT menu_day, category, item_name, selected_at
+            FROM meal_selections
+            WHERE telegram_id = ?
+            ORDER BY selected_at DESC
+            LIMIT ?
+            """,
+            (telegram_id, limit),
+        ).fetchall()
+
+
+def top_meals(telegram_id: int, limit: int = 3) -> list[sqlite3.Row]:
+    with db() as conn:
+        return conn.execute(
+            """
+            SELECT item_name, COUNT(*) AS total
+            FROM meal_selections
+            WHERE telegram_id = ?
+            GROUP BY item_name
+            ORDER BY total DESC, MAX(selected_at) DESC
+            LIMIT ?
+            """,
+            (telegram_id, limit),
+        ).fetchall()
 
 
 def save_employee(
@@ -650,7 +851,7 @@ def employee_data_snapshot(telegram_id: int) -> dict:
         "employee": load_employee(telegram_id),
         "nutrition": load_nutrition_profile(telegram_id),
         "gamification": gamification_summary(telegram_id),
-        "recent_orders": recent_orders(telegram_id, 10),
+        "recent_meals": recent_meals(telegram_id, 10),
         "favorites": favorite_items(telegram_id, 10),
     }
 
@@ -662,6 +863,7 @@ def delete_employee_data(telegram_id: int) -> None:
         conn.execute("DELETE FROM gamification WHERE telegram_id = ?", (telegram_id,))
         conn.execute("DELETE FROM nutrition_profiles WHERE telegram_id = ?", (telegram_id,))
         conn.execute("DELETE FROM favorite_waitlist WHERE telegram_id = ?", (telegram_id,))
+        conn.execute("DELETE FROM meal_selections WHERE telegram_id = ?", (telegram_id,))
         conn.execute("DELETE FROM orders WHERE telegram_id = ?", (telegram_id,))
         conn.execute("DELETE FROM clients WHERE telegram_id = ?", (telegram_id,))
 
@@ -697,26 +899,26 @@ def admin_report_data() -> dict:
             SELECT
                 (SELECT COUNT(*) FROM clients) AS employees,
                 (SELECT COUNT(*) FROM clients WHERE consent_accepted = 1) AS consented_employees,
-                (SELECT COUNT(*) FROM orders) AS orders,
+                (SELECT COUNT(*) FROM meal_selections) AS meals,
                 (SELECT COUNT(*) FROM favorite_waitlist) AS favorites,
-                (SELECT COUNT(*) FROM menu_items WHERE available = 1) AS available_items
+                (SELECT COUNT(DISTINCT menu_day) FROM daily_menu_components) AS menu_days
             """
         ).fetchone()
         recent = conn.execute(
             """
-            SELECT c.name, o.dish_name, o.ordered_at
-            FROM orders o
-            LEFT JOIN clients c ON c.telegram_id = o.telegram_id
-            ORDER BY o.ordered_at DESC
+            SELECT c.name, m.item_name, m.menu_day, m.selected_at
+            FROM meal_selections m
+            LEFT JOIN clients c ON c.telegram_id = m.telegram_id
+            ORDER BY m.selected_at DESC
             LIMIT 5
             """
         ).fetchall()
         top = conn.execute(
             """
-            SELECT dish_name, COUNT(*) AS total
-            FROM orders
-            GROUP BY dish_key, dish_name
-            ORDER BY total DESC, MAX(ordered_at) DESC
+            SELECT item_name, COUNT(*) AS total
+            FROM meal_selections
+            GROUP BY item_name
+            ORDER BY total DESC, MAX(selected_at) DESC
             LIMIT 5
             """
         ).fetchall()
@@ -913,61 +1115,113 @@ def nutrition_consent_buttons() -> list[list[tuple[str, str]]]:
     ]
 
 
-def menu_payload(day: str | None = None, restriction: str = "", goal: str = "") -> dict:
-    items = list_menu_items(day)
-    if not items:
-        return {"text": "\U0001f614 Ainda nao temos pratos disponiveis para esse dia.", "buttons": [[("\U0001f957 Ver cardapio completo", "menu_all")]]}
-    lines = ["\U0001f957 <b>Cardapio disponivel:</b>"]
-    buttons = []
-    for item in items:
-        tags = f" - {escape(item['tags'])}" if item["tags"] else ""
-        allergens = f"\nAlergenicos: {escape(item['allergens'])}" if item["allergens"] else ""
-        conflict = restriction_conflict(restriction, item) if restriction else None
-        safety = f"\n\U0001f6a0 Atencao: {escape(conflict)}" if conflict else "\n\u2705 Compativel com seu cadastro"
-        signal = ""
-        if goal:
-            signal_key = nutrition.nutrition_signal(goal_score(goal, item), bool(conflict))
-            signal_labels = {
-                "green": "\U0001f7e2 Boa aderencia a sua meta",
-                "yellow": "\U0001f7e1 Opcao compativel; ajuste a porcao",
-                "red": "\U0001f534 Conflito com sua restricao",
-            }
-            signal = f"\nSemaforo: {signal_labels[signal_key]}"
-        lines.append(
-            f"<b>{escape(item['dish_name'])}</b> - {format_price(item['price_cents'])}\n"
-            f"Dia: {escape(item['day_of_week'])}{tags}{allergens}{safety}{signal}"
-        )
-        buttons.append([(f"\U0001f37d Pedir {item['dish_name'][:30]}", f"dish:{item['dish_key']}")])
-    return {"text": "\n\n".join(lines), "buttons": buttons}
+def format_nutrition_value(value: float | None) -> str:
+    if value is None:
+        return "nao informado"
+    return f"{value:g}".replace(".", ",")
 
-def order_payload(dish_key: str) -> dict:
-    item = load_menu_item(dish_key)
+
+def menu_payload(
+    day: str | None = None,
+    restriction: str = "",
+    goal: str = "",
+    menu_date: date | str | None = None,
+) -> dict:
+    del day, goal  # parametros legados mantidos para compatibilidade com integracoes antigas
+    menu_key = menu_day_key(menu_date)
+    items = list_daily_menu(menu_key)
+    if not items:
+        return {
+            "text": (
+                f"\U0001f614 Ainda nao ha cardapio publicado para <b>{menu_day_label(menu_key)}</b>.\n\n"
+                "As refeicoes sao fornecidas pela empresa; o bot nao realiza vendas nem cobrancas."
+            ),
+            "buttons": [[("\U0001f4c5 Ver cardapio de 01/09", "menu_date:09-01")]],
+        }
+
+    by_category = {row["category"]: row for row in items}
+    lines = [
+        f"\U0001f957 <b>Cardapio servido em {menu_day_label(menu_key)}</b>",
+        f"<i>{escape(items[0]['menu_label'])}</i>",
+        "",
+        "<b>Pratos principais (escolha uma opcao)</b>",
+    ]
+    for category in ("main_1", "main_2", "main_option"):
+        row = by_category.get(category)
+        if row:
+            protein = (
+                f" | {format_nutrition_value(row['protein_grams'])} g proteina"
+                if row["protein_grams"] is not None else ""
+            )
+            lines.append(
+                f"- {escape(row['item_name'])} ({format_nutrition_value(row['calories'])} kcal{protein})"
+            )
+
+    sections = (
+        ("Guarnicoes", ("side_1", "side_2")),
+        ("Saladas", ("salad_1", "salad_2", "salad_3")),
+        ("Arroz e feijao", ("rice_1", "rice_2", "beans")),
+        ("Sobremesa e fruta", ("dessert", "fruit")),
+        ("Bebida", ("drink",)),
+    )
+    for title, categories in sections:
+        values = [by_category[category] for category in categories if category in by_category]
+        if not values:
+            continue
+        lines.extend(["", f"<b>{title}</b>"])
+        lines.extend(
+            f"- {escape(row['item_name'])} ({format_nutrition_value(row['calories'])} kcal)"
+            for row in values
+        )
+
+    if restriction and normalize(restriction) != "sem restricoes":
+        lines.extend([
+            "",
+            f"\u26a0\ufe0f Restricao cadastrada: <b>{escape(restriction)}</b>. ",
+            "O PDF nao informa ingredientes nem alergenicos; confirme a composicao com a equipe do restaurante.",
+        ])
+    lines.extend([
+        "",
+        "Valores nutricionais transcritos do cardapio fornecido pela operacao.",
+        "A refeicao e um beneficio da empresa: <b>nao ha pagamento</b>.",
+    ])
+    buttons = [
+        [(f"\u2705 Escolher {row['item_name'][:28]}", f"meal:{menu_key}:{row['category']}")]
+        for row in daily_main_choices(menu_key)
+    ]
+    buttons.append([("\u2b50 Ver recomendacao", "recommend")])
+    return {"text": "\n".join(lines), "buttons": buttons}
+
+
+def meal_selection_payload(menu_date: date | str, category: str) -> dict:
+    item = load_daily_menu_component(menu_date, category)
     if not item:
-        return {"text": "\U0001f614 Nao encontrei esse prato no cardapio atual.", "buttons": [[("\U0001f957 Ver cardapio", "menu_today")]]}
-    allergens = f"\nAlergenicos: {escape(item['allergens'])}" if item["allergens"] else ""
+        return {
+            "text": "\U0001f614 Nao encontrei essa opcao no cardapio publicado.",
+            "buttons": [[("\U0001f957 Ver cardapio", "menu_today")]],
+        }
     return {
         "text": (
-            f"\u2705 Pedido registrado para <b>{{name}}</b>.\n\n"
-            f"<b>{escape(item['dish_name'])}</b>\n"
-            f"Valor: {format_price(item['price_cents'])}\n"
-            f"Dia: {escape(item['day_of_week'])}{allergens}\n\n"
-            "Bom apetite \U0001f60a"
+            f"\u2705 Escolha de refeicao registrada para <b>{{name}}</b>.\n\n"
+            f"<b>{escape(item['item_name'])}</b>\n"
+            f"Data do cardapio: {menu_day_label(menu_date)}\n\n"
+            "Nao ha cobranca ou pagamento. Bom apetite \U0001f60a"
         ),
-        "buttons": [[("\u2b50 Avaliar depois", "rate_later")], [("\U0001f514 Me avise quando voltar", "favorite_last_order")]],
+        "buttons": [[("\U0001f957 Voltar ao cardapio", f"menu_date:{menu_day_key(menu_date)}")]],
     }
 
 
 
 def safety_warning_payload(item: sqlite3.Row, restriction: str, reason: str) -> dict:
     alternatives = compatible_menu_items(restriction, current_day_name())
-    buttons = [[(f"\U0001f957 Pedir {alt['dish_name'][:28]}", f"dish:{alt['dish_key']}")] for alt in alternatives[:3]]
+    buttons = [[(f"\U0001f957 Ver {alt['dish_name'][:28]}", "menu_today")] for alt in alternatives[:3]]
     buttons.append([("\U0001f957 Ver cardapio", "menu_today"), ("\U0001f464 Meu perfil", "profile")])
     return {
         "text": (
             "\u26a0\ufe0f <b>Antes de confirmar, preciso te avisar:</b>\n\n"
             f"O prato <b>{escape(item['dish_name'])}</b> {escape(reason)} e pode nao combinar com sua restricao cadastrada: "
             f"<b>{escape(restriction)}</b>.\n\n"
-            "Por seguranca, nao registrei esse pedido. Separei algumas opcoes mais adequadas para voce \U0001f33f"
+            "Por seguranca, nao registrei essa escolha. Separei algumas opcoes mais adequadas para voce \U0001f33f"
         ),
         "buttons": buttons,
     }
@@ -976,29 +1230,29 @@ def safety_warning_payload(item: sqlite3.Row, restriction: str, reason: str) -> 
 def recommendation_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
     data = profile(context)
     user_id = data.get("telegram_id")
-    item = recommend_item(
-        user_id,
-        data.get("restriction", ""),
-        data.get("goal", ""),
-        current_day_name(),
-    )
+    menu_key = context.user_data.get("active_menu_day") or menu_day_key()
+    item = recommend_daily_component(menu_key, data.get("restriction", ""), data.get("goal", ""))
     if not item:
         return {
             "text": (
-                "\U0001f614 Ainda nao encontrei uma recomendacao segura com o cardapio atual.\n\n"
-                "Posso te mostrar o cardapio completo para voce escolher com calma?"
+                f"\U0001f614 Ainda nao ha uma recomendacao para o cardapio de {menu_day_label(menu_key)}.\n\n"
+                "Consulte outro dia publicado ou fale com a equipe do restaurante."
             ),
-            "buttons": [[("\U0001f957 Ver cardapio", "menu_today"), ("\U0001f464 Meu perfil", "profile")]],
+            "buttons": [[("\U0001f4c5 Ver cardapio de 01/09", "menu_date:09-01"), ("\U0001f464 Meu perfil", "profile")]],
         }
-    recent_keys = {row["dish_key"] for row in recent_orders(data.get("telegram_id"), 10)} if data.get("telegram_id") else set()
-    reason = "ele combina com seu cadastro"
-    if goal_score(data.get("goal", ""), item):
-        reason = goal_reason(data.get("goal", ""))
-    elif item["dish_key"] in recent_keys:
-        reason = "voce ja pediu antes e ele continua compativel com seu cadastro"
-    elif item["tags"]:
-        reason = f"ele tem perfil {escape(item['tags'])} e respeita seu cadastro"
-    context.user_data["nutrition_recommendation"] = item["dish_key"]
+    goal_key = normalize(data.get("goal", ""))
+    if "ganhar massa" in goal_key:
+        reason = "e a opcao principal com maior quantidade de proteina informada"
+    elif "perder peso" in goal_key or "mais saudavel" in goal_key:
+        reason = "e a opcao principal com menor valor calorico informado"
+    elif "manter equilibrio" in goal_key:
+        reason = "oferece uma boa relacao entre proteina e calorias"
+    elif "vegetariana" in normalize(data.get("restriction", "")):
+        reason = "e a alternativa sem carne identificavel no cardapio"
+    else:
+        reason = "e uma das opcoes servidas nessa data"
+    recommendation_key = f"{menu_key}:{item['category']}"
+    context.user_data["nutrition_recommendation"] = recommendation_key
     nutrition_profile = load_nutrition_profile(user_id) if user_id else None
     if nutrition_profile:
         nutrition_text = (
@@ -1008,19 +1262,20 @@ def recommendation_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
         )
     else:
         nutrition_text = "\n\nUse /minha_meta para calcular uma estimativa de calorias, proteina e porcao."
-    signal_key = nutrition.nutrition_signal(goal_score(data.get("goal", ""), item))
-    signal = "\U0001f7e2 Boa aderencia" if signal_key == "green" else "\U0001f7e1 Ajuste a porcao"
-    buttons = [[(f"\U0001f37d Pedir {item['dish_name'][:30]}", f"dish:{item['dish_key']}")]]
+    kcal_text = format_nutrition_value(item["calories"])
+    protein_text = format_nutrition_value(item["protein_grams"])
+    buttons = [[(f"\u2705 Escolher {item['item_name'][:30]}", f"meal:{menu_key}:{item['category']}")]]
     if nutrition_profile:
         buttons.append([("Segui em parte (+10)", "nutrition_partial")])
-    buttons.append([("\U0001f957 Ver cardapio", "menu_today")])
+    buttons.append([("\U0001f957 Ver cardapio", f"menu_date:{menu_key}")])
     return {
         "text": (
-            "\u2b50 <b>Minha recomendacao para hoje:</b>\n\n"
-            f"<b>{escape(item['dish_name'])}</b> - {format_price(item['price_cents'])}\n"
-            f"Semaforo: {signal}\n"
+            f"\u2b50 <b>Recomendacao para {menu_day_label(menu_key)}:</b>\n\n"
+            f"<b>{escape(item['item_name'])}</b>\n"
+            f"{kcal_text} kcal | {protein_text} g de proteina\n"
             f"Escolhi porque {reason} \U0001f33f"
             f"{nutrition_text}\n\n"
+            "O documento nao informa ingredientes ou alergenicos. Confirme restricoes com a equipe do restaurante. "
             "Estimativas educativas; necessidades individuais devem ser avaliadas por nutricionista."
         ),
         "buttons": buttons,
@@ -1029,15 +1284,17 @@ def recommendation_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
 def profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
     data = profile(context)
     user_id = data.get("telegram_id")
-    top_text = "Ainda sem historico de pedidos."
-    recent_text = "Ainda sem pedidos registrados."
+    top_text = "Ainda sem escolhas de refeicao."
+    recent_text = "Ainda sem refeicoes registradas."
     if user_id:
-        top = top_dishes(user_id)
-        recent = recent_orders(user_id)
+        top = top_meals(user_id)
+        recent = recent_meals(user_id)
         if top:
-            top_text = "\n".join(f"- {escape(row['dish_name'])}: {row['total']} pedido(s)" for row in top)
+            top_text = "\n".join(f"- {escape(row['item_name'])}: {row['total']} escolha(s)" for row in top)
         if recent:
-            recent_text = "\n".join(f"- {escape(row['dish_name'])}" for row in recent)
+            recent_text = "\n".join(
+                f"- {menu_day_label(row['menu_day'])}: {escape(row['item_name'])}" for row in recent
+            )
     consent_text = "Pendente"
     if data.get("consent_accepted"):
         consent_text = f"Aceito em {escape(data.get('consented_at') or 'data nao informada')}"
@@ -1050,8 +1307,8 @@ def profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
             f"<b>Objetivo:</b> {escape(data.get('goal', 'Nao informado'))}\n"
             f"<b>Restricao alimentar:</b> {escape(data.get('restriction', 'Nao informado'))}\n"
             f"<b>Consentimento LGPD:</b> {consent_text}\n\n"
-            f"<b>Mais pedidos:</b>\n{top_text}\n\n"
-            f"<b>Historico recente:</b>\n{recent_text}"
+            f"<b>Escolhas mais frequentes:</b>\n{top_text}\n\n"
+            f"<b>Refeicoes recentes:</b>\n{recent_text}"
         ),
         "buttons": [[("\u270f\ufe0f Atualizar cadastro", "restart_registration"), ("\u2705 Esta correto", "thanks")]],
     }
@@ -1132,6 +1389,20 @@ def award_order_gamification(
     return awards
 
 
+def award_meal_gamification(
+    telegram_id: int,
+    menu_date: date | str,
+    category: str,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> list[dict]:
+    if not load_nutrition_profile(telegram_id):
+        return []
+    event_key = f"{menu_day_key(menu_date)}:{category}"
+    if context.user_data.get("nutrition_recommendation") == event_key:
+        return [award_points(telegram_id, "follow_recommendation", 20, event_key)]
+    return []
+
+
 def gamification_note(awards: list[dict]) -> str:
     awarded = [award for award in awards if award.get("awarded")]
     if not awarded:
@@ -1207,7 +1478,7 @@ async def ask_consent(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: 
             "\U0001f512 <b>Consentimento e privacidade</b>\n\n"
             "Para continuar, preciso do seu aceite para guardar nome, empresa/unidade, setor, "
             "objetivo, restricao alimentar, historico de refeicoes e pratos favoritos.\n\n"
-            "Esses dados personalizam recomendacoes, registram pedidos e permitem avisos de cardapio. "
+            "Esses dados personalizam recomendacoes, registram escolhas de refeicao e permitem avisos de cardapio. "
             "Voce pode consultar seus dados com /meus_dados e excluir tudo com /excluir_dados."
         ),
         context,
@@ -1269,7 +1540,7 @@ async def complete_registration_after_consent(
             f"<b>Objetivo:</b> {escape(data.get('goal', 'Nao informado'))}\n"
             f"<b>Restricao alimentar:</b> {escape(data.get('restriction', 'Nao informado'))}\n"
             f"<b>Consentimento:</b> aceito em {escape(data['consented_at'])}\n\n"
-            "Agora posso te ajudar com o cardapio e seus pedidos \U0001f60a"
+            "Agora posso te ajudar com o cardapio e suas escolhas de refeicao \U0001f60a"
         ),
         context,
         main_buttons(),
@@ -1284,7 +1555,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             update,
             (
                 "\U0001f37d\ufe0f <b>Ola, {name}!</b>\n\n"
-                "Sou o bot da Apetit. Posso te ajudar com cardapio, pedidos, recomendacoes e avisos de pratos favoritos \U0001f33f"
+                "Sou o bot interno da Apetit. Posso mostrar a refeicao servida no dia e ajudar na sua escolha \U0001f33f"
             ),
             context,
             main_buttons(),
@@ -1304,11 +1575,17 @@ async def show_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not user_id or not registered(context):
         await ask_registration_gate(update, context)
         return
-    rows = recent_orders(user_id, 10)
+    rows = recent_meals(user_id, 10)
     if not rows:
-        await send_text(update, "\U0001f4cb Voce ainda nao tem pedidos registrados.", context, main_buttons())
+        await send_text(update, "\U0001f4cb Voce ainda nao tem refeicoes registradas.", context, main_buttons())
         return
-    await send_text(update, "\U0001f4cb <b>Seu historico de pedidos:</b>\n\n" + "\n".join(f"- {escape(row['dish_name'])}" for row in rows), context, main_buttons())
+    await send_text(
+        update,
+        "\U0001f4cb <b>Seu historico de refeicoes:</b>\n\n"
+        + "\n".join(f"- {menu_day_label(row['menu_day'])}: {escape(row['item_name'])}" for row in rows),
+        context,
+        main_buttons(),
+    )
 
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1316,12 +1593,19 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not registered(context):
         await ask_registration_gate(update, context)
         return
+    requested_date = context.args[0] if context.args else None
+    try:
+        menu_key = menu_day_key(requested_date)
+    except (ValueError, TypeError):
+        await send_text(update, "Use /cardapio ou informe uma data como /cardapio 01/09.", context, main_buttons())
+        return
+    context.user_data["active_menu_day"] = menu_key
     await send_payload(
         update,
         menu_payload(
-            day=current_day_name(),
             restriction=profile(context).get("restriction", ""),
             goal=profile(context).get("goal", ""),
+            menu_date=menu_key,
         ),
         context,
     )
@@ -1506,11 +1790,14 @@ async def show_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not employee:
         await ask_registration_gate(update, context)
         return
-    orders = snapshot["recent_orders"]
+    meals = snapshot["recent_meals"]
     favorites = snapshot["favorites"]
     nutrition_profile = snapshot["nutrition"]
     game = snapshot["gamification"]
-    order_text = "\n".join(f"- {escape(row['dish_name'])}" for row in orders) or "Ainda sem pedidos registrados."
+    meal_text = (
+        "\n".join(f"- {menu_day_label(row['menu_day'])}: {escape(row['item_name'])}" for row in meals)
+        or "Ainda sem refeicoes registradas."
+    )
     favorite_text = "\n".join(f"- {escape(row['dish_name'])}" for row in favorites) or "Ainda sem pratos aguardados."
     if nutrition_profile:
         nutrition_text = (
@@ -1532,7 +1819,7 @@ async def show_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             f"<b>Restricao alimentar:</b> {escape(employee['restriction'])}\n"
             f"<b>Consentimento:</b> {'sim' if employee['consent_accepted'] else 'pendente'}\n"
             f"<b>Data do aceite:</b> {escape(employee['consented_at'] or 'Nao informado')}\n\n"
-            f"<b>Historico recente:</b>\n{order_text}\n\n"
+            f"<b>Historico recente de refeicoes:</b>\n{meal_text}\n\n"
             f"<b>Pratos favoritos/aguardados:</b>\n{favorite_text}\n\n"
             f"<b>Perfil nutricional:</b>\n{nutrition_text}\n\n"
             f"<b>Gamificacao:</b> {game['points']} pontos, streak de {game['streak']} dia(s), "
@@ -1574,33 +1861,46 @@ async def add_menu_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     text = update.effective_message.text or ""
     raw = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
     parts = [part.strip() for part in raw.split("|")]
-    if len(parts) < 6:
+    if len(parts) < 5:
         await update.effective_message.reply_text(
             "Envie assim:\n\n"
-            "/cardapio_add Nome do prato | 29,90 | segunda | ingredientes | alergenicos | tags | disponivel\n\n"
+            "/cardapio_add data | categoria | nome | kcal | proteina_g\n\n"
             "Exemplo:\n"
-            "/cardapio_add Frango Grelhado | 31,90 | quinta | frango, arroz, legumes | nenhum | proteico, caseiro | sim"
+            "/cardapio_add 01/09 | main_1 | Strogonoff de carne | 134 | 12\n\n"
+            "Categorias: " + ", ".join(cotton_menu.CATEGORY_LABELS)
         )
         return
-    name, price, day, ingredients, allergens, tags = parts[:6]
-    available = len(parts) < 7 or normalize(parts[6]) not in {"nao", "no", "false", "0", "esgotado"}
-    key = upsert_menu_item(name, price_to_cents(price), day, ingredients, allergens, tags, available)
-    await update.effective_message.reply_text(f"\u2705 Prato cadastrado/atualizado: {name} ({key}).")
+    menu_date, category, name, raw_calories, raw_protein = parts[:5]
+    try:
+        calories = parse_decimal(raw_calories) if raw_calories else None
+        protein = parse_decimal(raw_protein) if raw_protein else None
+        upsert_daily_menu_component(menu_date, category, name, calories, protein)
+    except ValueError as error:
+        await update.effective_message.reply_text(f"Nao consegui atualizar o cardapio: {error}")
+        return
+    await update.effective_message.reply_text(
+        f"\u2705 Cardapio de {menu_day_label(menu_date)} atualizado: {name}. Nao ha preco ou cobranca."
+    )
 
 
 async def list_admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_admin(tg_id(update)):
         await update.effective_message.reply_text("\U0001f512 Apenas administradores podem listar o cardapio administrativo.")
         return
-    day = " ".join(context.args).strip() if context.args else None
-    items = list_menu_items(day, only_available=False)
-    if not items:
-        await update.effective_message.reply_text("\U0001f614 Nenhum prato cadastrado.")
+    raw_date = " ".join(context.args).strip() if context.args else None
+    try:
+        menu_key = menu_day_key(raw_date)
+    except (ValueError, TypeError):
+        await update.effective_message.reply_text("Use /cardapio_list 01/09.")
         return
-    lines = ["\U0001f957 Cardapio cadastrado:"]
+    items = list_daily_menu(menu_key)
+    if not items:
+        await update.effective_message.reply_text(f"\U0001f614 Nenhum cardapio publicado para {menu_day_label(menu_key)}.")
+        return
+    lines = [f"\U0001f957 Cardapio publicado para {menu_day_label(menu_key)}:"]
     for item in items:
-        status = "disponivel" if item["available"] else "esgotado"
-        lines.append(f"- {item['dish_name']} | {format_price(item['price_cents'])} | {item['day_of_week']} | {status} | {item['tags']}")
+        label = cotton_menu.CATEGORY_LABELS.get(item["category"], item["category"])
+        lines.append(f"- {label}: {item['item_name']} | {format_nutrition_value(item['calories'])} kcal")
     await update.effective_message.reply_text("\n".join(lines))
 
 
@@ -1616,16 +1916,16 @@ async def show_admin_report(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "",
         f"Colaboradores cadastrados: {totals['employees']}",
         f"Colaboradores com consentimento: {totals['consented_employees']}",
-        f"Pedidos registrados: {totals['orders']}",
+        f"Escolhas de refeicao registradas: {totals['meals']}",
         f"Pratos aguardados/favoritos: {totals['favorites']}",
-        f"Pratos disponiveis no cardapio: {totals['available_items']}",
+        f"Dias de cardapio publicados: {totals['menu_days']}",
         "",
-        "Pratos mais pedidos:",
+        "Opcoes mais escolhidas:",
     ]
     if report["top"]:
-        lines.extend(f"- {row['dish_name']}: {row['total']} pedido(s)" for row in report["top"])
+        lines.extend(f"- {row['item_name']}: {row['total']} escolha(s)" for row in report["top"])
     else:
-        lines.append("- Ainda sem pedidos.")
+        lines.append("- Ainda sem refeicoes registradas.")
     lines.extend(["", "Objetivos dos colaboradores:"])
     if report["goals"]:
         lines.extend(f"- {row['goal'] or 'Nao informado'}: {row['total']}" for row in report["goals"])
@@ -1636,11 +1936,14 @@ async def show_admin_report(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         lines.extend(f"- {row['company'] or 'Nao informada'}: {row['total']}" for row in report["companies"])
     else:
         lines.append("- Ainda sem colaboradores cadastrados.")
-    lines.extend(["", "Pedidos recentes:"])
+    lines.extend(["", "Refeicoes recentes:"])
     if report["recent"]:
-        lines.extend(f"- {row['name'] or 'Colaborador'} pediu {row['dish_name']}" for row in report["recent"])
+        lines.extend(
+            f"- {row['name'] or 'Colaborador'} escolheu {row['item_name']} ({menu_day_label(row['menu_day'])})"
+            for row in report["recent"]
+        )
     else:
-        lines.append("- Ainda sem pedidos recentes.")
+        lines.append("- Ainda sem refeicoes recentes.")
     await update.effective_message.reply_text("\n".join(lines))
 
 
@@ -1729,7 +2032,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         context.user_data.clear()
         await send_text(
             update,
-            "Sem o aceite, nao consigo guardar seus dados nem iniciar pedidos. Envie /start quando quiser continuar.",
+            "Sem o aceite, nao consigo guardar seus dados nem registrar refeicoes. Envie /start quando quiser continuar.",
             context,
             edit=True,
         )
@@ -1820,52 +2123,56 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if not registered(context):
             await ask_registration_gate(update, context, edit=True)
             return
-        await send_payload(
-            update,
-            menu_payload(
-                day=current_day_name(),
-                restriction=profile(context).get("restriction", ""),
-                goal=profile(context).get("goal", ""),
-            ),
-            context,
-            edit=True,
-        )
-        return
-    if data == "menu_all":
-        if not registered(context):
-            await ask_registration_gate(update, context, edit=True)
-            return
+        menu_key = menu_day_key()
+        context.user_data["active_menu_day"] = menu_key
         await send_payload(
             update,
             menu_payload(
                 restriction=profile(context).get("restriction", ""),
                 goal=profile(context).get("goal", ""),
+                menu_date=menu_key,
             ),
             context,
             edit=True,
         )
         return
-    if data.startswith("dish:"):
+    if data.startswith("menu_date:"):
         if not registered(context):
             await ask_registration_gate(update, context, edit=True)
             return
-        key = data.removeprefix("dish:")
+        menu_key = menu_day_key(data.removeprefix("menu_date:"))
+        context.user_data["active_menu_day"] = menu_key
+        await send_payload(
+            update,
+            menu_payload(
+                restriction=profile(context).get("restriction", ""),
+                goal=profile(context).get("goal", ""),
+                menu_date=menu_key,
+            ),
+            context,
+            edit=True,
+        )
+        return
+    if data.startswith("meal:"):
+        if not registered(context):
+            await ask_registration_gate(update, context, edit=True)
+            return
+        try:
+            _, menu_key, category = data.split(":", 2)
+        except ValueError:
+            await send_text(update, "Opcao de refeicao invalida.", context, main_buttons(), edit=True)
+            return
         user_id = tg_id(update)
-        item = load_menu_item(key)
-        if not item:
-            await send_payload(update, order_payload(key), context, edit=True)
-            return
-        conflict = restriction_conflict(profile(context).get("restriction", ""), item)
-        if conflict:
-            await send_payload(update, safety_warning_payload(item, profile(context).get("restriction", ""), conflict), context, edit=True)
-            return
         if user_id:
-            record_order(user_id, key)
-            context.user_data["last_order"] = key
-            awards = award_order_gamification(user_id, item, context)
+            try:
+                record_meal_selection(user_id, menu_key, category)
+            except ValueError as error:
+                await send_text(update, escape(str(error)), context, main_buttons(), edit=True)
+                return
+            awards = award_meal_gamification(user_id, menu_key, category, context)
         else:
             awards = []
-        payload = order_payload(key)
+        payload = meal_selection_payload(menu_key, category)
         payload["text"] += gamification_note(awards)
         await send_payload(update, payload, context, edit=True)
         return
@@ -1897,33 +2204,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if await handle_nutrition_message(update, context):
         return
     text = normalize(update.message.text or "")
-    item = find_menu_item_in_text(update.message.text or "")
-    if item:
-        user_id = tg_id(update)
-        conflict = restriction_conflict(profile(context).get("restriction", ""), item)
-        if conflict:
-            await send_payload(
-                update,
-                safety_warning_payload(item, profile(context).get("restriction", ""), conflict),
-                context,
-            )
-            return
-        if user_id:
-            record_order(user_id, item["dish_key"])
-            context.user_data["last_order"] = item["dish_key"]
-            awards = award_order_gamification(user_id, item, context)
-        else:
-            awards = []
-        payload = order_payload(item["dish_key"])
-        payload["text"] += gamification_note(awards)
-        await send_payload(update, payload, context)
-    elif "cardapio" in text or "tem hoje" in text or "o que tem" in text:
+    if "cardapio" in text or "tem hoje" in text or "o que tem" in text:
+        menu_key = menu_day_key()
+        context.user_data["active_menu_day"] = menu_key
         await send_payload(
             update,
             menu_payload(
-                day=current_day_name(),
                 restriction=profile(context).get("restriction", ""),
                 goal=profile(context).get("goal", ""),
+                menu_date=menu_key,
             ),
             context,
         )
