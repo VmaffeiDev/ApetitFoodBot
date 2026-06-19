@@ -1,17 +1,21 @@
 # ApetitFoodBot
 
-MVP de bot Telegram da Apetit com fluxos inspirados no simulador HTML:
+MVP de bot Telegram da Apetit destinado aos funcionarios/colaboradores das empresas e unidades atendidas, nao a clientes finais. O sistema oferece:
 
 - boas-vindas com `/start`
 - cadastro obrigatorio antes de pedidos
 - aceite LGPD antes de salvar dados pessoais
-- objetivo do cliente no cadastro: perder peso, ganhar massa, manter equilibrio, alimentacao saudavel ou praticidade
-- banco SQLite com clientes e historico de pedidos
+- cadastro funcional com empresa/unidade e setor
+- objetivo do colaborador no cadastro: perder peso, ganhar massa, manter equilibrio, alimentacao saudavel ou praticidade
+- banco SQLite com colaboradores e historico de pedidos
 - comandos `/meus_dados` e `/excluir_dados`
 - cardapio real no banco com preco, dia, ingredientes, alergenicos e tags
 - cardapio do dia
 - cardapio sem carne
-- recomendacao inteligente baseada no cadastro e historico do cliente
+- recomendacao inteligente baseada no cadastro e historico do colaborador
+- perfil nutricional opcional com meta estimada de calorias, proteina e porcao
+- semaforo de aderencia ao objetivo em cada prato do cardapio
+- gamificacao com pontos, streak, badges e ranking pseudonimizado
 - bloqueio de pedido incompatavel com restricao alimentar cadastrada
 - reclamacao com escuta empatica
 - feedback positivo
@@ -58,9 +62,9 @@ No Telegram, abra o bot e envie:
 /start
 ```
 
-O bot vai pedir nome, telefone, endereco/bairro, objetivo alimentar, restricao alimentar e aceite LGPD antes de liberar cardapio, recomendacoes ou pedidos.
-Quando o cliente escolhe um prato, o bot confere os alergenicos, ingredientes e tags antes de registrar o pedido. Se houver conflito com a restricao cadastrada, o pedido nao e gravado e o bot sugere alternativas mais seguras.
-As recomendacoes consideram o objetivo do cliente e o historico de pedidos.
+O bot vai pedir nome, empresa/unidade, setor, objetivo alimentar, restricao alimentar e aceite LGPD antes de liberar cardapio, recomendacoes ou pedidos.
+Quando o colaborador escolhe um prato, o bot confere os alergenicos, ingredientes e tags antes de registrar o pedido. Se houver conflito com a restricao cadastrada, o pedido nao e gravado e o bot sugere alternativas mais seguras.
+As recomendacoes consideram o objetivo do colaborador e o historico de pedidos.
 
 Para refazer o cadastro, envie:
 
@@ -80,47 +84,98 @@ Para ver o cardapio disponivel:
 /cardapio
 ```
 
-Para consultar ou excluir os dados do cliente:
+Para consultar ou excluir os dados do colaborador:
 
 ```text
 /meus_dados
 /excluir_dados
 ```
 
+Para criar a meta nutricional e acompanhar a gamificacao:
+
+```text
+/minha_meta
+/meu_progresso
+/ranking
+```
+
 ## Banco de dados
 
 O bot cria automaticamente o arquivo `apetit.db` com:
 
-- clientes cadastrados
+- colaboradores cadastrados, empresa/unidade e setor
 - aceite LGPD e data do consentimento
 - historico de pedidos
 - pratos cadastrados no cardapio
 - pratos favoritos/aguardados
 - atualizacoes de cardapio semanal
+- perfil nutricional e consentimento especifico
+- eventos de pontuacao, streak e badges
 
 Esse arquivo fica fora do Git por seguranca e privacidade.
 
 ## LGPD e consentimento
 
-Como o bot guarda telefone, endereco/bairro, historico e preferencias, o cadastro so e concluido depois do aceite do cliente.
+Como o bot guarda empresa/unidade, setor, historico e preferencias, o cadastro so e concluido depois do aceite do colaborador.
 
-O cliente pode:
+O colaborador pode:
 
 - ver os dados salvos com `/meus_dados`
 - excluir cadastro, historico e favoritos com `/excluir_dados`
 - refazer o cadastro com `/recadastrar`
 
-O banco guarda `consent_accepted` e `consented_at`. Se o cliente nao aceitar, o bot nao conclui o cadastro nem libera pedidos.
+O banco guarda `consent_accepted` e `consented_at`. Se o colaborador nao aceitar, o bot nao conclui o cadastro nem libera pedidos.
+
+O perfil nutricional pede um segundo consentimento antes de guardar peso, altura, idade, sexo usado pela formula e nivel de atividade. O ranking nao mostra nomes: outros participantes aparecem com um identificador pseudonimizado.
+
+## Nutricao e gamificacao
+
+O comando `/minha_meta` coleta peso, altura, idade, sexo usado pela equacao, atividade e objetivo. O bot calcula:
+
+- gasto em repouso pela equacao de Mifflin-St Jeor
+- manutencao estimada usando um fator de atividade
+- meta calorica educativa conforme o objetivo
+- proteina diaria estimada e orientacao de porcao do almoco
+
+Para a meta calorica, o MVP aplica `-15%` para perder peso, manutencao para equilibrio/saude/praticidade e `+10%` para ganhar massa. Para proteina, aplica de `1,4` a `1,8 g/kg/dia` conforme o objetivo.
+
+A equacao foi publicada para adultos saudaveis de 19 a 78 anos e e uma estimativa, nao uma prescricao. As metas de proteina usam valores conservadores dentro da literatura para pessoas fisicamente ativas. Referencias: [Mifflin et al. no PubMed](https://pubmed.ncbi.nlm.nih.gov/2305711/) e [position stand da ISSN sobre proteina](https://pmc.ncbi.nlm.nih.gov/articles/PMC5477153/).
+
+Gestantes, menores de 19 anos, maiores de 78 anos, pessoas com doencas, restricoes clinicas ou necessidades especificas devem buscar nutricionista ou medico. O bot nao diagnostica, nao substitui acompanhamento profissional e nao estima os nutrientes de um prato sem ficha tecnica.
+
+O semaforo representa aderencia ao objetivo e compatibilidade com a restricao cadastrada:
+
+- verde: boa aderencia a meta
+- amarelo: opcao compativel, com atencao a porcao
+- vermelho: conflito com a restricao alimentar
+
+Pontuacao:
+
+- `+5` por acessar a dica/meta, no maximo uma vez ao dia
+- `+20` por pedir o prato recomendado
+- `+10` por registrar que seguiu parcialmente
+- `+10` por prato identificado como salada
+- `+15` por prato identificado como fruta
+
+Eventos repetidos para o mesmo prato no mesmo dia nao acumulam. Seguir integral e parcialmente a mesma recomendacao sao eventos mutuamente exclusivos.
+
+Badges:
+
+- `Primeiro Passo`: primeiros pontos
+- `Em Chamas`: streak de 3 dias
+- `Guardiao Verde`: 3 eventos de salada
+- `Vida Saudavel`: 100 pontos
+- `Mestre Apetit`: 500 pontos e streak de 7 dias
 
 ## Grafo do fluxo
 
 ```mermaid
 flowchart TD
-    A["Cliente abre o bot no Telegram"] --> B{Cliente ja tem cadastro?}
-    B -- "Nao" --> C["Cadastro obrigatorio: nome, telefone, endereco/bairro, objetivo e restricao alimentar"]
-    C --> LGPD{Cliente aceita guardar dados?}
+    A["Colaborador abre o bot no Telegram"] --> B{Colaborador ja tem cadastro?}
+    B -- "Nao" --> C["Cadastro funcional: nome, empresa/unidade, setor, objetivo e restricao alimentar"]
+    C --> LGPD{Colaborador aceita guardar dados?}
     LGPD -- "Nao" --> X["Bot nao conclui cadastro nem libera pedidos"]
-    LGPD -- "Sim" --> D["Salvar cliente no SQLite com data do consentimento"]
+    LGPD -- "Sim" --> D["Salvar colaborador no SQLite com data do consentimento"]
     B -- "Sim" --> E["Menu principal"]
     D --> E
 
@@ -132,7 +187,7 @@ flowchart TD
     F --> I["Bot lista pratos com preco, dia, tags e alergenicos"]
     G --> J["Bot cruza objetivo + restricao + historico + cardapio disponivel"]
     J --> K["Sugere prato compativel"]
-    K --> L["Cliente escolhe prato"]
+    K --> L["Colaborador escolhe prato"]
     I --> L
 
     L --> M{Prato conflita com restricao?}
@@ -141,13 +196,13 @@ flowchart TD
     O --> L
     M -- "Nao" --> P["Registrar pedido no historico"]
     P --> Q["Oferecer aviso quando o prato voltar"]
-    Q --> R{Cliente quer ser avisado?}
+    Q --> R{Colaborador quer ser avisado?}
     R -- "Sim" --> S["Salvar prato em favoritos/aguardados"]
     R -- "Nao" --> E
     S --> E
 
     T["Admin atualiza cardapio semanal"] --> U["Salvar semana no SQLite"]
-    U --> V["Buscar clientes com prato favorito ou recorrente"]
+    U --> V["Buscar colaboradores com prato favorito ou recorrente"]
     V --> W["Enviar alerta no Telegram quando o prato voltar"]
 ```
 
@@ -171,7 +226,7 @@ Para listar o cardapio cadastrado:
 /cardapio_list
 ```
 
-Para ver um resumo administrativo com clientes, pedidos, favoritos e pratos mais pedidos:
+Para ver um resumo administrativo com colaboradores por empresa/unidade, pedidos, favoritos e pratos mais pedidos:
 
 ```text
 /relatorio
@@ -179,7 +234,7 @@ Para ver um resumo administrativo com clientes, pedidos, favoritos e pratos mais
 
 ## Atualizar cardapio semanal
 
-Envie o comando abaixo no Telegram para registrar os pratos da semana e avisar clientes que aguardam algum deles ou ja pediram o prato varias vezes:
+Envie o comando abaixo no Telegram para registrar os pratos da semana e avisar colaboradores que aguardam algum deles ou ja pediram o prato varias vezes:
 
 ```text
 /cardapio_semana Lasanha de Legumes
@@ -187,12 +242,14 @@ Peixe Assado com Legumes
 Sopa de Lentilha
 ```
 
-Para restringir esse comando a administradores, configure no `.env`:
+Para habilitar os comandos administrativos, configure no `.env` os IDs autorizados:
 
 ```env
 ADMIN_TELEGRAM_IDS=123456789,987654321
 APETIT_DB_PATH=apetit.db
 ```
+
+Sem `ADMIN_TELEGRAM_IDS`, os comandos administrativos permanecem bloqueados.
 
 ## Deploy
 
@@ -232,7 +289,7 @@ Logs e monitoramento:
 - monitore reinicios, erros de webhook e espaco em disco
 - mantenha um alerta simples para queda do servico e falhas de backup
 
-## Checklist antes de usar com clientes
+## Checklist antes de usar com colaboradores
 
 - gerar um token novo no BotFather se o token antigo foi exposto
 - preencher `TELEGRAM_BOT_TOKEN` no `.env`
@@ -243,6 +300,8 @@ Logs e monitoramento:
 - testar um cadastro novo com `/start`
 - testar aceite LGPD, `/meus_dados` e `/excluir_dados`
 - testar objetivos diferentes, como perder peso e ganhar massa
+- testar o consentimento nutricional e o fluxo completo de `/minha_meta`
+- testar `/meu_progresso`, pontuacao sem duplicidade e `/ranking`
 - testar uma restricao alimentar e confirmar que prato incompatavel e bloqueado
 - testar `/cardapio_semana` com um prato favorito para confirmar o alerta
 

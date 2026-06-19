@@ -6,6 +6,8 @@
 .venv-1
 .venv-2/
 .venv-2
+.venv-codespaces/
+.venv-codespaces
 
 env/
 
