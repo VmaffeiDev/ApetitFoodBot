@@ -104,13 +104,6 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
-            CREATE TABLE IF NOT EXISTS orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                telegram_id INTEGER NOT NULL,
-                dish_key TEXT NOT NULL,
-                dish_name TEXT NOT NULL,
-                ordered_at TEXT NOT NULL
-            );
             CREATE TABLE IF NOT EXISTS favorite_waitlist (
                 telegram_id INTEGER NOT NULL,
                 dish_key TEXT NOT NULL,
@@ -144,18 +137,6 @@ def init_db() -> None:
                 item_name TEXT NOT NULL,
                 selected_at TEXT NOT NULL,
                 PRIMARY KEY (telegram_id, menu_day)
-            );
-            CREATE TABLE IF NOT EXISTS menu_items (
-                dish_key TEXT PRIMARY KEY,
-                dish_name TEXT NOT NULL,
-                price_cents INTEGER NOT NULL DEFAULT 0,
-                day_of_week TEXT NOT NULL DEFAULT 'todos',
-                ingredients TEXT NOT NULL DEFAULT '',
-                allergens TEXT NOT NULL DEFAULT '',
-                tags TEXT NOT NULL DEFAULT '',
-                available INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS nutrition_profiles (
                 telegram_id INTEGER PRIMARY KEY,
@@ -218,7 +199,10 @@ def init_db() -> None:
         }
         if "consented_at" not in nutrition_columns:
             conn.execute("ALTER TABLE nutrition_profiles ADD COLUMN consented_at TEXT NOT NULL DEFAULT ''")
-        seed_default_menu(conn)
+        # Remove o cardapio comercial legado, que continha precos.
+        # A operacao atual usa somente daily_menu_components, sem valores monetarios.
+        conn.execute("DROP TABLE IF EXISTS menu_items")
+        conn.execute("DROP TABLE IF EXISTS orders")
         seed_cotton_menu(conn)
 
 
@@ -252,202 +236,9 @@ def dish_key_from_name(name: str) -> str:
     return normalize(name).replace(" ", "_")[:64]
 
 
-def price_to_cents(raw: str) -> int:
-    cleaned = raw.strip().replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
-    try:
-        return int(round(float(cleaned) * 100))
-    except ValueError:
-        return 0
-
-
-def format_price(cents: int) -> str:
-    return f"R$ {cents / 100:.2f}".replace(".", ",")
-
-
-def seed_default_menu(conn: sqlite3.Connection) -> None:
-    timestamp = now_iso()
-    items = [
-        ("lasagna", "Lasanha de Legumes", 2890, "segunda", "Legumes, molho de tomate, massa sem gluten", "Pode conter lactose", "vegetariano, sem gluten", 1),
-        ("fish", "Peixe Assado com Legumes", 3290, "terca", "Peixe, legumes, azeite, ervas", "Peixe", "leve, proteico", 1),
-        ("soup", "Sopa de Lentilha", 2490, "quarta", "Lentilha, legumes, temperos naturais", "", "vegano, sem gluten", 1),
-        ("frango_grelhado_com_arroz_integral", "Frango Grelhado com Arroz Integral", 3190, "segunda", "Frango, arroz integral, legumes, azeite", "", "proteico, integral, ganho de massa", 1),
-        ("omelete_de_legumes", "Omelete de Legumes", 2690, "segunda", "Ovos, cenoura, abobrinha, tomate, ervas", "Ovo", "leve, proteico, vegetariano", 1),
-        ("salada_proteica_com_grao_de_bico", "Salada Proteica com Grao de Bico", 2790, "terca", "Grao de bico, folhas, tomate, pepino, azeite", "", "leve, vegano, proteico, perda de peso", 1),
-        ("patinho_moido_com_batata_doce", "Patinho Moido com Batata Doce", 3490, "quarta", "Patinho moido, batata doce, brocolis, cenoura", "", "proteico, ganho de massa", 1),
-        ("bowl_de_quinoa_com_legumes", "Bowl de Quinoa com Legumes", 3090, "quinta", "Quinoa, legumes assados, folhas, sementes", "", "vegano, integral, saudavel", 1),
-        ("tilapia_com_pure_de_abobora", "Tilapia com Pure de Abobora", 3390, "quinta", "Tilapia, abobora, legumes, ervas", "Peixe", "leve, proteico, perda de peso", 1),
-        ("macarrao_integral_com_frango", "Macarrao Integral com Frango", 3290, "sexta", "Macarrao integral, frango, molho de tomate, ervas", "Gluten", "integral, proteico, energia", 1),
-        ("carne_de_panela_com_arroz_e_feijao", "Carne de Panela com Arroz e Feijao", 3590, "sexta", "Carne bovina, arroz, feijao, legumes", "", "caseiro, proteico, energia", 1),
-        ("wrap_integral_de_frango", "Wrap Integral de Frango", 2990, "todos", "Pao integral, frango, folhas, cenoura, molho leve", "Gluten", "pratico, proteico", 1),
-        ("creme_de_abobora_com_lentilha", "Creme de Abobora com Lentilha", 2590, "todos", "Abobora, lentilha, temperos naturais", "", "leve, vegano, sem gluten", 1),
-    ]
-    for item in items:
-        conn.execute(
-            """
-            INSERT INTO menu_items (
-                dish_key, dish_name, price_cents, day_of_week, ingredients,
-                allergens, tags, available, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(dish_key) DO NOTHING
-            """,
-            (*item, timestamp, timestamp),
-        )
-
-
-def upsert_menu_item(name: str, price: int, day: str, ingredients: str, allergens: str, tags: str, available: bool) -> str:
-    key = dish_key_from_name(name)
-    timestamp = now_iso()
-    with db() as conn:
-        conn.execute(
-            """
-            INSERT INTO menu_items (
-                dish_key, dish_name, price_cents, day_of_week, ingredients,
-                allergens, tags, available, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(dish_key) DO UPDATE SET
-                dish_name = excluded.dish_name,
-                price_cents = excluded.price_cents,
-                day_of_week = excluded.day_of_week,
-                ingredients = excluded.ingredients,
-                allergens = excluded.allergens,
-                tags = excluded.tags,
-                available = excluded.available,
-                updated_at = excluded.updated_at
-            """,
-            (key, name, price, normalize(day) or "todos", ingredients, allergens, tags, int(available), timestamp, timestamp),
-        )
-    return key
-
-
-def list_menu_items(day: str | None = None, only_available: bool = True) -> list[sqlite3.Row]:
-    where, params = [], []
-    if only_available:
-        where.append("available = 1")
-    if day:
-        where.append("(day_of_week = ? OR day_of_week = 'todos')")
-        params.append(normalize(day))
-    sql_where = f"WHERE {' AND '.join(where)}" if where else ""
-    with db() as conn:
-        return conn.execute(f"SELECT * FROM menu_items {sql_where} ORDER BY day_of_week, dish_name", params).fetchall()
-
-
-def load_menu_item(key: str) -> sqlite3.Row | None:
-    with db() as conn:
-        return conn.execute("SELECT * FROM menu_items WHERE dish_key = ?", (key,)).fetchone()
-
-
-def find_menu_item_in_text(text: str) -> sqlite3.Row | None:
-    normalized = normalize(text)
-    for item in list_menu_items():
-        if normalize(item["dish_name"]) in normalized:
-            return item
-    return None
-
-
-def get_dish_name(key: str) -> str:
-    item = load_menu_item(key)
-    return item["dish_name"] if item else DEFAULT_DISHES.get(key, key.replace("_", " ").title())
-
-
-def item_search_text(item: sqlite3.Row) -> str:
-    return normalize(
-        " ".join(
-            [
-                item["dish_name"] or "",
-                item["ingredients"] or "",
-                item["allergens"] or "",
-                item["tags"] or "",
-            ]
-        )
-    )
-
-
-def restriction_conflict(restriction: str, item: sqlite3.Row) -> str | None:
-    text = item_search_text(item)
-    for safe_phrase in ("sem gluten", "sem lactose", "sem carne", "vegetariano", "vegetariana", "vegano", "vegana"):
-        text = text.replace(safe_phrase, "")
-    restriction_key = normalize(restriction)
-    checks = {
-        "sem gluten": (("gluten", "trigo", "farinha"), "contem gluten"),
-        "sem lactose": (("lactose", "leite", "queijo", "creme", "manteiga"), "contem lactose ou derivados de leite"),
-        "vegetariana": (("carne", "frango", "peixe", "bovina", "suina", "porco", "camarao"), "nao esta marcado como vegetariano"),
-        "sem frutos do mar": (("peixe", "camarao", "frutos do mar", "marisco"), "contem peixe ou frutos do mar"),
-    }
-    for key, (terms, reason) in checks.items():
-        if key in restriction_key and any(term in text for term in terms):
-            return reason
-    return None
-
-
-def compatible_menu_items(restriction: str, day: str | None = None) -> list[sqlite3.Row]:
-    return [item for item in list_menu_items(day) if not restriction_conflict(restriction, item)]
-
-
-def goal_score(goal: str, item: sqlite3.Row) -> int:
-    text = item_search_text(item)
-    goal_key = normalize(goal)
-    keywords = {
-        "perder peso": ("leve", "salada", "legumes", "sopa", "perda de peso", "grelhado", "abobora"),
-        "ganhar massa": ("proteico", "frango", "patinho", "ovo", "lentilha", "grao de bico", "batata doce"),
-        "manter equilibrio": ("equilibrado", "integral", "caseiro", "legumes", "arroz", "feijao"),
-        "alimentacao mais saudavel": ("saudavel", "vegano", "integral", "legumes", "natural", "sem gluten", "quinoa"),
-        "praticidade na rotina": ("pratico", "wrap", "bowl", "todos", "leve"),
-    }
-    for key, terms in keywords.items():
-        if key in goal_key:
-            score = sum(term in text for term in terms)
-            if key == "ganhar massa" and "proteico" in text:
-                score += 2
-            return score
-    return 0
-
-
-def goal_reason(goal: str) -> str:
-    goal_key = normalize(goal)
-    if "perder peso" in goal_key:
-        return "ajuda no seu objetivo de perder peso com uma opcao mais leve"
-    if "ganhar massa" in goal_key:
-        return "tem perfil mais proteico para apoiar ganho de massa"
-    if "manter equilibrio" in goal_key:
-        return "combina com uma rotina equilibrada"
-    if "alimentacao mais saudavel" in goal_key:
-        return "prioriza uma escolha mais natural e saudavel"
-    if "praticidade na rotina" in goal_key:
-        return "funciona bem para uma rotina mais pratica"
-    return "combina com seu cadastro"
-
-
-def recommend_item(
-    telegram_id: int | None,
-    restriction: str,
-    goal: str = "",
-    day: str | None = None,
-) -> sqlite3.Row | None:
-    compatible = compatible_menu_items(restriction, day)
-    if not compatible:
-        return None
-    history: dict[str, int] = {}
-    if telegram_id:
-        for row in top_dishes(telegram_id, 10):
-            history[row["dish_key"]] = row["total"]
-    return max(
-        compatible,
-        key=lambda item: (
-            history.get(item["dish_key"], 0) * 3 + goal_score(goal, item),
-            goal_score(goal, item),
-        ),
-    )
-
-
 def current_week_start() -> str:
     today = date.today()
     return today.fromordinal(today.toordinal() - today.weekday()).isoformat()
-
-
-def current_day_name() -> str:
-    return ("segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo")[date.today().weekday()]
 
 
 def menu_day_key(value: date | str | None = None) -> str:
@@ -812,15 +603,8 @@ def leaderboard(limit: int = 10) -> list[sqlite3.Row]:
         ).fetchall()
 
 
-def record_order(telegram_id: int, dish_key: str) -> None:
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO orders (telegram_id, dish_key, dish_name, ordered_at) VALUES (?, ?, ?, ?)",
-            (telegram_id, dish_key, get_dish_name(dish_key), now_iso()),
-        )
-
-
 def add_favorite_waitlist(telegram_id: int, dish_key: str) -> None:
+    dish_name = DEFAULT_DISHES.get(dish_key, dish_key.replace("_", " ").title())
     with db() as conn:
         conn.execute(
             """
@@ -828,7 +612,7 @@ def add_favorite_waitlist(telegram_id: int, dish_key: str) -> None:
             VALUES (?, ?, ?, ?)
             ON CONFLICT(telegram_id, dish_key) DO NOTHING
             """,
-            (telegram_id, dish_key, get_dish_name(dish_key), now_iso()),
+            (telegram_id, dish_key, dish_name, now_iso()),
         )
 
 
@@ -864,32 +648,7 @@ def delete_employee_data(telegram_id: int) -> None:
         conn.execute("DELETE FROM nutrition_profiles WHERE telegram_id = ?", (telegram_id,))
         conn.execute("DELETE FROM favorite_waitlist WHERE telegram_id = ?", (telegram_id,))
         conn.execute("DELETE FROM meal_selections WHERE telegram_id = ?", (telegram_id,))
-        conn.execute("DELETE FROM orders WHERE telegram_id = ?", (telegram_id,))
         conn.execute("DELETE FROM clients WHERE telegram_id = ?", (telegram_id,))
-
-
-def recent_orders(telegram_id: int, limit: int = 5) -> list[sqlite3.Row]:
-    with db() as conn:
-        return conn.execute(
-            "SELECT dish_key, dish_name, ordered_at FROM orders WHERE telegram_id = ? ORDER BY ordered_at DESC LIMIT ?",
-            (telegram_id, limit),
-        ).fetchall()
-
-
-def top_dishes(telegram_id: int, limit: int = 3) -> list[sqlite3.Row]:
-    with db() as conn:
-        return conn.execute(
-            """
-            SELECT dish_key, dish_name, COUNT(*) AS total
-            FROM orders
-            WHERE telegram_id = ?
-            GROUP BY dish_key, dish_name
-            ORDER BY total DESC, MAX(ordered_at) DESC
-            LIMIT ?
-            """,
-            (telegram_id, limit),
-        ).fetchall()
-
 
 
 def admin_report_data() -> dict:
@@ -964,11 +723,7 @@ def save_weekly_menu(dishes: list[tuple[str, str]]) -> list[sqlite3.Row]:
             f"""
             SELECT c.telegram_id, c.chat_id, c.name, GROUP_CONCAT(wm.dish_name, ', ') AS dishes
             FROM weekly_menu wm
-            JOIN (
-                SELECT telegram_id, dish_key FROM favorite_waitlist
-                UNION
-                SELECT telegram_id, dish_key FROM orders GROUP BY telegram_id, dish_key HAVING COUNT(*) >= 2
-            ) interest ON interest.dish_key = wm.dish_key
+            JOIN favorite_waitlist interest ON interest.dish_key = wm.dish_key
             JOIN clients c ON c.telegram_id = interest.telegram_id
             WHERE wm.week_start = ? AND wm.dish_key IN ({placeholders})
             GROUP BY c.telegram_id, c.chat_id, c.name
@@ -1212,21 +967,6 @@ def meal_selection_payload(menu_date: date | str, category: str) -> dict:
 
 
 
-def safety_warning_payload(item: sqlite3.Row, restriction: str, reason: str) -> dict:
-    alternatives = compatible_menu_items(restriction, current_day_name())
-    buttons = [[(f"\U0001f957 Ver {alt['dish_name'][:28]}", "menu_today")] for alt in alternatives[:3]]
-    buttons.append([("\U0001f957 Ver cardapio", "menu_today"), ("\U0001f464 Meu perfil", "profile")])
-    return {
-        "text": (
-            "\u26a0\ufe0f <b>Antes de confirmar, preciso te avisar:</b>\n\n"
-            f"O prato <b>{escape(item['dish_name'])}</b> {escape(reason)} e pode nao combinar com sua restricao cadastrada: "
-            f"<b>{escape(restriction)}</b>.\n\n"
-            "Por seguranca, nao registrei essa escolha. Separei algumas opcoes mais adequadas para voce \U0001f33f"
-        ),
-        "buttons": buttons,
-    }
-
-
 def recommendation_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
     data = profile(context)
     user_id = data.get("telegram_id")
@@ -1368,25 +1108,6 @@ def ranking_payload(telegram_id: int) -> dict:
         lines.append("\nOs demais participantes aparecem com identificador pseudonimizado.")
         text = "\n".join(lines)
     return {"text": text, "buttons": [[("Meu progresso", "nutrition_progress"), ("Minha meta", "nutrition_profile")]]}
-
-
-def award_order_gamification(
-    telegram_id: int,
-    item: sqlite3.Row,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> list[dict]:
-    if not load_nutrition_profile(telegram_id):
-        return []
-    awards = []
-    dish_key = item["dish_key"]
-    if context.user_data.get("nutrition_recommendation") == dish_key:
-        awards.append(award_points(telegram_id, "follow_recommendation", 20, dish_key))
-    item_text = item_search_text(item)
-    if "salada" in item_text:
-        awards.append(award_points(telegram_id, "salad", 10, dish_key))
-    if any(term in item_text for term in ("fruta", "banana", "maca", "laranja", "mamao")):
-        awards.append(award_points(telegram_id, "fruit", 15, dish_key))
-    return awards
 
 
 def award_meal_gamification(
@@ -2175,15 +1896,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         payload = meal_selection_payload(menu_key, category)
         payload["text"] += gamification_note(awards)
         await send_payload(update, payload, context, edit=True)
-        return
-    if data in {"favorite_last_order", "notify_me"}:
-        user_id = tg_id(update)
-        last = context.user_data.get("last_order")
-        if user_id and last:
-            add_favorite_waitlist(user_id, last)
-            await send_text(update, "\u2705 Combinado! Vou te avisar quando esse prato voltar ao cardapio \U0001f514", context, main_buttons(), edit=True)
-        else:
-            await send_text(update, "Escolha um prato primeiro para eu acompanhar \U0001f60a", context, main_buttons(), edit=True)
         return
     if data == "recommend":
         if not registered(context):

@@ -55,6 +55,23 @@ class CoreLogicTest(unittest.TestCase):
         self.assertNotIn("R$", payload["text"])
         self.assertNotIn("Pedir", str(payload["buttons"]))
 
+    def test_init_db_removes_legacy_commercial_menu_tables(self):
+        with closing(sqlite3.connect(bot.DB_PATH)) as conn:
+            conn.execute("CREATE TABLE menu_items (dish_key TEXT, price_cents INTEGER)")
+            conn.execute("CREATE TABLE orders (id INTEGER)")
+            conn.commit()
+
+        bot.init_db()
+
+        with closing(sqlite3.connect(bot.DB_PATH)) as conn:
+            tables = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('menu_items', 'orders')"
+                )
+            }
+        self.assertEqual(tables, set())
+
     def test_vegetarian_recommendation_uses_egg_option(self):
         recommended = bot.recommend_daily_component("01/09", "Vegetariana", "Manter equilibrio")
 
