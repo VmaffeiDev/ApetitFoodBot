@@ -26,6 +26,26 @@ Importante: as refeicoes sao um beneficio da empresa. O bot nao exibe valores, n
 
 O colaborador pode consultar e apagar seus dados a qualquer momento.
 
+## Grafo do fluxo
+
+```mermaid
+flowchart TD
+    A["Funcionario envia /start"] --> B["Cadastro funcional: nome, unidade e setor"]
+    B --> C{"Aceita LGPD funcional?"}
+    C -- "Nao" --> D["Fluxo pausado: cadastro nao e salvo"]
+    C -- "Sim" --> E["Cardapio diario liberado"]
+    E --> F["Consulta /cardapio ou /cardapio DD/MM"]
+    F --> G["Escolhe uma opcao principal"]
+    G --> H["Sistema registra em meal_selections"]
+    H --> I["Historico do colaborador"]
+    H --> J["Relatorio administrativo"]
+    E --> K["Opcional: /minha_meta"]
+    K --> L{"Aceita perfil nutricional?"}
+    L -- "Sim" --> M["Meta educativa, progresso e recomendacao"]
+    L -- "Nao" --> E
+    I --> N["/excluir_dados remove cadastro e historico"]
+```
+
 ## Cardapio Cotton de setembro
 
 O cardapio base foi transcrito do arquivo `Cardapio_Cotton_Setembro kcal-1.pdf` para [cotton_menu.py](cotton_menu.py).
