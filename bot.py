@@ -10,7 +10,7 @@ from pathlib import Path
 
 import openpyxl
 from dotenv import load_dotenv
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import BotCommand, BotCommandScopeChat, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
@@ -1198,12 +1198,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await send_text(update, "Quer ver o cardapio da semana ou seu perfil? \U0001f60a", context, main_buttons())
 
 
+EMPLOYEE_COMMANDS = [
+    BotCommand("start", "Iniciar cadastro"),
+    BotCommand("cardapio_semana", "Ver cardapio da semana"),
+    BotCommand("minhas_escolhas", "Ver minhas escolhas"),
+    BotCommand("meu_progresso", "Ver pontos, sequencia e badges"),
+    BotCommand("ranking", "Ver ranking de pontos"),
+    BotCommand("meus_dados", "Ver meus dados salvos"),
+    BotCommand("excluir_dados", "Apagar meus dados"),
+    BotCommand("recadastrar", "Refazer cadastro"),
+]
+
+ADMIN_COMMANDS = EMPLOYEE_COMMANDS + [
+    BotCommand("prato_add", "Cadastrar ingredientes/alergenicos de um prato"),
+    BotCommand("pratos_pendentes", "Ver pratos sem alergenicos cadastrados"),
+    BotCommand("relatorio", "Ver relatorio administrativo"),
+]
+
+
+async def configure_commands(app: Application) -> None:
+    await app.bot.set_my_commands(EMPLOYEE_COMMANDS)
+    for admin_id in ADMIN_TELEGRAM_IDS:
+        try:
+            await app.bot.set_my_commands(ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id))
+        except Exception:
+            logger.exception("Falha ao configurar comandos administrativos para %s", admin_id)
+
+
 def main() -> None:
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
         raise RuntimeError("Defina TELEGRAM_BOT_TOKEN no arquivo .env antes de iniciar o bot.")
     init_db()
-    app = Application.builder().token(token).build()
+    app = Application.builder().token(token).post_init(configure_commands).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("recadastrar", reset_registration))
     app.add_handler(CommandHandler("cardapio_semana", show_week_menu))
