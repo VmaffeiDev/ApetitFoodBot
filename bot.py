@@ -378,6 +378,98 @@ def week_selections(telegram_id: int, week_dates: list[str]) -> list[sqlite3.Row
 
 
 # ---------------------------------------------------------------------------
+# Gamificacao
+# ---------------------------------------------------------------------------
+
+BADGES = {
+    "primeiro_passo": "\U0001f463 Primeiro Passo",
+    "em_chamas": "\U0001f525 Em Chamas",
+    "guardiao_do_objetivo": "\U0001f3af Guardiao do Objetivo",
+    "vida_saudavel": "\U0001f957 Vida Saudavel",
+    "mestre_apetit": "\U0001f451 Mestre Apetit",
+}
+
+
+def next_business_day(day: date) -> date:
+    next_day = day + timedelta(days=1)
+    while next_day.weekday() >= 5:
+        next_day += timedelta(days=1)
+    return next_day
+
+
+def current_streak(menu_dates: list[str]) -> int:
+    if not menu_dates:
+        return 0
+    parsed = sorted(date.fromisoformat(value) for value in set(menu_dates))
+    streak = 1
+    for index in range(len(parsed) - 1, 0, -1):
+        if parsed[index] == next_business_day(parsed[index - 1]):
+            streak += 1
+        else:
+            break
+    return streak
+
+
+def earned_badges(points: int, streak: int, goal_aligned: int, total_selections: int) -> set[str]:
+    badges = set()
+    if total_selections > 0:
+        badges.add("primeiro_passo")
+    if streak >= 3:
+        badges.add("em_chamas")
+    if goal_aligned >= 5:
+        badges.add("guardiao_do_objetivo")
+    if points >= 100:
+        badges.add("vida_saudavel")
+    if points >= 300 and streak >= 5:
+        badges.add("mestre_apetit")
+    return badges
+
+
+def employee_gamification_stats(telegram_id: int, restriction: str, goal: str) -> dict:
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT menu_date, base_category, dish_key FROM selections WHERE telegram_id = ? ORDER BY menu_date",
+            (telegram_id,),
+        ).fetchall()
+    dates = sorted({row["menu_date"] for row in rows})
+    grouped_cache: dict[str, dict[str, list[sqlite3.Row]]] = {}
+    goal_aligned = 0
+    for row in rows:
+        grouped = grouped_cache.setdefault(row["menu_date"], day_menu_by_category(row["menu_date"]))
+        best = best_dish_for_goal(grouped.get(row["base_category"], []), restriction, goal)
+        if best and best["dish_key"] == row["dish_key"]:
+            goal_aligned += 1
+    points = len(dates) * 10 + goal_aligned * 5
+    streak = current_streak(dates)
+    return {
+        "points": points,
+        "streak": streak,
+        "goal_aligned": goal_aligned,
+        "total_selections": len(rows),
+        "last_active": dates[-1] if dates else None,
+        "badges": earned_badges(points, streak, goal_aligned, len(rows)),
+    }
+
+
+def points_ranking(limit: int = 10) -> list[dict]:
+    ranking = [
+        {
+            "name": employee["name"],
+            **{
+                key: value
+                for key, value in employee_gamification_stats(
+                    employee["telegram_id"], employee["restriction"], employee["goal"]
+                ).items()
+                if key in {"points", "streak"}
+            },
+        }
+        for employee in list_active_employees()
+    ]
+    ranking.sort(key=lambda row: (-row["points"], -row["streak"]))
+    return ranking[:limit]
+
+
+# ---------------------------------------------------------------------------
 # Employees
 # ---------------------------------------------------------------------------
 
@@ -533,6 +625,7 @@ async def send_payload(update: Update, payload: dict, context: ContextTypes.DEFA
 def main_buttons() -> list[list[tuple[str, str]]]:
     return [
         [("\U0001f4c5 Cardapio da semana", "week_menu")],
+        [("\U0001f3c6 Meu progresso", "progress"), ("\U0001f3c5 Ranking", "ranking")],
         [("\U0001f464 Meu perfil", "profile")],
     ]
 
@@ -626,6 +719,43 @@ def profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
         ),
         "buttons": [[("✏️ Atualizar cadastro", "restart_registration"), ("✅ Esta correto", "thanks")]],
     }
+
+
+def progress_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
+    data = profile(context)
+    user_id = data.get("telegram_id")
+    stats = employee_gamification_stats(user_id, data.get("restriction", ""), data.get("goal", ""))
+    badge_lines = "\n".join(f"- {BADGES[key]}" for key in sorted(stats["badges"]))
+    if not badge_lines:
+        badge_lines = "Ainda sem badges. Escolha um prato no cardapio da semana para comecar!"
+    last_active = format_date_br(stats["last_active"]) if stats["last_active"] else "Nenhuma escolha ainda"
+    return {
+        "text": (
+            "\U0001f3c6 <b>Seu progresso:</b>\n\n"
+            f"Pontos: <b>{stats['points']}</b>\n"
+            f"Sequencia atual: {stats['streak']} dia(s) util(eis)\n"
+            f"Escolhas alinhadas ao objetivo: {stats['goal_aligned']}\n"
+            f"Ultima escolha: {escape(last_active)}\n\n"
+            f"<b>Badges:</b>\n{badge_lines}"
+        ),
+        "buttons": [[("\U0001f3c5 Ver ranking", "ranking")], [("\U0001f4c5 Cardapio da semana", "week_menu")]],
+    }
+
+
+def ranking_payload() -> dict:
+    ranking = points_ranking(10)
+    if not ranking:
+        return {
+            "text": "\U0001f3c5 Ainda ninguem no ranking. Escolha um prato no cardapio da semana para comecar!",
+            "buttons": [[("\U0001f4c5 Cardapio da semana", "week_menu")]],
+        }
+    medals = ["\U0001f947", "\U0001f948", "\U0001f949"]
+    lines = ["\U0001f3c5 <b>Ranking de pontos:</b>", ""]
+    for index, row in enumerate(ranking):
+        prefix = medals[index] if index < len(medals) else f"{index + 1}."
+        first_name = escape((row["name"] or DEFAULT_USER_NAME).split()[0])
+        lines.append(f"{prefix} {first_name} — {row['points']} pts (sequencia {row['streak']})")
+    return {"text": "\n".join(lines), "buttons": [[("\U0001f3c6 Meu progresso", "progress")]]}
 
 
 # ---------------------------------------------------------------------------
@@ -790,6 +920,22 @@ async def show_my_selections(update: Update, context: ContextTypes.DEFAULT_TYPE)
             last_date = row["menu_date"]
         lines.append(f"- {row['base_category'].title()}: {row['dish_name']}")
     await update.effective_message.reply_text("\n".join(lines))
+
+
+async def show_progress(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    hydrate_profile(update, context)
+    if not registered(context):
+        await ask_name(update, context)
+        return
+    await send_payload(update, progress_payload(context), context)
+
+
+async def show_ranking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    hydrate_profile(update, context)
+    if not registered(context):
+        await ask_name(update, context)
+        return
+    await send_payload(update, ranking_payload(), context)
 
 
 # ---------------------------------------------------------------------------
@@ -985,6 +1131,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
         await send_payload(update, week_menu_payload(profile(context).get("restriction", "")), context, edit=True)
         return
+    if data == "progress":
+        if not registered(context):
+            await ask_name(update, context, edit=True)
+            return
+        await send_payload(update, progress_payload(context), context, edit=True)
+        return
+    if data == "ranking":
+        if not registered(context):
+            await ask_name(update, context, edit=True)
+            return
+        await send_payload(update, ranking_payload(), context, edit=True)
+        return
     if data.startswith("day:"):
         if not registered(context):
             await ask_name(update, context, edit=True)
@@ -1032,6 +1190,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await send_payload(update, profile_payload(context), context)
     elif "escolha" in text:
         await show_my_selections(update, context)
+    elif "progresso" in text or "pontos" in text or "badge" in text:
+        await show_progress(update, context)
+    elif "ranking" in text:
+        await show_ranking(update, context)
     else:
         await send_text(update, "Quer ver o cardapio da semana ou seu perfil? \U0001f60a", context, main_buttons())
 
@@ -1046,6 +1208,8 @@ def main() -> None:
     app.add_handler(CommandHandler("recadastrar", reset_registration))
     app.add_handler(CommandHandler("cardapio_semana", show_week_menu))
     app.add_handler(CommandHandler("minhas_escolhas", show_my_selections))
+    app.add_handler(CommandHandler("meu_progresso", show_progress))
+    app.add_handler(CommandHandler("ranking", show_ranking))
     app.add_handler(CommandHandler("meus_dados", show_my_data))
     app.add_handler(CommandHandler("excluir_dados", delete_my_data))
     app.add_handler(CommandHandler("prato_add", add_dish_metadata))

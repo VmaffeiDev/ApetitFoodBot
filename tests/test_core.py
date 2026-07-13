@@ -184,6 +184,93 @@ class CoreLogicTest(unittest.TestCase):
         self.assertEqual(report["goals"][0]["goal"], "Perder peso")
         self.assertEqual(report["top"][0]["dish_name"], "Sopa de Lentilha")
 
+    def test_next_business_day_skips_weekend(self):
+        friday = date(2026, 7, 17)
+        self.assertEqual(friday.weekday(), 4)
+
+        self.assertEqual(bot.next_business_day(friday), date(2026, 7, 20))
+
+    def test_current_streak_counts_consecutive_business_days(self):
+        day1 = date(2026, 7, 13)
+        day2 = bot.next_business_day(day1)
+        day3 = bot.next_business_day(day2)
+
+        streak = bot.current_streak([day1.isoformat(), day2.isoformat(), day3.isoformat()])
+
+        self.assertEqual(streak, 3)
+
+    def test_current_streak_resets_after_gap(self):
+        day1 = date(2026, 7, 13)
+        day2 = bot.next_business_day(day1)
+        gap_day = bot.next_business_day(bot.next_business_day(day2))
+
+        streak = bot.current_streak([day1.isoformat(), day2.isoformat(), gap_day.isoformat()])
+
+        self.assertEqual(streak, 1)
+
+    def test_earned_badges_thresholds(self):
+        self.assertEqual(bot.earned_badges(0, 0, 0, 0), set())
+        self.assertEqual(bot.earned_badges(10, 1, 0, 1), {"primeiro_passo"})
+        self.assertEqual(bot.earned_badges(30, 3, 0, 3), {"primeiro_passo", "em_chamas"})
+        self.assertEqual(
+            bot.earned_badges(125, 3, 5, 10),
+            {"primeiro_passo", "em_chamas", "guardiao_do_objetivo", "vida_saudavel"},
+        )
+        self.assertEqual(
+            bot.earned_badges(300, 5, 5, 20),
+            {"primeiro_passo", "em_chamas", "guardiao_do_objetivo", "vida_saudavel", "mestre_apetit"},
+        )
+
+    def test_employee_gamification_stats_counts_points_and_goal_alignment(self):
+        user_id = 321
+        bot.save_employee(user_id, 999, "Colaborador Fit", "Ganhar massa", "Sem restricoes", True, bot.now_iso())
+        self.seed_dish("frango", "Frango Grelhado", "LANCHE", ingredients="frango", tags="proteico, ganho de massa")
+        self.seed_dish("peixe", "Peixe Assado", "LANCHE", ingredients="peixe", tags="proteico, ganho de massa")
+        self.seed_dish("salada", "Salada", "LANCHE", ingredients="alface")
+        day1 = date(2026, 7, 13)
+        day2 = bot.next_business_day(day1)
+        with bot.db() as conn:
+            conn.execute(
+                "INSERT INTO daily_menu (menu_date, slot, base_category, dish_key, dish_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (day1.isoformat(), "LANCHE", "LANCHE", "frango", "Frango Grelhado", bot.now_iso()),
+            )
+            conn.execute(
+                "INSERT INTO daily_menu (menu_date, slot, base_category, dish_key, dish_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (day2.isoformat(), "LANCHE", "LANCHE", "peixe", "Peixe Assado", bot.now_iso()),
+            )
+            conn.execute(
+                "INSERT INTO daily_menu (menu_date, slot, base_category, dish_key, dish_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (day2.isoformat(), "LANCHE 2", "LANCHE", "salada", "Salada", bot.now_iso()),
+            )
+        bot.save_selection(user_id, day1.isoformat(), "LANCHE", "frango", "Frango Grelhado")
+        bot.save_selection(user_id, day2.isoformat(), "LANCHE", "salada", "Salada")
+
+        stats = bot.employee_gamification_stats(user_id, "Sem restricoes", "Ganhar massa")
+
+        self.assertEqual(stats["total_selections"], 2)
+        self.assertEqual(stats["goal_aligned"], 1)
+        self.assertEqual(stats["points"], 2 * 10 + 1 * 5)
+        self.assertEqual(stats["streak"], 2)
+        self.assertIn("primeiro_passo", stats["badges"])
+
+    def test_points_ranking_orders_by_points_desc(self):
+        bot.save_employee(1, 999, "Ana Colaboradora", "Perder peso", "Sem restricoes", True, bot.now_iso())
+        bot.save_employee(2, 999, "Bruno Colaborador", "Perder peso", "Sem restricoes", True, bot.now_iso())
+        self.seed_dish("sopa", "Sopa", "LANCHE", ingredients="legumes")
+        day1 = date(2026, 7, 13)
+        with bot.db() as conn:
+            conn.execute(
+                "INSERT INTO daily_menu (menu_date, slot, base_category, dish_key, dish_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (day1.isoformat(), "LANCHE", "LANCHE", "sopa", "Sopa", bot.now_iso()),
+            )
+        bot.save_selection(1, day1.isoformat(), "LANCHE", "sopa", "Sopa")
+
+        ranking = bot.points_ranking()
+
+        self.assertEqual(ranking[0]["name"], "Ana Colaboradora")
+        self.assertGreater(ranking[0]["points"], 0)
+        self.assertEqual(ranking[1]["points"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

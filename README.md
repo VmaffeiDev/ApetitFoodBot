@@ -8,6 +8,7 @@ o refeitório já serve um cardápio fixo definido pela empresa; o bot existe pa
   seu objetivo (emagrecer, ganhar massa, manter equilíbrio, alimentação saudável ou praticidade)
 - seja avisado quando algum prato do cardápio contiver um alérgeno/restrição que ele cadastrou
 - registre o que pretende comer em cada dia, para a empresa acompanhar as escolhas
+- ganhe pontos, sequência (streak) e badges por manter o registro em dia e escolher pratos alinhados ao objetivo
 
 ## Fluxo do colaborador
 
@@ -19,8 +20,21 @@ o refeitório já serve um cardápio fixo definido pela empresa; o bot existe pa
    objetivo do colaborador, bloqueia com ⚠️ os pratos que batem com a restrição cadastrada (não deixa escolher) e
    permite escolher um prato por categoria.
 5. `/minhas_escolhas` mostra o que o colaborador já escolheu na semana.
-6. `/meus_dados` mostra os dados salvos; `/excluir_dados` apaga cadastro e escolhas.
-7. `/recadastrar` refaz nome, objetivo e restrição.
+6. `/meu_progresso` mostra pontos, sequência de dias úteis com escolha registrada e badges conquistados;
+   `/ranking` mostra o top 10 colaboradores por pontos (só primeiro nome, sem expor objetivo/restrição de ninguém).
+7. `/meus_dados` mostra os dados salvos; `/excluir_dados` apaga cadastro e escolhas.
+8. `/recadastrar` refaz nome, objetivo e restrição.
+
+## Gamificação
+
+Pontos e sequência são calculados sempre a partir do histórico real de escolhas (`selections`), nunca de um
+contador separado — evita drift entre o que o colaborador vê e o que realmente foi registrado.
+
+- **+10 pontos** por dia em que o colaborador registra pelo menos uma escolha no cardápio
+- **+5 pontos** extra por escolha que bate com o prato recomendado (⭐) para o objetivo dele naquela categoria/dia
+- **Sequência**: dias úteis consecutivos com pelo menos uma escolha registrada (pula fim de semana automaticamente)
+- **Badges**: Primeiro Passo (primeira escolha), Em Chamas (sequência ≥ 3), Guardião do Objetivo (5+ escolhas
+  alinhadas ao objetivo), Vida Saudável (100+ pontos), Mestre Apetit (300+ pontos e sequência ≥ 5)
 
 ## Cadastro do cardápio pela empresa (admin)
 
