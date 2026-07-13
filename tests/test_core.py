@@ -1,12 +1,18 @@
 import os
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-token")
 os.environ.setdefault("APETIT_DB_PATH", "test-apetit.db")
 
 import bot
+
+
+def monday_of_this_week() -> date:
+    today = date.today()
+    return today - timedelta(days=today.weekday())
 
 
 class CoreLogicTest(unittest.TestCase):
@@ -22,88 +28,129 @@ class CoreLogicTest(unittest.TestCase):
         except PermissionError:
             pass
 
-    def test_price_to_cents_accepts_brazilian_format(self):
-        self.assertEqual(bot.price_to_cents("R$ 29,90"), 2990)
-        self.assertEqual(bot.format_price(2990), "R$ 29,90")
+    def seed_dish(self, key, name, base_category, ingredients="", allergens="", tags=""):
+        with bot.db() as conn:
+            conn.execute(
+                """
+                INSERT INTO dishes (dish_key, dish_name, base_category, ingredients, allergens, tags, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (key, name, base_category, ingredients, allergens, tags, bot.now_iso(), bot.now_iso()),
+            )
+
+    def test_parse_menu_cell_extracts_code_and_name(self):
+        code, name = bot.parse_menu_cell("100% - 08.03.01.110 - X-FRANGO - 2.28")
+        self.assertEqual(code, "08.03.01.110")
+        self.assertEqual(name, "X-FRANGO")
+
+    def test_parse_menu_cell_returns_none_for_empty(self):
+        self.assertIsNone(bot.parse_menu_cell(None))
+        self.assertIsNone(bot.parse_menu_cell("  "))
+
+    def test_base_category_strips_trailing_number(self):
+        self.assertEqual(bot.base_category_from_slot("ACOMPANHAMENTO 2"), "ACOMPANHAMENTO")
+        self.assertEqual(bot.base_category_from_slot("BEBIDA"), "BEBIDA")
 
     def test_restriction_conflict_blocks_unsafe_items(self):
-        fish = bot.load_menu_item("fish")
-        lasagna = bot.load_menu_item("lasagna")
+        self.seed_dish("frango", "Frango Grelhado", "LANCHE", ingredients="frango, arroz", tags="proteico")
+        self.seed_dish("lasanha", "Lasanha", "LANCHE", ingredients="massa, molho de tomate, queijo", allergens="leite")
+        frango = bot.load_dish("frango")
+        lasanha = bot.load_dish("lasanha")
 
-        self.assertEqual(bot.restriction_conflict("Vegetariana", fish), "nao esta marcado como vegetariano")
-        self.assertEqual(bot.restriction_conflict("Sem lactose", lasagna), "contem lactose ou derivados de leite")
-        self.assertIsNone(bot.restriction_conflict("Sem gluten", lasagna))
+        self.assertEqual(bot.restriction_conflict("Vegetariana", frango), "nao esta marcado como vegetariano")
+        self.assertEqual(bot.restriction_conflict("Sem lactose", lasanha), "contem lactose ou derivados de leite")
+        self.assertIsNone(bot.restriction_conflict("Sem gluten", frango))
 
-    def test_recommendation_respects_restriction_and_history(self):
-        user_id = 123
-        bot.record_order(user_id, "fish")
-        bot.record_order(user_id, "fish")
-        bot.record_order(user_id, "lasagna")
+    def test_best_dish_for_goal_excludes_restriction_conflicts(self):
+        self.seed_dish("peixe", "Peixe Assado", "LANCHE", ingredients="peixe", tags="leve, proteico")
+        self.seed_dish("salada", "Salada de Grao de Bico", "LANCHE", ingredients="grao de bico, legumes", tags="leve, vegano, perda de peso")
+        dishes = [bot.load_dish("peixe"), bot.load_dish("salada")]
 
-        recommended = bot.recommend_item(user_id, "Vegetariana", "Manter equilibrio")
+        best = bot.best_dish_for_goal(dishes, "Sem frutos do mar", "Perder peso")
 
-        self.assertEqual(recommended["dish_key"], "lasagna")
+        self.assertEqual(best["dish_key"], "salada")
 
-    def test_recommendation_uses_customer_goal(self):
-        recommended = bot.recommend_item(None, "Sem restricoes", "Ganhar massa")
+    def test_import_menu_workbook_creates_dishes_and_daily_menu(self):
+        import openpyxl
 
-        self.assertGreater(bot.goal_score("Ganhar massa", recommended), 0)
-        self.assertIn("proteico", bot.item_search_text(recommended))
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = "Oficina do lanche"
+        sheet.append(["Dia", "LANCHE", "ACOMPANHAMENTO", "ACOMPANHAMENTO 2"])
+        sheet.append(["14", "100% - 08.03.01.110 - X-FRANGO - 2.28", "100% - 03.01.02.190 - BATATA CHIPS - 0.55", "100% - 09.03.01.050 - KIT - LANCHE - 0.08"])
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp_file:
+            workbook.save(tmp_file.name)
+            tmp_path = tmp_file.name
+        try:
+            result = bot.import_menu_workbook(tmp_path, 2026, 7)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
 
-    def test_recent_orders_include_keys_for_recommendation_flow(self):
-        user_id = 456
-        bot.record_order(user_id, "soup")
+        self.assertEqual(result["days"], 1)
+        self.assertEqual({code for code, _ in result["new_dishes"]}, {"08.03.01.110", "03.01.02.190", "09.03.01.050"})
 
-        rows = bot.recent_orders(user_id)
+        grouped = bot.day_menu_by_category("2026-07-14")
+        self.assertEqual(set(grouped.keys()), {"LANCHE", "ACOMPANHAMENTO"})
+        self.assertEqual(len(grouped["ACOMPANHAMENTO"]), 2)
 
-        self.assertEqual(rows[0]["dish_key"], "soup")
+    def test_import_menu_workbook_keeps_existing_dish_metadata(self):
+        self.seed_dish("08.03.01.110", "X-FRANGO", "LANCHE", ingredients="pao, frango, queijo", allergens="gluten, leite")
+        import openpyxl
 
-    def test_admin_report_counts_clients_orders_and_favorites(self):
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.append(["Dia", "LANCHE"])
+        sheet.append(["14", "100% - 08.03.01.110 - X-FRANGO - 2.28"])
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp_file:
+            workbook.save(tmp_file.name)
+            tmp_path = tmp_file.name
+        try:
+            result = bot.import_menu_workbook(tmp_path, 2026, 7)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+        self.assertEqual(result["new_dishes"], [])
+        dish = bot.load_dish("08.03.01.110")
+        self.assertEqual(dish["allergens"], "gluten, leite")
+
+    def test_save_employee_stores_consent(self):
+        user_id = 987
+        consented_at = "2026-07-13T10:00:00+00:00"
+
+        bot.save_employee(user_id, 999, "Colaborador LGPD", "Manter equilibrio", "Sem restricoes", True, consented_at)
+
+        employee = bot.load_employee(user_id)
+        self.assertEqual(employee["consent_accepted"], 1)
+        self.assertEqual(employee["consented_at"], consented_at)
+
+    def test_delete_employee_data_removes_profile_and_selections(self):
+        user_id = 654
+        bot.save_employee(user_id, 999, "Colaborador Delete", "Perder peso", "Sem restricoes", True, bot.now_iso())
+        self.seed_dish("soup", "Sopa de Lentilha", "LANCHE")
+        menu_date = monday_of_this_week().isoformat()
+        bot.save_selection(user_id, menu_date, "LANCHE", "soup", "Sopa de Lentilha")
+
+        bot.delete_employee_data(user_id)
+
+        self.assertIsNone(bot.load_employee(user_id))
+        self.assertEqual(bot.week_selections(user_id, bot.current_week_dates()), [])
+
+    def test_admin_report_counts_employees_selections_and_pending_dishes(self):
         user_id = 789
-        bot.save_client(user_id, 999, "Cliente Teste", "11999999999", "Centro", "Sem restricoes", "Perder peso")
-        bot.record_order(user_id, "soup")
-        bot.add_favorite_waitlist(user_id, "soup")
+        bot.save_employee(user_id, 999, "Colaborador Teste", "Perder peso", "Sem restricoes", True, bot.now_iso())
+        self.seed_dish("soup", "Sopa de Lentilha", "LANCHE", ingredients="lentilha")
+        self.seed_dish("pendente", "Prato Novo", "LANCHE")
+        menu_date = monday_of_this_week().isoformat()
+        bot.save_selection(user_id, menu_date, "LANCHE", "soup", "Sopa de Lentilha")
 
         report = bot.admin_report_data()
 
-        self.assertEqual(report["totals"]["clients"], 1)
-        self.assertEqual(report["totals"]["orders"], 1)
-        self.assertEqual(report["totals"]["favorites"], 1)
+        self.assertEqual(report["totals"]["employees"], 1)
+        self.assertEqual(report["totals"]["selections"], 1)
+        self.assertEqual(report["totals"]["dishes"], 2)
+        self.assertEqual(report["totals"]["pending"], 1)
         self.assertEqual(report["goals"][0]["goal"], "Perder peso")
         self.assertEqual(report["top"][0]["dish_name"], "Sopa de Lentilha")
-
-    def test_client_consent_is_stored_with_timestamp(self):
-        user_id = 987
-        consented_at = "2026-05-27T10:00:00+00:00"
-
-        bot.save_client(
-            user_id,
-            999,
-            "Cliente LGPD",
-            "11988887777",
-            "Centro",
-            "Sem restricoes",
-            "Manter equilibrio",
-            True,
-            consented_at,
-        )
-
-        client = bot.load_client(user_id)
-
-        self.assertEqual(client["consent_accepted"], 1)
-        self.assertEqual(client["consented_at"], consented_at)
-
-    def test_delete_client_data_removes_profile_history_and_favorites(self):
-        user_id = 654
-        bot.save_client(user_id, 999, "Cliente Delete", "11977776666", "Bairro", "Sem restricoes", "Perder peso")
-        bot.record_order(user_id, "soup")
-        bot.add_favorite_waitlist(user_id, "soup")
-
-        bot.delete_client_data(user_id)
-
-        self.assertIsNone(bot.load_client(user_id))
-        self.assertEqual(bot.recent_orders(user_id), [])
-        self.assertEqual(bot.favorite_items(user_id), [])
 
 
 if __name__ == "__main__":

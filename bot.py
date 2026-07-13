@@ -1,11 +1,14 @@
 import logging
 import os
+import re
 import sqlite3
+import tempfile
 import unicodedata
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from html import escape
 from pathlib import Path
 
+import openpyxl
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
@@ -23,7 +26,7 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=lo
 logger = logging.getLogger(__name__)
 
 DB_PATH = Path(os.getenv("APETIT_DB_PATH", "apetit.db"))
-DEFAULT_USER_NAME = os.getenv("APETIT_USER_NAME", "Cliente")
+DEFAULT_USER_NAME = os.getenv("APETIT_USER_NAME", "Colaborador")
 
 REGISTRATION_STEP = "registration_step"
 ADMIN_TELEGRAM_IDS = {
@@ -48,19 +51,20 @@ GOALS = {
     "goal_practical": "Praticidade na rotina",
 }
 
-DEFAULT_DISHES = {
-    "lasagna": "Lasanha de Legumes",
-    "fish": "Peixe Assado com Legumes",
-    "soup": "Sopa de Lentilha",
-}
+WEEKDAY_LABELS = ["Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado", "Domingo"]
 
 
 def normalize(text: str) -> str:
-    return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower().strip()
+    return unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode().lower().strip()
 
 
 def now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def format_date_br(iso_date: str) -> str:
+    parsed = date.fromisoformat(iso_date)
+    return f"{WEEKDAY_LABELS[parsed.weekday()]} ({parsed.strftime('%d/%m')})"
 
 
 def db() -> sqlite3.Connection:
@@ -73,167 +77,157 @@ def init_db() -> None:
     with db() as conn:
         conn.executescript(
             """
-            CREATE TABLE IF NOT EXISTS clients (
+            CREATE TABLE IF NOT EXISTS employees (
                 telegram_id INTEGER PRIMARY KEY,
                 chat_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
-                phone TEXT NOT NULL DEFAULT '',
-                address TEXT NOT NULL DEFAULT '',
                 goal TEXT NOT NULL DEFAULT 'Nao informado',
-                restriction TEXT NOT NULL,
+                restriction TEXT NOT NULL DEFAULT 'Sem restricoes',
+                consent_accepted INTEGER NOT NULL DEFAULT 0,
+                consented_at TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
-            CREATE TABLE IF NOT EXISTS orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                telegram_id INTEGER NOT NULL,
-                dish_key TEXT NOT NULL,
-                dish_name TEXT NOT NULL,
-                ordered_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS favorite_waitlist (
-                telegram_id INTEGER NOT NULL,
-                dish_key TEXT NOT NULL,
-                dish_name TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                PRIMARY KEY (telegram_id, dish_key)
-            );
-            CREATE TABLE IF NOT EXISTS weekly_menu (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                week_start TEXT NOT NULL,
-                dish_key TEXT NOT NULL,
-                dish_name TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                UNIQUE (week_start, dish_key)
-            );
-            CREATE TABLE IF NOT EXISTS menu_items (
+            CREATE TABLE IF NOT EXISTS dishes (
                 dish_key TEXT PRIMARY KEY,
                 dish_name TEXT NOT NULL,
-                price_cents INTEGER NOT NULL DEFAULT 0,
-                day_of_week TEXT NOT NULL DEFAULT 'todos',
+                base_category TEXT NOT NULL,
                 ingredients TEXT NOT NULL DEFAULT '',
                 allergens TEXT NOT NULL DEFAULT '',
                 tags TEXT NOT NULL DEFAULT '',
-                available INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS daily_menu (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                menu_date TEXT NOT NULL,
+                slot TEXT NOT NULL,
+                base_category TEXT NOT NULL,
+                dish_key TEXT NOT NULL,
+                dish_name TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE (menu_date, slot)
+            );
+            CREATE TABLE IF NOT EXISTS selections (
+                telegram_id INTEGER NOT NULL,
+                menu_date TEXT NOT NULL,
+                base_category TEXT NOT NULL,
+                dish_key TEXT NOT NULL,
+                dish_name TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (telegram_id, menu_date, base_category)
+            );
             """
         )
-        columns = {row["name"] for row in conn.execute("PRAGMA table_info(clients)").fetchall()}
-        if "phone" not in columns:
-            conn.execute("ALTER TABLE clients ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
-        if "address" not in columns:
-            conn.execute("ALTER TABLE clients ADD COLUMN address TEXT NOT NULL DEFAULT ''")
-        if "goal" not in columns:
-            conn.execute("ALTER TABLE clients ADD COLUMN goal TEXT NOT NULL DEFAULT 'Nao informado'")
-        seed_default_menu(conn)
 
 
-def dish_key_from_name(name: str) -> str:
-    for key, dish_name in DEFAULT_DISHES.items():
-        if normalize(name) == normalize(dish_name):
-            return key
-    return normalize(name).replace(" ", "_")[:64]
+# ---------------------------------------------------------------------------
+# Dishes
+# ---------------------------------------------------------------------------
+
+def parse_menu_cell(raw) -> tuple[str, str] | None:
+    text = str(raw).strip() if raw is not None else ""
+    if not text:
+        return None
+    parts = [part.strip() for part in text.split(" - ")]
+    if len(parts) >= 3:
+        code = parts[1]
+        tail = parts[2:]
+        if len(tail) > 1 and re.match(r"^[\d.,]+$", tail[-1]):
+            tail = tail[:-1]
+        name = " - ".join(tail).strip() or code
+        return code, name
+    return normalize(text)[:40] or "prato", text
 
 
-def price_to_cents(raw: str) -> int:
-    cleaned = raw.strip().replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
-    try:
-        return int(round(float(cleaned) * 100))
-    except ValueError:
-        return 0
+def base_category_from_slot(slot: str) -> str:
+    return re.sub(r"\s+\d+$", "", slot).strip().upper()
 
 
-def format_price(cents: int) -> str:
-    return f"R$ {cents / 100:.2f}".replace(".", ",")
+def upsert_dish_name(conn: sqlite3.Connection, code: str, name: str, base_category: str, timestamp: str) -> bool:
+    existing = conn.execute("SELECT dish_key FROM dishes WHERE dish_key = ?", (code,)).fetchone()
+    if existing:
+        conn.execute("UPDATE dishes SET dish_name = ?, updated_at = ? WHERE dish_key = ?", (name, timestamp, code))
+        return False
+    conn.execute(
+        """
+        INSERT INTO dishes (dish_key, dish_name, base_category, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (code, name, base_category, timestamp, timestamp),
+    )
+    return True
 
 
-def seed_default_menu(conn: sqlite3.Connection) -> None:
+def import_menu_workbook(file_path: str, year: int, month: int) -> dict:
+    workbook = openpyxl.load_workbook(file_path, data_only=True)
+    sheet = workbook.worksheets[0]
+    rows = list(sheet.iter_rows(values_only=True))
+    if not rows:
+        return {"days": 0, "new_dishes": []}
+    header = [str(cell).strip() if cell else "" for cell in rows[0]]
+    slot_columns = [(index, name) for index, name in enumerate(header) if index != 0 and name]
     timestamp = now_iso()
-    items = [
-        ("lasagna", "Lasanha de Legumes", 2890, "segunda", "Legumes, molho de tomate, massa sem gluten", "Pode conter lactose", "vegetariano, sem gluten", 1),
-        ("fish", "Peixe Assado com Legumes", 3290, "terca", "Peixe, legumes, azeite, ervas", "Peixe", "leve, proteico", 1),
-        ("soup", "Sopa de Lentilha", 2490, "quarta", "Lentilha, legumes, temperos naturais", "", "vegano, sem gluten", 1),
-        ("frango_grelhado_com_arroz_integral", "Frango Grelhado com Arroz Integral", 3190, "segunda", "Frango, arroz integral, legumes, azeite", "", "proteico, integral, ganho de massa", 1),
-        ("omelete_de_legumes", "Omelete de Legumes", 2690, "segunda", "Ovos, cenoura, abobrinha, tomate, ervas", "Ovo", "leve, proteico, vegetariano", 1),
-        ("salada_proteica_com_grao_de_bico", "Salada Proteica com Grao de Bico", 2790, "terca", "Grao de bico, folhas, tomate, pepino, azeite", "", "leve, vegano, proteico, perda de peso", 1),
-        ("patinho_moido_com_batata_doce", "Patinho Moido com Batata Doce", 3490, "quarta", "Patinho moido, batata doce, brocolis, cenoura", "", "proteico, ganho de massa", 1),
-        ("bowl_de_quinoa_com_legumes", "Bowl de Quinoa com Legumes", 3090, "quinta", "Quinoa, legumes assados, folhas, sementes", "", "vegano, integral, saudavel", 1),
-        ("tilapia_com_pure_de_abobora", "Tilapia com Pure de Abobora", 3390, "quinta", "Tilapia, abobora, legumes, ervas", "Peixe", "leve, proteico, perda de peso", 1),
-        ("macarrao_integral_com_frango", "Macarrao Integral com Frango", 3290, "sexta", "Macarrao integral, frango, molho de tomate, ervas", "Gluten", "integral, proteico, energia", 1),
-        ("carne_de_panela_com_arroz_e_feijao", "Carne de Panela com Arroz e Feijao", 3590, "sexta", "Carne bovina, arroz, feijao, legumes", "", "caseiro, proteico, energia", 1),
-        ("wrap_integral_de_frango", "Wrap Integral de Frango", 2990, "todos", "Pao integral, frango, folhas, cenoura, molho leve", "Gluten", "pratico, proteico", 1),
-        ("creme_de_abobora_com_lentilha", "Creme de Abobora com Lentilha", 2590, "todos", "Abobora, lentilha, temperos naturais", "", "leve, vegano, sem gluten", 1),
-    ]
-    for item in items:
+    imported_days = 0
+    new_dishes: list[tuple[str, str]] = []
+    with db() as conn:
+        for row in rows[1:]:
+            day_raw = row[0] if row else None
+            if day_raw in (None, ""):
+                continue
+            try:
+                day = int(str(day_raw).strip())
+                menu_date = date(year, month, day).isoformat()
+            except (ValueError, TypeError):
+                continue
+            row_has_item = False
+            for col_index, slot in slot_columns:
+                if col_index >= len(row):
+                    continue
+                parsed = parse_menu_cell(row[col_index])
+                if not parsed:
+                    continue
+                code, name = parsed
+                base_category = base_category_from_slot(slot)
+                if upsert_dish_name(conn, code, name, base_category, timestamp):
+                    new_dishes.append((code, name))
+                conn.execute(
+                    """
+                    INSERT INTO daily_menu (menu_date, slot, base_category, dish_key, dish_name, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(menu_date, slot) DO UPDATE SET
+                        base_category = excluded.base_category,
+                        dish_key = excluded.dish_key,
+                        dish_name = excluded.dish_name,
+                        created_at = excluded.created_at
+                    """,
+                    (menu_date, slot, base_category, code, name, timestamp),
+                )
+                row_has_item = True
+            if row_has_item:
+                imported_days += 1
+    return {"days": imported_days, "new_dishes": new_dishes}
+
+
+def load_dish(dish_key: str) -> sqlite3.Row | None:
+    with db() as conn:
+        return conn.execute("SELECT * FROM dishes WHERE dish_key = ?", (dish_key,)).fetchone()
+
+
+def update_dish_metadata(dish_key: str, ingredients: str, allergens: str, tags: str) -> None:
+    with db() as conn:
         conn.execute(
-            """
-            INSERT INTO menu_items (
-                dish_key, dish_name, price_cents, day_of_week, ingredients,
-                allergens, tags, available, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(dish_key) DO NOTHING
-            """,
-            (*item, timestamp, timestamp),
+            "UPDATE dishes SET ingredients = ?, allergens = ?, tags = ?, updated_at = ? WHERE dish_key = ?",
+            (ingredients, allergens, tags, now_iso(), dish_key),
         )
 
 
-def upsert_menu_item(name: str, price: int, day: str, ingredients: str, allergens: str, tags: str, available: bool) -> str:
-    key = dish_key_from_name(name)
-    timestamp = now_iso()
+def pending_dishes() -> list[sqlite3.Row]:
     with db() as conn:
-        conn.execute(
-            """
-            INSERT INTO menu_items (
-                dish_key, dish_name, price_cents, day_of_week, ingredients,
-                allergens, tags, available, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(dish_key) DO UPDATE SET
-                dish_name = excluded.dish_name,
-                price_cents = excluded.price_cents,
-                day_of_week = excluded.day_of_week,
-                ingredients = excluded.ingredients,
-                allergens = excluded.allergens,
-                tags = excluded.tags,
-                available = excluded.available,
-                updated_at = excluded.updated_at
-            """,
-            (key, name, price, normalize(day) or "todos", ingredients, allergens, tags, int(available), timestamp, timestamp),
-        )
-    return key
-
-
-def list_menu_items(day: str | None = None, only_available: bool = True) -> list[sqlite3.Row]:
-    where, params = [], []
-    if only_available:
-        where.append("available = 1")
-    if day:
-        where.append("(day_of_week = ? OR day_of_week = 'todos')")
-        params.append(normalize(day))
-    sql_where = f"WHERE {' AND '.join(where)}" if where else ""
-    with db() as conn:
-        return conn.execute(f"SELECT * FROM menu_items {sql_where} ORDER BY day_of_week, dish_name", params).fetchall()
-
-
-def load_menu_item(key: str) -> sqlite3.Row | None:
-    with db() as conn:
-        return conn.execute("SELECT * FROM menu_items WHERE dish_key = ?", (key,)).fetchone()
-
-
-def find_menu_item_in_text(text: str) -> sqlite3.Row | None:
-    normalized = normalize(text)
-    for item in list_menu_items():
-        if normalize(item["dish_name"]) in normalized:
-            return item
-    return None
-
-
-def get_dish_name(key: str) -> str:
-    item = load_menu_item(key)
-    return item["dish_name"] if item else DEFAULT_DISHES.get(key, key.replace("_", " ").title())
+        return conn.execute(
+            "SELECT * FROM dishes WHERE ingredients = '' AND allergens = '' ORDER BY dish_name"
+        ).fetchall()
 
 
 def item_search_text(item: sqlite3.Row) -> str:
@@ -266,20 +260,15 @@ def restriction_conflict(restriction: str, item: sqlite3.Row) -> str | None:
     return None
 
 
-def compatible_menu_items(restriction: str) -> list[sqlite3.Row]:
-    return [item for item in list_menu_items() if not restriction_conflict(restriction, item)]
-
-
-
 def goal_score(goal: str, item: sqlite3.Row) -> int:
     text = item_search_text(item)
     goal_key = normalize(goal)
     keywords = {
-        "perder peso": ("leve", "salada", "legumes", "sopa", "perda de peso", "grelhado", "abobora"),
-        "ganhar massa": ("proteico", "frango", "patinho", "ovo", "lentilha", "grao de bico", "batata doce", "ganho de massa"),
-        "manter equilibrio": ("equilibrado", "integral", "caseiro", "legumes", "arroz", "feijao"),
-        "alimentacao mais saudavel": ("saudavel", "vegano", "integral", "legumes", "natural", "sem gluten", "quinoa"),
-        "praticidade na rotina": ("pratico", "wrap", "bowl", "todos", "leve"),
+        "perder peso": ("leve", "salada", "legumes", "sopa", "perda de peso", "grelhado", "fruta"),
+        "ganhar massa": ("proteico", "frango", "carne", "ovo", "integral", "ganho de massa"),
+        "manter equilibrio": ("equilibrado", "integral", "caseiro", "legumes", "natural"),
+        "alimentacao mais saudavel": ("saudavel", "vegano", "integral", "legumes", "natural", "sem gluten", "fruta"),
+        "praticidade na rotina": ("pratico", "kit", "rapido"),
     }
     for key, terms in keywords.items():
         if key in goal_key:
@@ -299,111 +288,126 @@ def goal_reason(goal: str) -> str:
         return "prioriza uma escolha mais natural e saudavel"
     if "praticidade na rotina" in goal_key:
         return "funciona bem para uma rotina mais pratica"
-    return "ele combina com seu cadastro"
+    return "combina com seu cadastro"
 
 
-def recommend_item(telegram_id: int | None, restriction: str, goal: str = "") -> sqlite3.Row | None:
-    compatible = compatible_menu_items(restriction)
+def best_dish_for_goal(dishes: list[sqlite3.Row], restriction: str, goal: str) -> sqlite3.Row | None:
+    compatible = [dish for dish in dishes if not restriction_conflict(restriction, dish)]
     if not compatible:
         return None
-    history = {}
-    if telegram_id:
-        for row in top_dishes(telegram_id, 10):
-            history[row["dish_key"]] = row["total"]
-    return max(
-        compatible,
-        key=lambda item: (history.get(item["dish_key"], 0) * 3 + goal_score(goal, item), goal_score(goal, item)),
-    )
-def current_week_start() -> str:
+    return max(compatible, key=lambda dish: goal_score(goal, dish))
+
+
+# ---------------------------------------------------------------------------
+# Weekly menu / selections
+# ---------------------------------------------------------------------------
+
+def current_week_dates() -> list[str]:
     today = date.today()
-    return today.fromordinal(today.toordinal() - today.weekday()).isoformat()
+    monday = today - timedelta(days=today.weekday())
+    return [(monday + timedelta(days=offset)).isoformat() for offset in range(7)]
 
 
+def week_menu_dates(week_dates: list[str]) -> list[str]:
+    placeholders = ",".join("?" for _ in week_dates)
+    with db() as conn:
+        rows = conn.execute(
+            f"SELECT DISTINCT menu_date FROM daily_menu WHERE menu_date IN ({placeholders}) ORDER BY menu_date",
+            week_dates,
+        ).fetchall()
+    return [row["menu_date"] for row in rows]
 
-def save_client(telegram_id: int, chat_id: int, name: str, phone: str, address: str, restriction: str, goal: str = "Nao informado") -> None:
+
+def day_menu_by_category(menu_date: str) -> dict[str, list[sqlite3.Row]]:
+    with db() as conn:
+        rows = conn.execute(
+            """
+            SELECT dm.base_category, dm.slot, d.*
+            FROM daily_menu dm
+            JOIN dishes d ON d.dish_key = dm.dish_key
+            WHERE dm.menu_date = ?
+            ORDER BY dm.base_category, dm.slot
+            """,
+            (menu_date,),
+        ).fetchall()
+    grouped: dict[str, list[sqlite3.Row]] = {}
+    for row in rows:
+        grouped.setdefault(row["base_category"], []).append(row)
+    return grouped
+
+
+def employee_selections(telegram_id: int, menu_date: str) -> dict[str, str]:
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT base_category, dish_key FROM selections WHERE telegram_id = ? AND menu_date = ?",
+            (telegram_id, menu_date),
+        ).fetchall()
+    return {row["base_category"]: row["dish_key"] for row in rows}
+
+
+def save_selection(telegram_id: int, menu_date: str, base_category: str, dish_key: str, dish_name: str) -> None:
     timestamp = now_iso()
     with db() as conn:
-        columns = {row["name"] for row in conn.execute("PRAGMA table_info(clients)").fetchall()}
-        if "company" in columns:
-            conn.execute(
-                """
-                INSERT INTO clients (telegram_id, chat_id, name, company, phone, address, goal, restriction, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(telegram_id) DO UPDATE SET
-                    chat_id = excluded.chat_id,
-                    name = excluded.name,
-                    company = excluded.company,
-                    phone = excluded.phone,
-                    address = excluded.address,
-                    goal = excluded.goal,
-                    restriction = excluded.restriction,
-                    updated_at = excluded.updated_at
-                """,
-                (telegram_id, chat_id, name, address, phone, address, goal, restriction, timestamp, timestamp),
-            )
-            return
         conn.execute(
             """
-            INSERT INTO clients (telegram_id, chat_id, name, phone, address, goal, restriction, created_at, updated_at)
+            INSERT INTO selections (telegram_id, menu_date, base_category, dish_key, dish_name, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(telegram_id, menu_date, base_category) DO UPDATE SET
+                dish_key = excluded.dish_key,
+                dish_name = excluded.dish_name,
+                updated_at = excluded.updated_at
+            """,
+            (telegram_id, menu_date, base_category, dish_key, dish_name, timestamp, timestamp),
+        )
+
+
+def week_selections(telegram_id: int, week_dates: list[str]) -> list[sqlite3.Row]:
+    placeholders = ",".join("?" for _ in week_dates)
+    with db() as conn:
+        return conn.execute(
+            f"""
+            SELECT menu_date, base_category, dish_name
+            FROM selections
+            WHERE telegram_id = ? AND menu_date IN ({placeholders})
+            ORDER BY menu_date, base_category
+            """,
+            (telegram_id, *week_dates),
+        ).fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Employees
+# ---------------------------------------------------------------------------
+
+def save_employee(telegram_id: int, chat_id: int, name: str, goal: str, restriction: str, consent_accepted: bool, consented_at: str) -> None:
+    timestamp = now_iso()
+    with db() as conn:
+        conn.execute(
+            """
+            INSERT INTO employees (telegram_id, chat_id, name, goal, restriction, consent_accepted, consented_at, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(telegram_id) DO UPDATE SET
                 chat_id = excluded.chat_id,
                 name = excluded.name,
-                phone = excluded.phone,
-                address = excluded.address,
                 goal = excluded.goal,
                 restriction = excluded.restriction,
+                consent_accepted = excluded.consent_accepted,
+                consented_at = excluded.consented_at,
                 updated_at = excluded.updated_at
             """,
-            (telegram_id, chat_id, name, phone, address, goal, restriction, timestamp, timestamp),
-        )
-def load_client(telegram_id: int) -> sqlite3.Row | None:
-    with db() as conn:
-        return conn.execute("SELECT * FROM clients WHERE telegram_id = ?", (telegram_id,)).fetchone()
-
-
-def record_order(telegram_id: int, dish_key: str) -> None:
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO orders (telegram_id, dish_key, dish_name, ordered_at) VALUES (?, ?, ?, ?)",
-            (telegram_id, dish_key, get_dish_name(dish_key), now_iso()),
+            (telegram_id, chat_id, name, goal, restriction, int(consent_accepted), consented_at, timestamp, timestamp),
         )
 
 
-def add_favorite_waitlist(telegram_id: int, dish_key: str) -> None:
+def load_employee(telegram_id: int) -> sqlite3.Row | None:
     with db() as conn:
-        conn.execute(
-            """
-            INSERT INTO favorite_waitlist (telegram_id, dish_key, dish_name, created_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(telegram_id, dish_key) DO NOTHING
-            """,
-            (telegram_id, dish_key, get_dish_name(dish_key), now_iso()),
-        )
+        return conn.execute("SELECT * FROM employees WHERE telegram_id = ?", (telegram_id,)).fetchone()
 
 
-def recent_orders(telegram_id: int, limit: int = 5) -> list[sqlite3.Row]:
+def delete_employee_data(telegram_id: int) -> None:
     with db() as conn:
-        return conn.execute(
-            "SELECT dish_key, dish_name, ordered_at FROM orders WHERE telegram_id = ? ORDER BY ordered_at DESC LIMIT ?",
-            (telegram_id, limit),
-        ).fetchall()
-
-
-def top_dishes(telegram_id: int, limit: int = 3) -> list[sqlite3.Row]:
-    with db() as conn:
-        return conn.execute(
-            """
-            SELECT dish_key, dish_name, COUNT(*) AS total
-            FROM orders
-            WHERE telegram_id = ?
-            GROUP BY dish_key, dish_name
-            ORDER BY total DESC, MAX(ordered_at) DESC
-            LIMIT ?
-            """,
-            (telegram_id, limit),
-        ).fetchall()
-
+        conn.execute("DELETE FROM selections WHERE telegram_id = ?", (telegram_id,))
+        conn.execute("DELETE FROM employees WHERE telegram_id = ?", (telegram_id,))
 
 
 def admin_report_data() -> dict:
@@ -411,76 +415,30 @@ def admin_report_data() -> dict:
         totals = conn.execute(
             """
             SELECT
-                (SELECT COUNT(*) FROM clients) AS clients,
-                (SELECT COUNT(*) FROM orders) AS orders,
-                (SELECT COUNT(*) FROM favorite_waitlist) AS favorites,
-                (SELECT COUNT(*) FROM menu_items WHERE available = 1) AS available_items
+                (SELECT COUNT(*) FROM employees) AS employees,
+                (SELECT COUNT(*) FROM selections) AS selections,
+                (SELECT COUNT(*) FROM dishes) AS dishes,
+                (SELECT COUNT(*) FROM dishes WHERE ingredients = '' AND allergens = '') AS pending
             """
         ).fetchone()
-        recent = conn.execute(
-            """
-            SELECT c.name, o.dish_name, o.ordered_at
-            FROM orders o
-            LEFT JOIN clients c ON c.telegram_id = o.telegram_id
-            ORDER BY o.ordered_at DESC
-            LIMIT 5
-            """
+        goals = conn.execute(
+            "SELECT goal, COUNT(*) AS total FROM employees GROUP BY goal ORDER BY total DESC, goal"
         ).fetchall()
         top = conn.execute(
             """
             SELECT dish_name, COUNT(*) AS total
-            FROM orders
+            FROM selections
             GROUP BY dish_key, dish_name
-            ORDER BY total DESC, MAX(ordered_at) DESC
+            ORDER BY total DESC, dish_name
             LIMIT 5
             """
         ).fetchall()
-        goals = conn.execute(
-            """
-            SELECT goal, COUNT(*) AS total
-            FROM clients
-            GROUP BY goal
-            ORDER BY total DESC, goal
-            """
-        ).fetchall()
-    return {"totals": totals, "recent": recent, "top": top, "goals": goals}
+    return {"totals": totals, "goals": goals, "top": top}
 
 
-def save_weekly_menu(dishes: list[tuple[str, str]]) -> list[sqlite3.Row]:
-    week = current_week_start()
-    timestamp = now_iso()
-    with db() as conn:
-        for key, name in dishes:
-            conn.execute(
-                """
-                INSERT INTO weekly_menu (week_start, dish_key, dish_name, created_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(week_start, dish_key) DO UPDATE SET
-                    dish_name = excluded.dish_name,
-                    created_at = excluded.created_at
-                """,
-                (week, key, name, timestamp),
-            )
-        if not dishes:
-            return []
-        placeholders = ",".join("?" for _ in dishes)
-        keys = [key for key, _ in dishes]
-        return conn.execute(
-            f"""
-            SELECT c.telegram_id, c.chat_id, c.name, GROUP_CONCAT(wm.dish_name, ', ') AS dishes
-            FROM weekly_menu wm
-            JOIN (
-                SELECT telegram_id, dish_key FROM favorite_waitlist
-                UNION
-                SELECT telegram_id, dish_key FROM orders GROUP BY telegram_id, dish_key HAVING COUNT(*) >= 2
-            ) interest ON interest.dish_key = wm.dish_key
-            JOIN clients c ON c.telegram_id = interest.telegram_id
-            WHERE wm.week_start = ? AND wm.dish_key IN ({placeholders})
-            GROUP BY c.telegram_id, c.chat_id, c.name
-            """,
-            (week, *keys),
-        ).fetchall()
-
+# ---------------------------------------------------------------------------
+# Telegram helpers
+# ---------------------------------------------------------------------------
 
 def tg_id(update: Update) -> int | None:
     return update.effective_user.id if update.effective_user else None
@@ -498,16 +456,14 @@ def hydrate_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = tg_id(update)
     if not user_id or profile(context).get("registered"):
         return
-    client = load_client(user_id)
-    if client:
+    employee = load_employee(user_id)
+    if employee and employee["consent_accepted"]:
         profile(context).update(
             {
-                "telegram_id": client["telegram_id"],
-                "name": client["name"],
-                "phone": client["phone"],
-                "address": client["address"],
-                "goal": client["goal"],
-                "restriction": client["restriction"],
+                "telegram_id": employee["telegram_id"],
+                "name": employee["name"],
+                "goal": employee["goal"],
+                "restriction": employee["restriction"],
                 "registered": True,
             }
         )
@@ -544,14 +500,14 @@ async def send_payload(update: Update, payload: dict, context: ContextTypes.DEFA
 
 def main_buttons() -> list[list[tuple[str, str]]]:
     return [
-        [("\U0001f957 Ver cardapio", "menu_today"), ("\u2b50 Me recomendar algo", "recommend")],
+        [("\U0001f4c5 Cardapio da semana", "week_menu")],
         [("\U0001f464 Meu perfil", "profile")],
     ]
 
 
 def restriction_buttons() -> list[list[tuple[str, str]]]:
     return [
-        [("\u2705 Nenhuma restricao", "restriction_none")],
+        [("✅ Nenhuma restricao", "restriction_none")],
         [("\U0001f33e Sem gluten", "restriction_gluten"), ("\U0001f95b Sem lactose", "restriction_lactose")],
         [("\U0001f969 Vegetariana", "restriction_vegetarian"), ("\U0001f420 Sem frutos do mar", "restriction_seafood")],
     ]
@@ -560,189 +516,173 @@ def restriction_buttons() -> list[list[tuple[str, str]]]:
 def goal_buttons() -> list[list[tuple[str, str]]]:
     return [
         [("\U0001f343 Perder peso", "goal_weight_loss"), ("\U0001f4aa Ganhar massa", "goal_muscle_gain")],
-        [("\u2696\ufe0f Manter equilibrio", "goal_maintenance")],
-        [("\U0001f957 Alimentacao saudavel", "goal_health"), ("\u23f1\ufe0f Praticidade", "goal_practical")],
+        [("⚖️ Manter equilibrio", "goal_maintenance")],
+        [("\U0001f957 Alimentacao saudavel", "goal_health"), ("⏱️ Praticidade", "goal_practical")],
     ]
 
-def menu_payload(day: str | None = None, restriction: str = "") -> dict:
-    items = list_menu_items(day)
-    if not items:
-        return {"text": "\U0001f614 Ainda nao temos pratos disponiveis para esse dia.", "buttons": [[("\U0001f957 Ver cardapio completo", "menu_today")]]}
-    lines = ["\U0001f957 <b>Cardapio disponivel:</b>"]
-    buttons = []
-    for item in items:
-        tags = f" - {escape(item['tags'])}" if item["tags"] else ""
-        allergens = f"\nAlergenicos: {escape(item['allergens'])}" if item["allergens"] else ""
-        conflict = restriction_conflict(restriction, item) if restriction else None
-        safety = f"\n\U0001f6a0 Atencao: {escape(conflict)}" if conflict else "\n\u2705 Compativel com seu cadastro"
-        lines.append(
-            f"<b>{escape(item['dish_name'])}</b> - {format_price(item['price_cents'])}\n"
-            f"Dia: {escape(item['day_of_week'])}{tags}{allergens}{safety}"
-        )
-        buttons.append([(f"\U0001f37d Pedir {item['dish_name'][:30]}", f"dish:{item['dish_key']}")])
-    return {"text": "\n\n".join(lines), "buttons": buttons}
 
-def order_payload(dish_key: str) -> dict:
-    item = load_menu_item(dish_key)
-    if not item:
-        return {"text": "\U0001f614 Nao encontrei esse prato no cardapio atual.", "buttons": [[("\U0001f957 Ver cardapio", "menu_today")]]}
-    allergens = f"\nAlergenicos: {escape(item['allergens'])}" if item["allergens"] else ""
-    return {
-        "text": (
-            f"\u2705 Pedido registrado para <b>{{name}}</b>.\n\n"
-            f"<b>{escape(item['dish_name'])}</b>\n"
-            f"Valor: {format_price(item['price_cents'])}\n"
-            f"Dia: {escape(item['day_of_week'])}{allergens}\n\n"
-            "Bom apetite \U0001f60a"
-        ),
-        "buttons": [[("\u2b50 Avaliar depois", "rate_later")], [("\U0001f514 Me avise quando voltar", "favorite_last_order")]],
-    }
+def consent_buttons() -> list[list[tuple[str, str]]]:
+    return [[("✅ Aceito", "consent_yes"), ("❌ Nao aceito", "consent_no")]]
 
 
+# ---------------------------------------------------------------------------
+# Payloads
+# ---------------------------------------------------------------------------
 
-def safety_warning_payload(item: sqlite3.Row, restriction: str, reason: str) -> dict:
-    alternatives = compatible_menu_items(restriction)
-    buttons = [[(f"\U0001f957 Pedir {alt['dish_name'][:28]}", f"dish:{alt['dish_key']}")] for alt in alternatives[:3]]
-    buttons.append([("\U0001f957 Ver cardapio", "menu_today"), ("\U0001f464 Meu perfil", "profile")])
-    return {
-        "text": (
-            "\u26a0\ufe0f <b>Antes de confirmar, preciso te avisar:</b>\n\n"
-            f"O prato <b>{escape(item['dish_name'])}</b> {escape(reason)} e pode nao combinar com sua restricao cadastrada: "
-            f"<b>{escape(restriction)}</b>.\n\n"
-            "Por seguranca, nao registrei esse pedido. Separei algumas opcoes mais adequadas para voce \U0001f33f"
-        ),
-        "buttons": buttons,
-    }
-
-
-def recommendation_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
-    data = profile(context)
-    item = recommend_item(data.get("telegram_id"), data.get("restriction", ""), data.get("goal", ""))
-    if not item:
+def week_menu_payload(restriction: str) -> dict:
+    week_dates = current_week_dates()
+    dates_with_menu = week_menu_dates(week_dates)
+    if not dates_with_menu:
         return {
-            "text": (
-                "\U0001f614 Ainda nao encontrei uma recomendacao segura com o cardapio atual.\n\n"
-                "Posso te mostrar o cardapio completo para voce escolher com calma?"
-            ),
-            "buttons": [[("\U0001f957 Ver cardapio", "menu_today"), ("\U0001f464 Meu perfil", "profile")]],
+            "text": "\U0001f614 Ainda nao recebemos o cardapio desta semana. Assim que a empresa enviar, aviso por aqui.",
+            "buttons": [],
         }
-    recent_keys = {row["dish_key"] for row in recent_orders(data.get("telegram_id"), 10)} if data.get("telegram_id") else set()
-    reason = "ele combina com seu cadastro"
-    if goal_score(data.get("goal", ""), item):
-        reason = goal_reason(data.get("goal", ""))
-    elif item["dish_key"] in recent_keys:
-        reason = "voce ja pediu antes e ele continua compativel com seu cadastro"
-    elif item["tags"]:
-        reason = f"ele tem perfil {escape(item['tags'])} e respeita seu cadastro"
-    return {
-        "text": (
-            "\u2b50 <b>Minha recomendacao para hoje:</b>\n\n"
-            f"<b>{escape(item['dish_name'])}</b> - {format_price(item['price_cents'])}\n"
-            f"Escolhi porque {reason} \U0001f33f"
-        ),
-        "buttons": [[(f"\U0001f37d Pedir {item['dish_name'][:30]}", f"dish:{item['dish_key']}")], [("\U0001f957 Ver cardapio", "menu_today")]],
-    }
+    lines = ["\U0001f4c5 <b>Cardapio da semana:</b>"]
+    buttons = []
+    for menu_date in dates_with_menu:
+        grouped = day_menu_by_category(menu_date)
+        categories = []
+        for base_category, dishes in grouped.items():
+            names = ", ".join(escape(dish["dish_name"]) for dish in dishes)
+            conflict_names = [dish["dish_name"] for dish in dishes if restriction_conflict(restriction, dish)]
+            warn = " ⚠️" if restriction and conflict_names else ""
+            categories.append(f"{escape(base_category.title())}: {names}{warn}")
+        lines.append(f"\n<b>{escape(format_date_br(menu_date))}</b>\n" + "\n".join(categories))
+        buttons.append([(f"Ver {format_date_br(menu_date)}", f"day:{menu_date}")])
+    return {"text": "\n".join(lines), "buttons": buttons}
+
+
+def day_menu_payload(menu_date: str, context: ContextTypes.DEFAULT_TYPE) -> dict:
+    data = profile(context)
+    restriction = data.get("restriction", "")
+    goal = data.get("goal", "")
+    telegram_id = data.get("telegram_id")
+    grouped = day_menu_by_category(menu_date)
+    if not grouped:
+        return {"text": "\U0001f614 Nao encontrei cardapio para esse dia.", "buttons": [[("\U0001f4c5 Cardapio da semana", "week_menu")]]}
+    selected = employee_selections(telegram_id, menu_date) if telegram_id else {}
+    lines = [f"\U0001f4c5 <b>Cardapio de {escape(format_date_br(menu_date))}:</b>"]
+    buttons = []
+    for base_category, dishes in grouped.items():
+        lines.append(f"\n<b>{escape(base_category.title())}</b>")
+        best = best_dish_for_goal(dishes, restriction, goal) if goal else None
+        for dish in dishes:
+            conflict = restriction_conflict(restriction, dish) if restriction else None
+            marker = ""
+            if conflict:
+                marker = f" ⚠️ {escape(conflict)}"
+            elif best and dish["dish_key"] == best["dish_key"]:
+                marker = " ⭐ recomendado para seu objetivo"
+            picked = selected.get(base_category) == dish["dish_key"]
+            check = " ✅" if picked else ""
+            lines.append(f"- {escape(dish['dish_name'])}{check}{marker}")
+            if not conflict:
+                label = f"Escolher {dish['dish_name'][:26]}"
+                buttons.append([(label, f"pick:{menu_date}:{base_category}:{dish['dish_key']}")])
+    buttons.append([("\U0001f4c5 Cardapio da semana", "week_menu")])
+    return {"text": "\n".join(lines), "buttons": buttons}
+
 
 def profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
     data = profile(context)
-    user_id = data.get("telegram_id")
-    top_text = "Ainda sem historico de pedidos."
-    recent_text = "Ainda sem pedidos registrados."
-    if user_id:
-        top = top_dishes(user_id)
-        recent = recent_orders(user_id)
-        if top:
-            top_text = "\n".join(f"- {escape(row['dish_name'])}: {row['total']} pedido(s)" for row in top)
-        if recent:
-            recent_text = "\n".join(f"- {escape(row['dish_name'])}" for row in recent)
     return {
         "text": (
             "\U0001f464 <b>Seu perfil:</b>\n\n"
             f"<b>Nome:</b> {escape(data.get('name', DEFAULT_USER_NAME))}\n"
-            f"<b>Telefone:</b> {escape(data.get('phone', 'Nao informado'))}\n"
-            f"<b>Endereco/bairro:</b> {escape(data.get('address', 'Nao informado'))}\n"
-            f"<b>Restricao alimentar:</b> {escape(data.get('restriction', 'Nao informado'))}\n\n"
-            f"<b>Mais pedidos:</b>\n{top_text}\n\n"
-            f"<b>Historico recente:</b>\n{recent_text}"
+            f"<b>Objetivo:</b> {escape(data.get('goal', 'Nao informado'))}\n"
+            f"<b>Restricao alimentar:</b> {escape(data.get('restriction', 'Nao informado'))}"
         ),
-        "buttons": [[("\u270f\ufe0f Atualizar cadastro", "restart_registration"), ("\u2705 Esta correto", "thanks")]],
+        "buttons": [[("✏️ Atualizar cadastro", "restart_registration"), ("✅ Esta correto", "thanks")]],
     }
 
+
+# ---------------------------------------------------------------------------
+# Registration
+# ---------------------------------------------------------------------------
 
 async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     context.user_data[REGISTRATION_STEP] = "name"
     await send_text(
         update,
         (
-            "\U0001f37d\ufe0f <b>Antes de iniciar seu pedido, preciso fazer um cadastro rapido.</b>\n\n"
-            "Assim consigo considerar suas restricoes, objetivo e identificar seu pedido corretamente \U0001f33f\n\n"
-            "Qual e o seu nome completo?"
+            "\U0001f957 <b>Bem-vindo ao Apetit!</b>\n\n"
+            "Vou te ajudar a acompanhar o cardapio da semana da empresa, recomendar pratos de acordo com seu objetivo "
+            "e avisar quando algo tiver ingrediente que voce nao pode comer.\n\n"
+            "Antes, preciso de um cadastro rapido. Qual e o seu nome?"
         ),
         context,
         edit=edit,
     )
 
 
-async def ask_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    context.user_data[REGISTRATION_STEP] = "phone"
-    await send_text(update, "Obrigado, {name}! \U0001f60a Agora me envie seu telefone para contato.", context)
-
-
-async def ask_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    context.user_data[REGISTRATION_STEP] = "address"
-    await send_text(update, "Perfeito \U0001f4cd Agora me informe seu endereco ou bairro de entrega.", context)
-
-
 async def ask_goal(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     context.user_data[REGISTRATION_STEP] = "goal"
-    await send_text(
-        update,
-        "\U0001f3af Qual e o seu foco principal com a alimentacao agora?",
-        context,
-        goal_buttons(),
-        edit=edit,
-    )
+    await send_text(update, "\U0001f3af Qual e o seu objetivo principal com a alimentacao agora?", context, goal_buttons(), edit=edit)
 
 
 async def ask_restriction(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     context.user_data[REGISTRATION_STEP] = "restriction"
-    await send_text(update, "\U0001f33f Para sua seguranca alimentar, selecione sua principal restricao:", context, restriction_buttons(), edit=edit)
+    await send_text(update, "\U0001f33f Voce tem alguma restricao ou alergia alimentar?", context, restriction_buttons(), edit=edit)
 
 
-async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE, restriction: str, edit: bool = False) -> None:
+async def ask_consent(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+    context.user_data[REGISTRATION_STEP] = "consent"
+    await send_text(
+        update,
+        (
+            "\U0001f512 <b>Antes de concluir:</b>\n\n"
+            "Vou guardar seu nome, objetivo e restricao alimentar para poder te recomendar pratos e avisar sobre alergenos "
+            "no cardapio da empresa. Voce pode consultar (/meus_dados) ou apagar (/excluir_dados) esses dados quando quiser.\n\n"
+            "Voce aceita?"
+        ),
+        context,
+        consent_buttons(),
+        edit=edit,
+    )
+
+
+async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE, accepted: bool, edit: bool = False) -> None:
     data = profile(context)
-    data["restriction"] = restriction
-    data["registered"] = True
     user_id = tg_id(update)
     current_chat_id = chat_id(update)
+    if not accepted:
+        context.user_data.pop(REGISTRATION_STEP, None)
+        await send_text(
+            update,
+            "Sem problemas. Sem o aceite eu nao consigo guardar seu cadastro, entao nao vou liberar o cardapio agora. "
+            "Quando quiser tentar de novo, envie /start.",
+            context,
+        )
+        return
+    consented_at = now_iso()
     if user_id:
         data["telegram_id"] = user_id
+    data["registered"] = True
     if user_id and current_chat_id:
-        save_client(
+        save_employee(
             user_id,
             current_chat_id,
             data.get("name", DEFAULT_USER_NAME),
-            data.get("phone", "Nao informado"),
-            data.get("address", "Nao informado"),
-            restriction,
             data.get("goal", "Nao informado"),
+            data.get("restriction", "Sem restricoes"),
+            True,
+            consented_at,
         )
     context.user_data.pop(REGISTRATION_STEP, None)
     await send_text(
         update,
         (
-            "\u2705 <b>Cadastro concluido!</b>\n\n"
+            "✅ <b>Cadastro concluido!</b>\n\n"
             "<b>Nome:</b> {name}\n"
-            f"<b>Telefone:</b> {escape(data.get('phone', 'Nao informado'))}\n"
-            f"<b>Endereco/bairro:</b> {escape(data.get('address', 'Nao informado'))}\n"
             f"<b>Objetivo:</b> {escape(data.get('goal', 'Nao informado'))}\n"
-            f"<b>Restricao alimentar:</b> {escape(restriction)}\n\n"
-            "Agora posso te ajudar com o cardapio e seus pedidos \U0001f60a"
+            f"<b>Restricao alimentar:</b> {escape(data.get('restriction', 'Sem restricoes'))}\n\n"
+            "Agora posso te mostrar o cardapio da semana \U0001f60a"
         ),
         context,
         main_buttons(),
         edit,
     )
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     hydrate_profile(update, context)
@@ -750,8 +690,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await send_text(
             update,
             (
-                "\U0001f37d\ufe0f <b>Ola, {name}!</b>\n\n"
-                "Sou o bot da Apetit. Posso te ajudar com cardapio, pedidos, recomendacoes e avisos de pratos favoritos \U0001f33f"
+                "\U0001f957 <b>Ola, {name}!</b>\n\n"
+                "Posso te mostrar o cardapio da semana, recomendar pratos para o seu objetivo e avisar sobre alergenos \U0001f33f"
             ),
             context,
             main_buttons(),
@@ -765,64 +705,133 @@ async def reset_registration(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await ask_name(update, context)
 
 
-async def show_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def show_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = tg_id(update)
+    employee = load_employee(user_id) if user_id else None
+    if not employee:
+        await update.effective_message.reply_text("Voce ainda nao tem cadastro. Envie /start para se cadastrar.")
+        return
+    await update.effective_message.reply_text(
+        "\U0001f4cb Seus dados salvos:\n\n"
+        f"Nome: {employee['name']}\n"
+        f"Objetivo: {employee['goal']}\n"
+        f"Restricao alimentar: {employee['restriction']}\n"
+        f"Consentimento LGPD: aceito em {employee['consented_at']}\n\n"
+        "Para apagar tudo, envie /excluir_dados."
+    )
+
+
+async def delete_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = tg_id(update)
+    if not user_id:
+        return
+    delete_employee_data(user_id)
+    context.user_data.clear()
+    await update.effective_message.reply_text(
+        "✅ Seus dados (cadastro e escolhas de cardapio) foram apagados. Se quiser voltar a usar o bot, envie /start."
+    )
+
+
+async def show_week_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    hydrate_profile(update, context)
+    if not registered(context):
+        await ask_name(update, context)
+        return
+    await send_payload(update, week_menu_payload(profile(context).get("restriction", "")), context)
+
+
+async def show_my_selections(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     hydrate_profile(update, context)
     user_id = tg_id(update)
     if not user_id or not registered(context):
         await ask_name(update, context)
         return
-    rows = recent_orders(user_id, 10)
+    rows = week_selections(user_id, current_week_dates())
     if not rows:
-        await send_text(update, "\U0001f4cb Voce ainda nao tem pedidos registrados.", context, main_buttons())
+        await update.effective_message.reply_text("Voce ainda nao escolheu nenhum prato desta semana. Use /cardapio_semana.")
         return
-    await send_text(update, "\U0001f4cb <b>Seu historico de pedidos:</b>\n\n" + "\n".join(f"- {escape(row['dish_name'])}" for row in rows), context, main_buttons())
+    lines = ["\U0001f4cb Suas escolhas desta semana:"]
+    last_date = None
+    for row in rows:
+        if row["menu_date"] != last_date:
+            lines.append(f"\n{format_date_br(row['menu_date'])}")
+            last_date = row["menu_date"]
+        lines.append(f"- {row['base_category'].title()}: {row['dish_name']}")
+    await update.effective_message.reply_text("\n".join(lines))
 
 
-async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    hydrate_profile(update, context)
-    if not registered(context):
-        await ask_name(update, context)
-        return
-    await send_payload(update, menu_payload(restriction=profile(context).get("restriction", "")), context)
-
+# ---------------------------------------------------------------------------
+# Admin
+# ---------------------------------------------------------------------------
 
 def is_admin(user_id: int | None) -> bool:
-    return not ADMIN_TELEGRAM_IDS or bool(user_id in ADMIN_TELEGRAM_IDS)
+    return bool(ADMIN_TELEGRAM_IDS) and user_id in ADMIN_TELEGRAM_IDS
 
 
-async def add_menu_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_menu_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    document = update.effective_message.document
+    if not document or not (document.file_name or "").lower().endswith(".xlsx"):
+        return
     if not is_admin(tg_id(update)):
-        await update.effective_message.reply_text("\U0001f512 Apenas administradores podem cadastrar pratos.")
+        await update.effective_message.reply_text("\U0001f512 Apenas administradores podem importar o cardapio.")
+        return
+    caption = (update.effective_message.caption or "").strip()
+    match = re.match(r"^(\d{1,2})/(\d{4})$", caption)
+    today = date.today()
+    month, year = (int(match.group(1)), int(match.group(2))) if match else (today.month, today.year)
+    telegram_file = await document.get_file()
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        await telegram_file.download_to_drive(tmp_path)
+        result = import_menu_workbook(tmp_path, year, month)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+    lines = [f"✅ Cardapio importado para {month:02d}/{year}: {result['days']} dia(s) com itens."]
+    if not match:
+        lines.append("(Nenhum mes/ano na legenda da mensagem, usei o mes atual. Envie a legenda no formato MM/AAAA para escolher outro mes.)")
+    if result["new_dishes"]:
+        lines.append("")
+        lines.append(f"⚠️ {len(result['new_dishes'])} prato(s) novo(s) sem ingredientes/alergenicos cadastrados:")
+        lines.extend(f"- {code}: {name}" for code, name in result["new_dishes"][:15])
+        lines.append("")
+        lines.append("Complete cada um com:\n/prato_add <codigo> | ingredientes | alergenicos | tags")
+    await update.effective_message.reply_text("\n".join(lines))
+
+
+async def add_dish_metadata(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_admin(tg_id(update)):
+        await update.effective_message.reply_text("\U0001f512 Apenas administradores podem cadastrar alergenicos.")
         return
     text = update.effective_message.text or ""
     raw = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
     parts = [part.strip() for part in raw.split("|")]
-    if len(parts) < 6:
+    if len(parts) < 4:
         await update.effective_message.reply_text(
-            "Envie assim:\n\n"
-            "/cardapio_add Nome do prato | 29,90 | segunda | ingredientes | alergenicos | tags | disponivel\n\n"
-            "Exemplo:\n"
-            "/cardapio_add Frango Grelhado | 31,90 | quinta | frango, arroz, legumes | nenhum | proteico, caseiro | sim"
+            "Envie assim:\n\n/prato_add <codigo> | ingredientes | alergenicos | tags\n\n"
+            "O codigo e o que aparece em /pratos_pendentes."
         )
         return
-    name, price, day, ingredients, allergens, tags = parts[:6]
-    available = len(parts) < 7 or normalize(parts[6]) not in {"nao", "no", "false", "0", "esgotado"}
-    key = upsert_menu_item(name, price_to_cents(price), day, ingredients, allergens, tags, available)
-    await update.effective_message.reply_text(f"\u2705 Prato cadastrado/atualizado: {name} ({key}).")
-
-
-async def list_admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    day = " ".join(context.args).strip() if context.args else None
-    items = list_menu_items(day, only_available=False)
-    if not items:
-        await update.effective_message.reply_text("\U0001f614 Nenhum prato cadastrado.")
+    code, ingredients, allergens, tags = parts[:4]
+    dish = load_dish(code)
+    if not dish:
+        await update.effective_message.reply_text(f"Nao encontrei prato com codigo {code}. Importe o cardapio antes.")
         return
-    lines = ["\U0001f957 Cardapio cadastrado:"]
-    for item in items:
-        status = "disponivel" if item["available"] else "esgotado"
-        lines.append(f"- {item['dish_name']} | {format_price(item['price_cents'])} | {item['day_of_week']} | {status} | {item['tags']}")
-    await update.effective_message.reply_text("\n".join(lines))
+    update_dish_metadata(code, ingredients, allergens, tags)
+    await update.effective_message.reply_text(f"✅ Prato atualizado: {dish['dish_name']} ({code}).")
 
+
+async def list_pending_dishes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_admin(tg_id(update)):
+        await update.effective_message.reply_text("\U0001f512 Apenas administradores podem ver essa lista.")
+        return
+    pending = pending_dishes()
+    if not pending:
+        await update.effective_message.reply_text("✅ Nenhum prato pendente de cadastro de alergenicos.")
+        return
+    lines = ["⚠️ Pratos sem ingredientes/alergenicos cadastrados:"]
+    lines.extend(f"- {dish['dish_key']}: {dish['dish_name']}" for dish in pending)
+    await update.effective_message.reply_text("\n".join(lines))
 
 
 async def show_admin_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -834,71 +843,33 @@ async def show_admin_report(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     lines = [
         "\U0001f4ca Relatorio Apetit Bot",
         "",
-        f"Clientes cadastrados: {totals['clients']}",
-        f"Pedidos registrados: {totals['orders']}",
-        f"Pratos aguardados/favoritos: {totals['favorites']}",
-        f"Pratos disponiveis no cardapio: {totals['available_items']}",
+        f"Colaboradores cadastrados: {totals['employees']}",
+        f"Escolhas de cardapio registradas: {totals['selections']}",
+        f"Pratos cadastrados: {totals['dishes']}",
+        f"Pratos pendentes de alergenicos: {totals['pending']}",
         "",
-        "Pratos mais pedidos:",
+        "Objetivos dos colaboradores:",
     ]
-    if report["top"]:
-        lines.extend(f"- {row['dish_name']}: {row['total']} pedido(s)" for row in report["top"])
-    else:
-        lines.append("- Ainda sem pedidos.")
-    lines.extend(["", "Objetivos dos clientes:"])
     if report["goals"]:
-        lines.extend(f"- {row['goal'] or 'Nao informado'}: {row['total']}" for row in report["goals"])
+        lines.extend(f"- {row['goal']}: {row['total']}" for row in report["goals"])
     else:
-        lines.append("- Ainda sem clientes cadastrados.")
-    lines.extend(["", "Pedidos recentes:"])
-    if report["recent"]:
-        lines.extend(f"- {row['name'] or 'Cliente'} pediu {row['dish_name']}" for row in report["recent"])
+        lines.append("- Ainda sem colaboradores cadastrados.")
+    lines.extend(["", "Pratos mais escolhidos:"])
+    if report["top"]:
+        lines.extend(f"- {row['dish_name']}: {row['total']}" for row in report["top"])
     else:
-        lines.append("- Ainda sem pedidos recentes.")
+        lines.append("- Ainda sem escolhas registradas.")
     await update.effective_message.reply_text("\n".join(lines))
 
 
-def parse_weekly_menu(raw: str) -> list[tuple[str, str]]:
-    items = []
-    for line in raw.splitlines():
-        name = line.strip(" -\t")
-        if name:
-            items.append((dish_key_from_name(name), name))
-    return items
-
-
-async def update_weekly_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not is_admin(tg_id(update)):
-        await update.effective_message.reply_text("\U0001f512 Apenas administradores podem atualizar o cardapio semanal.")
-        return
-    text = update.effective_message.text or ""
-    raw = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
-    if not raw:
-        await update.effective_message.reply_text("Envie assim:\n\n/cardapio_semana Lasanha de Legumes\nPeixe Assado com Legumes")
-        return
-    matches = save_weekly_menu(parse_weekly_menu(raw))
-    notified = 0
-    for row in matches:
-        try:
-            await context.bot.send_message(
-                chat_id=row["chat_id"],
-                text=(
-                    f"\U0001f514 Ola, {escape(row['name'])}! Tem prato que aparece no seu historico/favoritos no cardapio desta semana:\n\n"
-                    f"<b>{escape(row['dishes'])}</b>"
-                ),
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard([[("\U0001f957 Ver cardapio", "menu_today")]]),
-            )
-            notified += 1
-        except Exception:
-            logger.exception("Falha ao notificar cliente %s", row["telegram_id"])
-    await update.effective_message.reply_text(f"\u2705 Cardapio semanal atualizado. Clientes notificados: {notified}.")
-
+# ---------------------------------------------------------------------------
+# Message / callback handlers
+# ---------------------------------------------------------------------------
 
 async def handle_registration_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     step = context.user_data.get(REGISTRATION_STEP)
-    if not step:
-        return False
+    if not step or step in {"goal", "restriction", "consent"}:
+        return step is not None
     text = (update.message.text or "").strip()
     if len(text) < 2:
         await send_text(update, "Me envie uma resposta um pouco mais completa, por favor \U0001f60a", context)
@@ -906,19 +877,9 @@ async def handle_registration_message(update: Update, context: ContextTypes.DEFA
     data = profile(context)
     if step == "name":
         data["name"] = text
-        await ask_phone(update, context)
-    elif step == "phone":
-        data["phone"] = text
-        await ask_address(update, context)
-    elif step == "address":
-        data["address"] = text
         await ask_goal(update, context)
-    elif step == "goal":
-        data["goal"] = text
-        await ask_restriction(update, context)
-    else:
-        await ask_restriction(update, context)
     return True
+
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     hydrate_profile(update, context)
@@ -935,7 +896,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await ask_restriction(update, context, edit=True)
         return
     if data in RESTRICTIONS:
-        await finish_registration(update, context, RESTRICTIONS[data], edit=True)
+        profile(context)["restriction"] = RESTRICTIONS[data]
+        await ask_consent(update, context, edit=True)
+        return
+    if data in {"consent_yes", "consent_no"}:
+        await finish_registration(update, context, accepted=(data == "consent_yes"), edit=True)
         return
     if data == "profile":
         if not registered(context):
@@ -943,45 +908,41 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
         await send_payload(update, profile_payload(context), context, edit=True)
         return
-    if data == "menu_today":
+    if data == "week_menu":
         if not registered(context):
             await ask_name(update, context, edit=True)
             return
-        await send_payload(update, menu_payload(restriction=profile(context).get("restriction", "")), context, edit=True)
+        await send_payload(update, week_menu_payload(profile(context).get("restriction", "")), context, edit=True)
         return
-    if data.startswith("dish:"):
+    if data.startswith("day:"):
         if not registered(context):
             await ask_name(update, context, edit=True)
             return
-        key = data.removeprefix("dish:")
-        user_id = tg_id(update)
-        item = load_menu_item(key)
-        if not item:
-            await send_payload(update, order_payload(key), context, edit=True)
+        menu_date = data.removeprefix("day:")
+        await send_payload(update, day_menu_payload(menu_date, context), context, edit=True)
+        return
+    if data.startswith("pick:"):
+        if not registered(context):
+            await ask_name(update, context, edit=True)
             return
-        conflict = restriction_conflict(profile(context).get("restriction", ""), item)
+        _, menu_date, base_category, dish_key = data.split(":", 3)
+        user_id = tg_id(update)
+        dish = load_dish(dish_key)
+        if not dish:
+            await send_payload(update, day_menu_payload(menu_date, context), context, edit=True)
+            return
+        conflict = restriction_conflict(profile(context).get("restriction", ""), dish)
         if conflict:
-            await send_payload(update, safety_warning_payload(item, profile(context).get("restriction", ""), conflict), context, edit=True)
+            await send_text(
+                update,
+                f"⚠️ <b>{escape(dish['dish_name'])}</b> {escape(conflict)} e pode nao combinar com sua restricao. Nao registrei essa escolha.",
+                context,
+                edit=True,
+            )
             return
         if user_id:
-            record_order(user_id, key)
-            context.user_data["last_order"] = key
-        await send_payload(update, order_payload(key), context, edit=True)
-        return
-    if data in {"favorite_last_order", "notify_me"}:
-        user_id = tg_id(update)
-        last = context.user_data.get("last_order")
-        if user_id and last:
-            add_favorite_waitlist(user_id, last)
-            await send_text(update, "\u2705 Combinado! Vou te avisar quando esse prato voltar ao cardapio \U0001f514", context, main_buttons(), edit=True)
-        else:
-            await send_text(update, "Escolha um prato primeiro para eu acompanhar \U0001f60a", context, main_buttons(), edit=True)
-        return
-    if data == "recommend":
-        if not registered(context):
-            await ask_name(update, context, edit=True)
-            return
-        await send_payload(update, recommendation_payload(context), context, edit=True)
+            save_selection(user_id, menu_date, base_category, dish_key, dish["dish_name"])
+        await send_payload(update, day_menu_payload(menu_date, context), context, edit=True)
         return
     await send_text(update, "Como posso ajudar? \U0001f60a", context, main_buttons(), edit=True)
 
@@ -994,21 +955,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await ask_name(update, context)
         return
     text = normalize(update.message.text or "")
-    item = find_menu_item_in_text(update.message.text or "")
-    if item:
-        user_id = tg_id(update)
-        if user_id:
-            record_order(user_id, item["dish_key"])
-            context.user_data["last_order"] = item["dish_key"]
-        await send_payload(update, order_payload(item["dish_key"]), context)
-    elif "cardapio" in text or "tem hoje" in text or "o que tem" in text:
-        await send_payload(update, menu_payload(restriction=profile(context).get("restriction", "")), context)
+    if "cardapio" in text or "semana" in text:
+        await send_payload(update, week_menu_payload(profile(context).get("restriction", "")), context)
     elif "perfil" in text or "cadastro" in text:
         await send_payload(update, profile_payload(context), context)
-    elif "historico" in text:
-        await show_history(update, context)
+    elif "escolha" in text:
+        await show_my_selections(update, context)
     else:
-        await send_text(update, "Quer ver o cardapio ou acessar seu perfil? \U0001f60a", context, main_buttons())
+        await send_text(update, "Quer ver o cardapio da semana ou seu perfil? \U0001f60a", context, main_buttons())
 
 
 def main() -> None:
@@ -1019,13 +973,15 @@ def main() -> None:
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("recadastrar", reset_registration))
-    app.add_handler(CommandHandler("historico", show_history))
-    app.add_handler(CommandHandler("cardapio", show_menu))
-    app.add_handler(CommandHandler("cardapio_add", add_menu_item))
-    app.add_handler(CommandHandler("cardapio_list", list_admin_menu))
-    app.add_handler(CommandHandler("cardapio_semana", update_weekly_menu))
+    app.add_handler(CommandHandler("cardapio_semana", show_week_menu))
+    app.add_handler(CommandHandler("minhas_escolhas", show_my_selections))
+    app.add_handler(CommandHandler("meus_dados", show_my_data))
+    app.add_handler(CommandHandler("excluir_dados", delete_my_data))
+    app.add_handler(CommandHandler("prato_add", add_dish_metadata))
+    app.add_handler(CommandHandler("pratos_pendentes", list_pending_dishes))
     app.add_handler(CommandHandler("relatorio", show_admin_report))
     app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.Document.FileExtension("xlsx"), handle_menu_document))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     logger.info("Apetit Bot iniciado.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

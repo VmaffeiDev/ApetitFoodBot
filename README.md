@@ -1,27 +1,78 @@
 # ApetitFoodBot
 
-MVP de bot Telegram da Apetit com fluxos inspirados no simulador HTML:
+Bot de Telegram para o **controle nutricional dos colaboradores** da empresa. Não é um sistema de pedido/entrega:
+o refeitório já serve um cardápio fixo definido pela empresa; o bot existe para que cada colaborador:
 
-- boas-vindas com `/start`
-- cadastro obrigatorio antes de pedidos
-- aceite LGPD antes de salvar dados pessoais
-- objetivo do cliente no cadastro: perder peso, ganhar massa, manter equilibrio, alimentacao saudavel ou praticidade
-- banco SQLite com clientes e historico de pedidos
-- comandos `/meus_dados` e `/excluir_dados`
-- cardapio real no banco com preco, dia, ingredientes, alergenicos e tags
-- cardapio do dia
-- cardapio sem carne
-- recomendacao inteligente baseada no cadastro e historico do cliente
-- bloqueio de pedido incompatavel com restricao alimentar cadastrada
-- reclamacao com escuta empatica
-- feedback positivo
-- alerta de restricao alimentar
-- perfil nutricional demonstrativo
+- saiba com antecedência o cardápio da semana
+- receba uma recomendação de prato por categoria (lanche, acompanhamento, sobremesa, fruta, bebida) de acordo com o
+  seu objetivo (emagrecer, ganhar massa, manter equilíbrio, alimentação saudável ou praticidade)
+- seja avisado quando algum prato do cardápio contiver um alérgeno/restrição que ele cadastrou
+- registre o que pretende comer em cada dia, para a empresa acompanhar as escolhas
 
-## Seguranca do token
+## Fluxo do colaborador
 
-Se um token foi colado em chat, issue, commit ou qualquer lugar publico, gere outro no BotFather.
-Nao salve o token diretamente no codigo.
+1. `/start` inicia o cadastro: nome, objetivo e restrição/alergia alimentar.
+2. Antes de concluir, o bot pede o aceite do uso dos dados (LGPD). Sem aceite, o cadastro não é salvo.
+3. `/cardapio_semana` mostra um resumo dos dias da semana com cardápio já importado, com aviso ⚠️ nas categorias
+   que têm algum prato incompatível com a restrição do colaborador.
+4. Ao abrir um dia específico, o bot lista os pratos de cada categoria, marca com ⭐ o mais indicado para o
+   objetivo do colaborador, bloqueia com ⚠️ os pratos que batem com a restrição cadastrada (não deixa escolher) e
+   permite escolher um prato por categoria.
+5. `/minhas_escolhas` mostra o que o colaborador já escolheu na semana.
+6. `/meus_dados` mostra os dados salvos; `/excluir_dados` apaga cadastro e escolhas.
+7. `/recadastrar` refaz nome, objetivo e restrição.
+
+## Cadastro do cardápio pela empresa (admin)
+
+O cardápio é importado a partir da planilha que a empresa já usa para o refeitório (formato "Oficina do Lanche"):
+uma linha por dia do mês (coluna `Dia`) e uma coluna por categoria (`LANCHE`, `ACOMPANHAMENTO`, `ACOMPANHAMENTO 2`,
+`SOBREMESA`, `FRUTA`, `BEBIDA`, `BEBIDA 2`, ...). Cada célula preenchida segue o padrão
+`<percentual> - <código> - <NOME DO PRATO> - <peso/custo>`.
+
+Para importar, um administrador (configurado em `ADMIN_TELEGRAM_IDS`) envia o arquivo `.xlsx` diretamente no chat do
+bot, com a legenda no formato `MM/AAAA` (ex.: `07/2026`) indicando o mês/ano daquele calendário. Sem legenda, o bot
+assume o mês atual.
+
+Pratos com código novo (nunca importado antes) entram no catálogo sem ingredientes/alergênicos cadastrados. O bot
+avisa quais são no retorno da importação e eles também aparecem em:
+
+```text
+/pratos_pendentes
+```
+
+Para completar o cadastro de um prato (reaproveitado em toda vez que aquele código aparecer em cardápios futuros):
+
+```text
+/prato_add <codigo> | ingredientes | alergenicos | tags
+```
+
+Exemplo:
+
+```text
+/prato_add 08.03.01.110 | pao, hamburguer de frango, queijo, alface, tomate | gluten, leite | proteico, praticidade
+```
+
+As `tags` são palavras-chave livres usadas para casar o prato com os objetivos dos colaboradores (ex.: `leve`,
+`proteico`, `integral`, `vegano`, `perda de peso`, `ganho de massa`).
+
+Para ver um resumo administrativo (colaboradores por objetivo, pratos mais escolhidos, pratos pendentes):
+
+```text
+/relatorio
+```
+
+Para restringir os comandos administrativos, configure no `.env`:
+
+```env
+ADMIN_TELEGRAM_IDS=123456789,987654321
+```
+
+Sem essa variável configurada, **ninguém** consegue rodar comandos administrativos (o bot nega por padrão).
+
+## Segurança do token
+
+Se um token foi colado em chat, issue, commit ou qualquer lugar público, gere outro no BotFather.
+Não salve o token diretamente no código.
 
 ## Rodar localmente
 
@@ -52,204 +103,47 @@ Para rodar os testes:
 python -m unittest discover -s tests
 ```
 
-No Telegram, abra o bot e envie:
-
-```text
-/start
-```
-
-O bot vai pedir nome, telefone, endereco/bairro, objetivo alimentar, restricao alimentar e aceite LGPD antes de liberar cardapio, recomendacoes ou pedidos.
-Quando o cliente escolhe um prato, o bot confere os alergenicos, ingredientes e tags antes de registrar o pedido. Se houver conflito com a restricao cadastrada, o pedido nao e gravado e o bot sugere alternativas mais seguras.
-As recomendacoes consideram o objetivo do cliente e o historico de pedidos.
-
-Para refazer o cadastro, envie:
-
-```text
-/recadastrar
-```
-
-Para ver o historico de pedidos:
-
-```text
-/historico
-```
-
-Para ver o cardapio disponivel:
-
-```text
-/cardapio
-```
-
-Para consultar ou excluir os dados do cliente:
-
-```text
-/meus_dados
-/excluir_dados
-```
-
 ## Banco de dados
 
 O bot cria automaticamente o arquivo `apetit.db` com:
 
-- clientes cadastrados
-- aceite LGPD e data do consentimento
-- historico de pedidos
-- pratos cadastrados no cardapio
-- pratos favoritos/aguardados
-- atualizacoes de cardapio semanal
+- colaboradores cadastrados (nome, objetivo, restrição, aceite LGPD e data do consentimento)
+- catálogo de pratos (nome, categoria, ingredientes, alergênicos, tags)
+- cardápio importado por dia/categoria
+- escolhas dos colaboradores por dia/categoria
 
-Esse arquivo fica fora do Git por seguranca e privacidade.
+Esse arquivo fica fora do Git por segurança e privacidade.
 
 ## LGPD e consentimento
 
-Como o bot guarda telefone, endereco/bairro, historico e preferencias, o cadastro so e concluido depois do aceite do cliente.
+O bot guarda nome, objetivo e restrição/alergia alimentar — dado de saúde é dado sensível segundo a LGPD — então o
+cadastro só é concluído depois do aceite do colaborador.
 
-O cliente pode:
+O colaborador pode:
 
 - ver os dados salvos com `/meus_dados`
-- excluir cadastro, historico e favoritos com `/excluir_dados`
+- apagar cadastro e escolhas com `/excluir_dados`
 - refazer o cadastro com `/recadastrar`
 
-O banco guarda `consent_accepted` e `consented_at`. Se o cliente nao aceitar, o bot nao conclui o cadastro nem libera pedidos.
+O banco guarda `consent_accepted` e `consented_at`. Sem aceite, o bot não conclui o cadastro nem libera o cardápio.
 
-## Grafo do fluxo
-
-```mermaid
-flowchart TD
-    A["Cliente abre o bot no Telegram"] --> B{Cliente ja tem cadastro?}
-    B -- "Nao" --> C["Cadastro obrigatorio: nome, telefone, endereco/bairro, objetivo e restricao alimentar"]
-    C --> LGPD{Cliente aceita guardar dados?}
-    LGPD -- "Nao" --> X["Bot nao conclui cadastro nem libera pedidos"]
-    LGPD -- "Sim" --> D["Salvar cliente no SQLite com data do consentimento"]
-    B -- "Sim" --> E["Menu principal"]
-    D --> E
-
-    E --> F["Ver cardapio"]
-    E --> G["Receber recomendacao"]
-    E --> H["Ver perfil e historico"]
-    E --> LGPD2["/meus_dados ou /excluir_dados"]
-
-    F --> I["Bot lista pratos com preco, dia, tags e alergenicos"]
-    G --> J["Bot cruza objetivo + restricao + historico + cardapio disponivel"]
-    J --> K["Sugere prato compativel"]
-    K --> L["Cliente escolhe prato"]
-    I --> L
-
-    L --> M{Prato conflita com restricao?}
-    M -- "Sim" --> N["Pedido nao e registrado"]
-    N --> O["Bot avisa o motivo e sugere alternativas seguras"]
-    O --> L
-    M -- "Nao" --> P["Registrar pedido no historico"]
-    P --> Q["Oferecer aviso quando o prato voltar"]
-    Q --> R{Cliente quer ser avisado?}
-    R -- "Sim" --> S["Salvar prato em favoritos/aguardados"]
-    R -- "Nao" --> E
-    S --> E
-
-    T["Admin atualiza cardapio semanal"] --> U["Salvar semana no SQLite"]
-    U --> V["Buscar clientes com prato favorito ou recorrente"]
-    V --> W["Enviar alerta no Telegram quando o prato voltar"]
-```
-
-## Cadastrar pratos
-
-Administradores podem cadastrar ou atualizar pratos assim:
-
-```text
-/cardapio_add Nome do prato | 29,90 | segunda | ingredientes | alergenicos | tags | disponivel
-```
-
-Exemplo:
-
-```text
-/cardapio_add Frango Grelhado | 31,90 | quinta | frango, arroz, legumes | nenhum | proteico, caseiro | sim
-```
-
-Para listar o cardapio cadastrado:
-
-```text
-/cardapio_list
-```
-
-Para ver um resumo administrativo com clientes, pedidos, favoritos e pratos mais pedidos:
-
-```text
-/relatorio
-```
-
-## Atualizar cardapio semanal
-
-Envie o comando abaixo no Telegram para registrar os pratos da semana e avisar clientes que aguardam algum deles ou ja pediram o prato varias vezes:
-
-```text
-/cardapio_semana Lasanha de Legumes
-Peixe Assado com Legumes
-Sopa de Lentilha
-```
-
-Para restringir esse comando a administradores, configure no `.env`:
-
-```env
-ADMIN_TELEGRAM_IDS=123456789,987654321
-APETIT_DB_PATH=apetit.db
-```
-
-## Deploy
-
-Para operar de verdade, use webhook em producao e deixe polling apenas para testes locais.
-
-Variaveis recomendadas:
-
-```env
-TELEGRAM_BOT_TOKEN=seu_token_novo
-ADMIN_TELEGRAM_IDS=123456789
-APETIT_DB_PATH=apetit.db
-TELEGRAM_WEBHOOK_URL=https://seu-app.onrender.com
-TELEGRAM_WEBHOOK_PATH=telegram-webhook
-TELEGRAM_WEBHOOK_SECRET_TOKEN=um-segredo-forte
-PORT=8000
-```
-
-Com `TELEGRAM_WEBHOOK_URL` preenchido, o bot sobe com webhook automaticamente. Sem essa variavel, ele continua usando polling.
-
-Opcoes de hospedagem:
-
-- Render, Railway ou Fly para uma primeira versao gerenciada
-- VPS quando voce quiser mais controle de sistema, disco e backups
-- SQLite funciona para MVP; para escala maior, considere migrar para PostgreSQL
-
-Backup do banco:
+## Backup do banco
 
 ```powershell
 python scripts/backup_db.py
 ```
 
-O script cria uma copia em `backups/`. Em producao, agende esse comando no provedor ou na VPS e guarde copias fora da maquina principal.
+O script cria uma cópia em `backups/`. Em produção, agende esse comando no provedor ou na VPS e guarde cópias fora
+da máquina principal.
 
-Logs e monitoramento:
-
-- os logs saem no stdout do processo, que Render/Railway/Fly/VPS conseguem capturar
-- monitore reinicios, erros de webhook e espaco em disco
-- mantenha um alerta simples para queda do servico e falhas de backup
-
-## Checklist antes de usar com clientes
+## Checklist antes de usar com colaboradores
 
 - gerar um token novo no BotFather se o token antigo foi exposto
 - preencher `TELEGRAM_BOT_TOKEN` no `.env`
-- configurar `ADMIN_TELEGRAM_IDS` para proteger comandos administrativos
-- preencher `TELEGRAM_WEBHOOK_URL` em producao
+- configurar `ADMIN_TELEGRAM_IDS` para liberar os comandos administrativos
+- importar o cardápio do mês/semana enviando o `.xlsx` com a legenda `MM/AAAA`
+- completar `/prato_add` para todo prato listado em `/pratos_pendentes` antes de divulgar o cardápio
 - configurar rotina de backup do banco
-- cadastrar pratos reais com ingredientes, alergenicos e tags
-- testar um cadastro novo com `/start`
-- testar aceite LGPD, `/meus_dados` e `/excluir_dados`
-- testar objetivos diferentes, como perder peso e ganhar massa
-- testar uma restricao alimentar e confirmar que prato incompatavel e bloqueado
-- testar `/cardapio_semana` com um prato favorito para confirmar o alerta
-
-## Exemplos de frases
-
-- `O que tem hoje sem carne?`
-- `O que voce recomenda hoje?`
-- `A comida estava fria.`
-- `Gostei muito do almoco de hoje!`
-- `Posso pedir o estrogonofe de cogumelos?`
+- testar um cadastro novo com `/start`, incluindo o aceite LGPD
+- testar `/meus_dados` e `/excluir_dados`
+- testar uma restrição/alergia e confirmar que o prato incompatível aparece bloqueado (⚠️) no `/cardapio_semana`
