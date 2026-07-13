@@ -33,6 +33,12 @@ Para importar, um administrador (configurado em `ADMIN_TELEGRAM_IDS`) envia o ar
 bot, com a legenda no formato `MM/AAAA` (ex.: `07/2026`) indicando o mês/ano daquele calendário. Sem legenda, o bot
 assume o mês atual.
 
+Assim que a importação termina, o bot avisa automaticamente todos os colaboradores cadastrados (com aceite LGPD)
+de que o cardápio da semana está disponível, já com botão para abrir `/cardapio_semana`. Se algum prato daquele
+período bate com a restrição/alergia cadastrada do colaborador, o aviso já vem com essa observação — sem precisar
+o colaborador ir checar por conta própria. Pratos ainda sem ingredientes/alergênicos cadastrados também geram um
+aviso genérico pedindo para confirmar com o refeitório.
+
 Pratos com código novo (nunca importado antes) entram no catálogo sem ingredientes/alergênicos cadastrados. O bot
 avisa quais são no retorno da importação e eles também aparecem em:
 

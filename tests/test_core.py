@@ -70,6 +70,37 @@ class CoreLogicTest(unittest.TestCase):
 
         self.assertEqual(best["dish_key"], "salada")
 
+    def test_restriction_conflicts_for_dates_reports_menu_date_and_dish(self):
+        self.seed_dish("peixe", "Peixe Assado", "LANCHE", ingredients="peixe")
+        self.seed_dish("salada", "Salada", "LANCHE", ingredients="grao de bico")
+        with bot.db() as conn:
+            for slot, key, name in [("LANCHE", "peixe", "Peixe Assado"), ("LANCHE 2", "salada", "Salada")]:
+                conn.execute(
+                    "INSERT INTO daily_menu (menu_date, slot, base_category, dish_key, dish_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    ("2026-07-14", slot, "LANCHE", key, name, bot.now_iso()),
+                )
+
+        conflicts = bot.restriction_conflicts_for_dates("Sem frutos do mar", ["2026-07-14"])
+
+        self.assertEqual(conflicts, [("2026-07-14", "Peixe Assado", "contem peixe ou frutos do mar")])
+
+    def test_restriction_conflicts_for_dates_empty_without_restriction(self):
+        self.assertEqual(bot.restriction_conflicts_for_dates("", ["2026-07-14"]), [])
+
+    def test_pending_dish_names_for_dates_lists_dishes_without_metadata(self):
+        self.seed_dish("novo", "Prato Novo", "LANCHE")
+        self.seed_dish("completo", "Prato Completo", "LANCHE", ingredients="arroz")
+        with bot.db() as conn:
+            for key, name in [("novo", "Prato Novo"), ("completo", "Prato Completo")]:
+                conn.execute(
+                    "INSERT INTO daily_menu (menu_date, slot, base_category, dish_key, dish_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    ("2026-07-14", key.upper(), "LANCHE", key, name, bot.now_iso()),
+                )
+
+        pending = bot.pending_dish_names_for_dates(["2026-07-14"])
+
+        self.assertEqual(pending, ["Prato Novo"])
+
     def test_import_menu_workbook_creates_dishes_and_daily_menu(self):
         import openpyxl
 
@@ -87,6 +118,7 @@ class CoreLogicTest(unittest.TestCase):
             Path(tmp_path).unlink(missing_ok=True)
 
         self.assertEqual(result["days"], 1)
+        self.assertEqual(result["dates"], ["2026-07-14"])
         self.assertEqual({code for code, _ in result["new_dishes"]}, {"08.03.01.110", "03.01.02.190", "09.03.01.050"})
 
         grouped = bot.day_menu_by_category("2026-07-14")

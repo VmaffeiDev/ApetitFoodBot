@@ -165,12 +165,13 @@ def import_menu_workbook(file_path: str, year: int, month: int) -> dict:
     sheet = workbook.worksheets[0]
     rows = list(sheet.iter_rows(values_only=True))
     if not rows:
-        return {"days": 0, "new_dishes": []}
+        return {"days": 0, "new_dishes": [], "dates": []}
     header = [str(cell).strip() if cell else "" for cell in rows[0]]
     slot_columns = [(index, name) for index, name in enumerate(header) if index != 0 and name]
     timestamp = now_iso()
     imported_days = 0
     new_dishes: list[tuple[str, str]] = []
+    imported_dates: list[str] = []
     with db() as conn:
         for row in rows[1:]:
             day_raw = row[0] if row else None
@@ -207,7 +208,8 @@ def import_menu_workbook(file_path: str, year: int, month: int) -> dict:
                 row_has_item = True
             if row_has_item:
                 imported_days += 1
-    return {"days": imported_days, "new_dishes": new_dishes}
+                imported_dates.append(menu_date)
+    return {"days": imported_days, "new_dishes": new_dishes, "dates": imported_dates}
 
 
 def load_dish(dish_key: str) -> sqlite3.Row | None:
@@ -408,6 +410,36 @@ def delete_employee_data(telegram_id: int) -> None:
     with db() as conn:
         conn.execute("DELETE FROM selections WHERE telegram_id = ?", (telegram_id,))
         conn.execute("DELETE FROM employees WHERE telegram_id = ?", (telegram_id,))
+
+
+def list_active_employees() -> list[sqlite3.Row]:
+    with db() as conn:
+        return conn.execute("SELECT * FROM employees WHERE consent_accepted = 1").fetchall()
+
+
+def restriction_conflicts_for_dates(restriction: str, menu_dates: list[str]) -> list[tuple[str, str, str]]:
+    conflicts = []
+    if not restriction:
+        return conflicts
+    for menu_date in menu_dates:
+        for dishes in day_menu_by_category(menu_date).values():
+            for dish in dishes:
+                reason = restriction_conflict(restriction, dish)
+                if reason:
+                    conflicts.append((menu_date, dish["dish_name"], reason))
+    return conflicts
+
+
+def pending_dish_names_for_dates(menu_dates: list[str]) -> list[str]:
+    seen: set[str] = set()
+    names: list[str] = []
+    for menu_date in menu_dates:
+        for dishes in day_menu_by_category(menu_date).values():
+            for dish in dishes:
+                if not dish["ingredients"] and not dish["allergens"] and dish["dish_key"] not in seen:
+                    seen.add(dish["dish_key"])
+                    names.append(dish["dish_name"])
+    return names
 
 
 def admin_report_data() -> dict:
@@ -768,6 +800,44 @@ def is_admin(user_id: int | None) -> bool:
     return bool(ADMIN_TELEGRAM_IDS) and user_id in ADMIN_TELEGRAM_IDS
 
 
+async def broadcast_new_menu(context: ContextTypes.DEFAULT_TYPE, menu_dates: list[str]) -> int:
+    if not menu_dates:
+        return 0
+    start_label = format_date_br(min(menu_dates))
+    end_label = format_date_br(max(menu_dates))
+    period = start_label if start_label == end_label else f"{start_label} a {end_label}"
+    pending = pending_dish_names_for_dates(menu_dates)
+    notified = 0
+    for employee in list_active_employees():
+        conflicts = restriction_conflicts_for_dates(employee["restriction"], menu_dates)
+        lines = [
+            "\U0001f4c5 <b>Cardapio novo disponivel!</b>",
+            "",
+            f"A empresa ja publicou o cardapio de {escape(period)}. De uma olhada no que vai ter e escolha o que voce vai comer.",
+        ]
+        if pending:
+            lines.append("")
+            lines.append(
+                "ℹ️ Alguns pratos dessa semana ainda nao tem ingredientes/alergenicos cadastrados "
+                f"({', '.join(escape(name) for name in pending[:5])}). Se tiver alergia, confirme com o refeitorio antes de comer."
+            )
+        if conflicts:
+            lines.append("")
+            lines.append(f"⚠️ <b>Atencao:</b> tem prato(s) essa semana que batem com sua restricao ({escape(employee['restriction'])}):")
+            lines.extend(f"- {escape(format_date_br(menu_date))}: {escape(dish_name)} ({escape(reason)})" for menu_date, dish_name, reason in conflicts)
+        try:
+            await context.bot.send_message(
+                chat_id=employee["chat_id"],
+                text="\n".join(lines),
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard([[("\U0001f4c5 Ver cardapio da semana", "week_menu")]]),
+            )
+            notified += 1
+        except Exception:
+            logger.exception("Falha ao notificar colaborador %s sobre novo cardapio", employee["telegram_id"])
+    return notified
+
+
 async def handle_menu_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     document = update.effective_message.document
     if not document or not (document.file_name or "").lower().endswith(".xlsx"):
@@ -787,7 +857,8 @@ async def handle_menu_document(update: Update, context: ContextTypes.DEFAULT_TYP
         result = import_menu_workbook(tmp_path, year, month)
     finally:
         Path(tmp_path).unlink(missing_ok=True)
-    lines = [f"✅ Cardapio importado para {month:02d}/{year}: {result['days']} dia(s) com itens."]
+    notified = await broadcast_new_menu(context, result["dates"])
+    lines = [f"✅ Cardapio importado para {month:02d}/{year}: {result['days']} dia(s) com itens. Colaboradores notificados: {notified}."]
     if not match:
         lines.append("(Nenhum mes/ano na legenda da mensagem, usei o mes atual. Envie a legenda no formato MM/AAAA para escolher outro mes.)")
     if result["new_dishes"]:
