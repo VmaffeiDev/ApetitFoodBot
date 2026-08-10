@@ -89,6 +89,40 @@ Para consultar ou excluir os dados do cliente:
 /excluir_dados
 ```
 
+## Importacao do cardapio com informacao nutricional
+
+O cardapio da operacao chega em CSV, com uma coluna de nome por categoria seguida
+de KCAL, CHO, LIP e PTN. O importador aceita os dois layouts observados (largo,
+uma linha por dia; e longo, uma linha por item), separador `;` ou `,` e decimal
+com virgula.
+
+```powershell
+python scripts/import_cardapio.py cardapio.csv --unidade SM --refeicao almoco
+```
+
+Antes de publicar, cada item passa por validacao:
+
+- **energia inconsistente** — a kcal declarada e comparada com a conta de Atwater
+  (4 kcal/g de carboidrato, 9 de lipideo, 4 de proteina). So bloqueia quando a
+  divergencia passa de 25% **e** de 30 kcal, para nao acusar arredondamento de
+  salada de 4 kcal
+- **macro maior que a porcao** — quando o export traz a gramagem
+- **valor negativo**
+- **macro incompleto** — publica, mas marcado como sem informacao nutricional
+
+O que nao passa **nao e publicado**: fica na fila de revisao com o motivo, porque
+num app que orienta o funcionario um macro errado vira orientacao errada.
+
+```powershell
+python scripts/import_cardapio.py --pendencias
+```
+
+A fila agrupa por ficha tecnica, nao por ocorrencia: um item errado que aparece
+em doze dias do mes e uma correcao, nao doze.
+
+Colunas de **custo e per capita sao descartadas** na importacao. Sao dado
+comercial da operacao e nao podem chegar ao app do funcionario.
+
 ## Banco de dados
 
 O bot cria automaticamente o arquivo `apetit.db` com:
