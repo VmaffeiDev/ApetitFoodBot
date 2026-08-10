@@ -81,6 +81,8 @@ def init_db() -> None:
                 address TEXT NOT NULL DEFAULT '',
                 goal TEXT NOT NULL DEFAULT 'Nao informado',
                 restriction TEXT NOT NULL,
+                consent_accepted INTEGER NOT NULL DEFAULT 0,
+                consented_at TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -127,6 +129,10 @@ def init_db() -> None:
             conn.execute("ALTER TABLE clients ADD COLUMN address TEXT NOT NULL DEFAULT ''")
         if "goal" not in columns:
             conn.execute("ALTER TABLE clients ADD COLUMN goal TEXT NOT NULL DEFAULT 'Nao informado'")
+        if "consent_accepted" not in columns:
+            conn.execute("ALTER TABLE clients ADD COLUMN consent_accepted INTEGER NOT NULL DEFAULT 0")
+        if "consented_at" not in columns:
+            conn.execute("ALTER TABLE clients ADD COLUMN consented_at TEXT NOT NULL DEFAULT ''")
         seed_default_menu(conn)
 
 
@@ -320,15 +326,30 @@ def current_week_start() -> str:
 
 
 
-def save_client(telegram_id: int, chat_id: int, name: str, phone: str, address: str, restriction: str, goal: str = "Nao informado") -> None:
+def save_client(
+    telegram_id: int,
+    chat_id: int,
+    name: str,
+    phone: str,
+    address: str,
+    restriction: str,
+    goal: str = "Nao informado",
+    consent_accepted: bool = True,
+    consented_at: str | None = None,
+) -> None:
     timestamp = now_iso()
+    consent_timestamp = consented_at or (timestamp if consent_accepted else "")
+    consent_value = 1 if consent_accepted else 0
     with db() as conn:
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(clients)").fetchall()}
         if "company" in columns:
             conn.execute(
                 """
-                INSERT INTO clients (telegram_id, chat_id, name, company, phone, address, goal, restriction, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO clients (
+                    telegram_id, chat_id, name, company, phone, address, goal,
+                    restriction, consent_accepted, consented_at, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(telegram_id) DO UPDATE SET
                     chat_id = excluded.chat_id,
                     name = excluded.name,
@@ -337,15 +358,33 @@ def save_client(telegram_id: int, chat_id: int, name: str, phone: str, address: 
                     address = excluded.address,
                     goal = excluded.goal,
                     restriction = excluded.restriction,
+                    consent_accepted = excluded.consent_accepted,
+                    consented_at = excluded.consented_at,
                     updated_at = excluded.updated_at
                 """,
-                (telegram_id, chat_id, name, address, phone, address, goal, restriction, timestamp, timestamp),
+                (
+                    telegram_id,
+                    chat_id,
+                    name,
+                    address,
+                    phone,
+                    address,
+                    goal,
+                    restriction,
+                    consent_value,
+                    consent_timestamp,
+                    timestamp,
+                    timestamp,
+                ),
             )
             return
         conn.execute(
             """
-            INSERT INTO clients (telegram_id, chat_id, name, phone, address, goal, restriction, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO clients (
+                telegram_id, chat_id, name, phone, address, goal, restriction,
+                consent_accepted, consented_at, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(telegram_id) DO UPDATE SET
                 chat_id = excluded.chat_id,
                 name = excluded.name,
@@ -353,10 +392,25 @@ def save_client(telegram_id: int, chat_id: int, name: str, phone: str, address: 
                 address = excluded.address,
                 goal = excluded.goal,
                 restriction = excluded.restriction,
+                consent_accepted = excluded.consent_accepted,
+                consented_at = excluded.consented_at,
                 updated_at = excluded.updated_at
             """,
-            (telegram_id, chat_id, name, phone, address, goal, restriction, timestamp, timestamp),
+            (
+                telegram_id,
+                chat_id,
+                name,
+                phone,
+                address,
+                goal,
+                restriction,
+                consent_value,
+                consent_timestamp,
+                timestamp,
+                timestamp,
+            ),
         )
+
 def load_client(telegram_id: int) -> sqlite3.Row | None:
     with db() as conn:
         return conn.execute("SELECT * FROM clients WHERE telegram_id = ?", (telegram_id,)).fetchone()
@@ -381,6 +435,34 @@ def add_favorite_waitlist(telegram_id: int, dish_key: str) -> None:
             (telegram_id, dish_key, get_dish_name(dish_key), now_iso()),
         )
 
+
+def favorite_items(telegram_id: int, limit: int = 10) -> list[sqlite3.Row]:
+    with db() as conn:
+        return conn.execute(
+            """
+            SELECT dish_key, dish_name, created_at
+            FROM favorite_waitlist
+            WHERE telegram_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (telegram_id, limit),
+        ).fetchall()
+
+
+def client_data_snapshot(telegram_id: int) -> dict:
+    return {
+        "client": load_client(telegram_id),
+        "recent_orders": recent_orders(telegram_id, 10),
+        "favorites": favorite_items(telegram_id, 10),
+    }
+
+
+def delete_client_data(telegram_id: int) -> None:
+    with db() as conn:
+        conn.execute("DELETE FROM favorite_waitlist WHERE telegram_id = ?", (telegram_id,))
+        conn.execute("DELETE FROM orders WHERE telegram_id = ?", (telegram_id,))
+        conn.execute("DELETE FROM clients WHERE telegram_id = ?", (telegram_id,))
 
 def recent_orders(telegram_id: int, limit: int = 5) -> list[sqlite3.Row]:
     with db() as conn:
@@ -412,6 +494,7 @@ def admin_report_data() -> dict:
             """
             SELECT
                 (SELECT COUNT(*) FROM clients) AS clients,
+                (SELECT COUNT(*) FROM clients WHERE consent_accepted = 1) AS consented_clients,
                 (SELECT COUNT(*) FROM orders) AS orders,
                 (SELECT COUNT(*) FROM favorite_waitlist) AS favorites,
                 (SELECT COUNT(*) FROM menu_items WHERE available = 1) AS available_items
@@ -508,14 +591,31 @@ def hydrate_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 "address": client["address"],
                 "goal": client["goal"],
                 "restriction": client["restriction"],
-                "registered": True,
+                "consent_accepted": bool(client["consent_accepted"]),
+                "consented_at": client["consented_at"],
+                "registered": bool(client["consent_accepted"]),
             }
         )
-
 
 def registered(context: ContextTypes.DEFAULT_TYPE) -> bool:
     return bool(profile(context).get("registered"))
 
+
+def has_registration_data(context: ContextTypes.DEFAULT_TYPE) -> bool:
+    data = profile(context)
+    return bool(data.get("name") and data.get("phone") and data.get("address") and data.get("restriction"))
+
+
+def needs_consent(context: ContextTypes.DEFAULT_TYPE) -> bool:
+    data = profile(context)
+    return has_registration_data(context) and not data.get("consent_accepted")
+
+
+async def ask_registration_gate(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+    if needs_consent(context):
+        await ask_consent(update, context, edit=edit)
+    else:
+        await ask_name(update, context, edit=edit)
 
 def user_name(context: ContextTypes.DEFAULT_TYPE) -> str:
     return profile(context).get("name") or DEFAULT_USER_NAME
@@ -562,6 +662,12 @@ def goal_buttons() -> list[list[tuple[str, str]]]:
         [("\U0001f343 Perder peso", "goal_weight_loss"), ("\U0001f4aa Ganhar massa", "goal_muscle_gain")],
         [("\u2696\ufe0f Manter equilibrio", "goal_maintenance")],
         [("\U0001f957 Alimentacao saudavel", "goal_health"), ("\u23f1\ufe0f Praticidade", "goal_practical")],
+    ]
+
+def consent_buttons() -> list[list[tuple[str, str]]]:
+    return [
+        [("✅ Aceito e quero continuar", "lgpd_accept")],
+        [("❌ Nao aceito", "lgpd_decline")],
     ]
 
 def menu_payload(day: str | None = None, restriction: str = "") -> dict:
@@ -651,23 +757,35 @@ def profile_payload(context: ContextTypes.DEFAULT_TYPE) -> dict:
     if user_id:
         top = top_dishes(user_id)
         recent = recent_orders(user_id)
+        newline = chr(10)
         if top:
-            top_text = "\n".join(f"- {escape(row['dish_name'])}: {row['total']} pedido(s)" for row in top)
+            top_text = newline.join(f"- {escape(row['dish_name'])}: {row['total']} pedido(s)" for row in top)
         if recent:
-            recent_text = "\n".join(f"- {escape(row['dish_name'])}" for row in recent)
+            recent_text = newline.join(f"- {escape(row['dish_name'])}" for row in recent)
+    consent_text = "Aceito"
+    if data.get("consented_at"):
+        consent_text = f"Aceito em {escape(data.get('consented_at'))}"
+    elif not data.get("consent_accepted"):
+        consent_text = "Pendente"
     return {
-        "text": (
-            "\U0001f464 <b>Seu perfil:</b>\n\n"
-            f"<b>Nome:</b> {escape(data.get('name', DEFAULT_USER_NAME))}\n"
-            f"<b>Telefone:</b> {escape(data.get('phone', 'Nao informado'))}\n"
-            f"<b>Endereco/bairro:</b> {escape(data.get('address', 'Nao informado'))}\n"
-            f"<b>Restricao alimentar:</b> {escape(data.get('restriction', 'Nao informado'))}\n\n"
-            f"<b>Mais pedidos:</b>\n{top_text}\n\n"
-            f"<b>Historico recente:</b>\n{recent_text}"
-        ),
-        "buttons": [[("\u270f\ufe0f Atualizar cadastro", "restart_registration"), ("\u2705 Esta correto", "thanks")]],
-    }
+        "text": f"""
+👤 <b>Seu perfil:</b>
 
+<b>Nome:</b> {escape(data.get('name', DEFAULT_USER_NAME))}
+<b>Telefone:</b> {escape(data.get('phone', 'Nao informado'))}
+<b>Endereco/bairro:</b> {escape(data.get('address', 'Nao informado'))}
+<b>Objetivo:</b> {escape(data.get('goal', 'Nao informado'))}
+<b>Restricao alimentar:</b> {escape(data.get('restriction', 'Nao informado'))}
+<b>Consentimento LGPD:</b> {consent_text}
+
+<b>Mais pedidos:</b>
+{top_text}
+
+<b>Historico recente:</b>
+{recent_text}
+""".strip(),
+        "buttons": [[("✏️ Atualizar cadastro", "restart_registration"), ("✅ Esta correto", "thanks")]],
+    }
 
 async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     context.user_data[REGISTRATION_STEP] = "name"
@@ -709,10 +827,30 @@ async def ask_restriction(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
     await send_text(update, "\U0001f33f Para sua seguranca alimentar, selecione sua principal restricao:", context, restriction_buttons(), edit=edit)
 
 
-async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE, restriction: str, edit: bool = False) -> None:
+async def ask_consent(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+    context.user_data[REGISTRATION_STEP] = "consent"
+    await send_text(
+        update,
+        """
+🔒 <b>Consentimento e privacidade</b>
+
+Para continuar, preciso do seu aceite para guardar nome, telefone, endereco/bairro, objetivo, restricao alimentar, historico de pedidos e pratos favoritos/aguardados.
+
+Usamos esses dados para personalizar recomendacoes, registrar pedidos e avisar quando um prato que voce gosta voltar ao cardapio 🔔
+
+Voce pode consultar seus dados com /meus_dados e excluir tudo quando quiser com /excluir_dados.
+""".strip(),
+        context,
+        consent_buttons(),
+        edit=edit,
+    )
+
+
+async def complete_registration_after_consent(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     data = profile(context)
-    data["restriction"] = restriction
     data["registered"] = True
+    data["consent_accepted"] = True
+    data["consented_at"] = now_iso()
     user_id = tg_id(update)
     current_chat_id = chat_id(update)
     if user_id:
@@ -724,25 +862,37 @@ async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE
             data.get("name", DEFAULT_USER_NAME),
             data.get("phone", "Nao informado"),
             data.get("address", "Nao informado"),
-            restriction,
+            data.get("restriction", "Nao informado"),
             data.get("goal", "Nao informado"),
+            True,
+            data["consented_at"],
         )
     context.user_data.pop(REGISTRATION_STEP, None)
     await send_text(
         update,
-        (
-            "\u2705 <b>Cadastro concluido!</b>\n\n"
-            "<b>Nome:</b> {name}\n"
-            f"<b>Telefone:</b> {escape(data.get('phone', 'Nao informado'))}\n"
-            f"<b>Endereco/bairro:</b> {escape(data.get('address', 'Nao informado'))}\n"
-            f"<b>Objetivo:</b> {escape(data.get('goal', 'Nao informado'))}\n"
-            f"<b>Restricao alimentar:</b> {escape(restriction)}\n\n"
-            "Agora posso te ajudar com o cardapio e seus pedidos \U0001f60a"
-        ),
+        f"""
+✅ <b>Cadastro concluido!</b>
+
+<b>Nome:</b> {{name}}
+<b>Telefone:</b> {escape(data.get('phone', 'Nao informado'))}
+<b>Endereco/bairro:</b> {escape(data.get('address', 'Nao informado'))}
+<b>Objetivo:</b> {escape(data.get('goal', 'Nao informado'))}
+<b>Restricao alimentar:</b> {escape(data.get('restriction', 'Nao informado'))}
+<b>Consentimento:</b> aceito em {escape(data['consented_at'])}
+
+Agora posso te ajudar com o cardapio e seus pedidos 😊
+""".strip(),
         context,
         main_buttons(),
         edit,
     )
+
+
+async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE, restriction: str, edit: bool = False) -> None:
+    data = profile(context)
+    data["restriction"] = restriction
+    data["consent_accepted"] = False
+    await ask_consent(update, context, edit=edit)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     hydrate_profile(update, context)
@@ -750,14 +900,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await send_text(
             update,
             (
-                "\U0001f37d\ufe0f <b>Ola, {name}!</b>\n\n"
-                "Sou o bot da Apetit. Posso te ajudar com cardapio, pedidos, recomendacoes e avisos de pratos favoritos \U0001f33f"
+                "🍽️ <b>Ola, {name}!</b>\n\n"
+                "Sou o bot da Apetit. Posso te ajudar com cardapio, pedidos, recomendacoes e avisos de pratos favoritos 🌿"
             ),
             context,
             main_buttons(),
         )
         return
-    await ask_name(update, context)
+    await ask_registration_gate(update, context)
 
 
 async def reset_registration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -769,30 +919,103 @@ async def show_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     hydrate_profile(update, context)
     user_id = tg_id(update)
     if not user_id or not registered(context):
-        await ask_name(update, context)
+        await ask_registration_gate(update, context)
         return
     rows = recent_orders(user_id, 10)
     if not rows:
-        await send_text(update, "\U0001f4cb Voce ainda nao tem pedidos registrados.", context, main_buttons())
+        await send_text(update, "📋 Voce ainda nao tem pedidos registrados.", context, main_buttons())
         return
-    await send_text(update, "\U0001f4cb <b>Seu historico de pedidos:</b>\n\n" + "\n".join(f"- {escape(row['dish_name'])}" for row in rows), context, main_buttons())
+    await send_text(update, "📋 <b>Seu historico de pedidos:</b>\n\n" + chr(10).join(f"- {escape(row['dish_name'])}" for row in rows), context, main_buttons())
 
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     hydrate_profile(update, context)
     if not registered(context):
-        await ask_name(update, context)
+        await ask_registration_gate(update, context)
         return
     await send_payload(update, menu_payload(restriction=profile(context).get("restriction", "")), context)
 
 
+async def show_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    hydrate_profile(update, context)
+    user_id = tg_id(update)
+    if not user_id:
+        await send_text(update, "😔 Nao consegui identificar seu usuario agora. Tente novamente em instantes.", context)
+        return
+    snapshot = client_data_snapshot(user_id)
+    client = snapshot["client"]
+    if not client:
+        await ask_registration_gate(update, context)
+        return
+    newline = chr(10)
+    orders = snapshot["recent_orders"]
+    favorites = snapshot["favorites"]
+    order_text = newline.join(f"- {escape(row['dish_name'])}" for row in orders) if orders else "Ainda sem pedidos registrados."
+    favorite_text = newline.join(f"- {escape(row['dish_name'])}" for row in favorites) if favorites else "Ainda sem pratos aguardados."
+    consent = "sim" if client["consent_accepted"] else "pendente"
+    await send_text(
+        update,
+        f"""
+🔒 <b>Seus dados salvos na Apetit</b>
+
+<b>Nome:</b> {escape(client['name'])}
+<b>Telefone:</b> {escape(client['phone'])}
+<b>Endereco/bairro:</b> {escape(client['address'])}
+<b>Objetivo:</b> {escape(client['goal'])}
+<b>Restricao alimentar:</b> {escape(client['restriction'])}
+<b>Consentimento:</b> {consent}
+<b>Data do aceite:</b> {escape(client['consented_at'] or 'Nao informado')}
+
+<b>Historico recente:</b>
+{order_text}
+
+<b>Pratos favoritos/aguardados:</b>
+{favorite_text}
+
+Para apagar tudo, envie /excluir_dados.
+""".strip(),
+        context,
+        main_buttons(),
+    )
+
+
+async def confirm_delete_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    hydrate_profile(update, context)
+    user_id = tg_id(update)
+    if not user_id or not load_client(user_id):
+        context.user_data.clear()
+        await send_text(update, "📋 Nao encontrei dados cadastrados para excluir.", context)
+        return
+    await send_text(
+        update,
+        """
+⚠️ <b>Excluir seus dados?</b>
+
+Vou apagar seu cadastro, telefone, endereco/bairro, objetivo, restricao alimentar, historico de pedidos e pratos favoritos/aguardados.
+
+Depois disso, para pedir novamente sera necessario fazer um novo cadastro.
+""".strip(),
+        context,
+        [[("✅ Sim, excluir tudo", "delete_my_data_confirm")], [("❌ Cancelar", "delete_my_data_cancel")]],
+    )
+
 def is_admin(user_id: int | None) -> bool:
-    return not ADMIN_TELEGRAM_IDS or bool(user_id in ADMIN_TELEGRAM_IDS)
+    return user_id is not None and user_id in ADMIN_TELEGRAM_IDS
+
+
+async def deny_admin(update: Update, action: str) -> None:
+    if not ADMIN_TELEGRAM_IDS:
+        await update.effective_message.reply_text(
+            "\U0001f512 Nenhum administrador configurado. "
+            "Defina ADMIN_TELEGRAM_IDS no .env com os IDs de Telegram autorizados para liberar os comandos administrativos."
+        )
+        return
+    await update.effective_message.reply_text(f"\U0001f512 Apenas administradores podem {action}.")
 
 
 async def add_menu_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_admin(tg_id(update)):
-        await update.effective_message.reply_text("\U0001f512 Apenas administradores podem cadastrar pratos.")
+        await deny_admin(update, "cadastrar pratos")
         return
     text = update.effective_message.text or ""
     raw = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
@@ -812,6 +1035,9 @@ async def add_menu_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def list_admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_admin(tg_id(update)):
+        await deny_admin(update, "ver o cardapio cadastrado")
+        return
     day = " ".join(context.args).strip() if context.args else None
     items = list_menu_items(day, only_available=False)
     if not items:
@@ -827,7 +1053,7 @@ async def list_admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def show_admin_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_admin(tg_id(update)):
-        await update.effective_message.reply_text("\U0001f512 Apenas administradores podem ver o relatorio.")
+        await deny_admin(update, "ver o relatorio")
         return
     report = admin_report_data()
     totals = report["totals"]
@@ -835,6 +1061,7 @@ async def show_admin_report(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "\U0001f4ca Relatorio Apetit Bot",
         "",
         f"Clientes cadastrados: {totals['clients']}",
+        f"Clientes com consentimento: {totals['consented_clients']}",
         f"Pedidos registrados: {totals['orders']}",
         f"Pratos aguardados/favoritos: {totals['favorites']}",
         f"Pratos disponiveis no cardapio: {totals['available_items']}",
@@ -869,7 +1096,7 @@ def parse_weekly_menu(raw: str) -> list[tuple[str, str]]:
 
 async def update_weekly_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_admin(tg_id(update)):
-        await update.effective_message.reply_text("\U0001f512 Apenas administradores podem atualizar o cardapio semanal.")
+        await deny_admin(update, "atualizar o cardapio semanal")
         return
     text = update.effective_message.text or ""
     raw = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
@@ -901,7 +1128,7 @@ async def handle_registration_message(update: Update, context: ContextTypes.DEFA
         return False
     text = (update.message.text or "").strip()
     if len(text) < 2:
-        await send_text(update, "Me envie uma resposta um pouco mais completa, por favor \U0001f60a", context)
+        await send_text(update, "Me envie uma resposta um pouco mais completa, por favor 😊", context)
         return True
     data = profile(context)
     if step == "name":
@@ -916,9 +1143,12 @@ async def handle_registration_message(update: Update, context: ContextTypes.DEFA
     elif step == "goal":
         data["goal"] = text
         await ask_restriction(update, context)
+    elif step == "consent":
+        await ask_consent(update, context)
     else:
         await ask_restriction(update, context)
     return True
+
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     hydrate_profile(update, context)
@@ -930,6 +1160,26 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         profile(context).pop("registered", None)
         await ask_name(update, context, edit=True)
         return
+    if data == "lgpd_accept":
+        await complete_registration_after_consent(update, context, edit=True)
+        return
+    if data == "lgpd_decline":
+        user_id = tg_id(update)
+        if user_id:
+            delete_client_data(user_id)
+        context.user_data.clear()
+        await send_text(update, "🔒 Sem o aceite, nao consigo guardar seus dados nem iniciar pedidos por aqui.\n\nQuando quiser continuar, envie /start e fazemos o cadastro novamente 😊", context, edit=True)
+        return
+    if data == "delete_my_data_confirm":
+        user_id = tg_id(update)
+        if user_id:
+            delete_client_data(user_id)
+        context.user_data.clear()
+        await send_text(update, "✅ Dados excluidos com sucesso. Se quiser pedir novamente, envie /start para fazer um novo cadastro 🌿", context, edit=True)
+        return
+    if data == "delete_my_data_cancel":
+        await send_text(update, "Tudo bem, mantive seus dados como estavam 😊", context, main_buttons(), edit=True)
+        return
     if data in GOALS:
         profile(context)["goal"] = GOALS[data]
         await ask_restriction(update, context, edit=True)
@@ -939,19 +1189,19 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
     if data == "profile":
         if not registered(context):
-            await ask_name(update, context, edit=True)
+            await ask_registration_gate(update, context, edit=True)
             return
         await send_payload(update, profile_payload(context), context, edit=True)
         return
     if data == "menu_today":
         if not registered(context):
-            await ask_name(update, context, edit=True)
+            await ask_registration_gate(update, context, edit=True)
             return
         await send_payload(update, menu_payload(restriction=profile(context).get("restriction", "")), context, edit=True)
         return
     if data.startswith("dish:"):
         if not registered(context):
-            await ask_name(update, context, edit=True)
+            await ask_registration_gate(update, context, edit=True)
             return
         key = data.removeprefix("dish:")
         user_id = tg_id(update)
@@ -973,43 +1223,47 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         last = context.user_data.get("last_order")
         if user_id and last:
             add_favorite_waitlist(user_id, last)
-            await send_text(update, "\u2705 Combinado! Vou te avisar quando esse prato voltar ao cardapio \U0001f514", context, main_buttons(), edit=True)
+            await send_text(update, "✅ Combinado! Vou te avisar quando esse prato voltar ao cardapio 🔔", context, main_buttons(), edit=True)
         else:
-            await send_text(update, "Escolha um prato primeiro para eu acompanhar \U0001f60a", context, main_buttons(), edit=True)
+            await send_text(update, "Escolha um prato primeiro para eu acompanhar 😊", context, main_buttons(), edit=True)
         return
     if data == "recommend":
         if not registered(context):
-            await ask_name(update, context, edit=True)
+            await ask_registration_gate(update, context, edit=True)
             return
         await send_payload(update, recommendation_payload(context), context, edit=True)
         return
-    await send_text(update, "Como posso ajudar? \U0001f60a", context, main_buttons(), edit=True)
-
+    await send_text(update, "Como posso ajudar? 😊", context, main_buttons(), edit=True)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     hydrate_profile(update, context)
     if await handle_registration_message(update, context):
         return
     if not registered(context):
-        await ask_name(update, context)
+        await ask_registration_gate(update, context)
         return
     text = normalize(update.message.text or "")
     item = find_menu_item_in_text(update.message.text or "")
     if item:
         user_id = tg_id(update)
+        conflict = restriction_conflict(profile(context).get("restriction", ""), item)
+        if conflict:
+            await send_payload(update, safety_warning_payload(item, profile(context).get("restriction", ""), conflict), context)
+            return
         if user_id:
             record_order(user_id, item["dish_key"])
             context.user_data["last_order"] = item["dish_key"]
         await send_payload(update, order_payload(item["dish_key"]), context)
     elif "cardapio" in text or "tem hoje" in text or "o que tem" in text:
         await send_payload(update, menu_payload(restriction=profile(context).get("restriction", "")), context)
+    elif "recomenda" in text or "sugestao" in text or "sugestão" in text:
+        await send_payload(update, recommendation_payload(context), context)
     elif "perfil" in text or "cadastro" in text:
         await send_payload(update, profile_payload(context), context)
     elif "historico" in text:
         await show_history(update, context)
     else:
-        await send_text(update, "Quer ver o cardapio ou acessar seu perfil? \U0001f60a", context, main_buttons())
-
+        await send_text(update, "Quer ver o cardapio ou acessar seu perfil? 😊", context, main_buttons())
 
 def main() -> None:
     token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -1021,15 +1275,31 @@ def main() -> None:
     app.add_handler(CommandHandler("recadastrar", reset_registration))
     app.add_handler(CommandHandler("historico", show_history))
     app.add_handler(CommandHandler("cardapio", show_menu))
+    app.add_handler(CommandHandler("meus_dados", show_my_data))
+    app.add_handler(CommandHandler("excluir_dados", confirm_delete_my_data))
     app.add_handler(CommandHandler("cardapio_add", add_menu_item))
     app.add_handler(CommandHandler("cardapio_list", list_admin_menu))
     app.add_handler(CommandHandler("cardapio_semana", update_weekly_menu))
     app.add_handler(CommandHandler("relatorio", show_admin_report))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    logger.info("Apetit Bot iniciado.")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
-
+    webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL", "").rstrip("/")
+    if webhook_url:
+        webhook_path = os.getenv("TELEGRAM_WEBHOOK_PATH", "telegram-webhook").strip("/")
+        port = int(os.getenv("PORT", "8000"))
+        secret_token = os.getenv("TELEGRAM_WEBHOOK_SECRET_TOKEN") or None
+        logger.info("Apetit Bot iniciado em webhook na porta %s.", port)
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=webhook_path,
+            webhook_url=f"{webhook_url}/{webhook_path}",
+            secret_token=secret_token,
+            allowed_updates=Update.ALL_TYPES,
+        )
+    else:
+        logger.info("Apetit Bot iniciado em polling.")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()

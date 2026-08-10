@@ -2,11 +2,36 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-token")
 os.environ.setdefault("APETIT_DB_PATH", "test-apetit.db")
 
 import bot
+
+
+class FakeMessage:
+    def __init__(self, text=""):
+        self.text = text
+        self.replies = []
+
+    async def reply_text(self, text=None, parse_mode=None, reply_markup=None):
+        self.replies.append(text or "")
+
+
+class FakeUpdate:
+    def __init__(self, text, user_id, chat_id=999):
+        self.message = FakeMessage(text)
+        self.effective_message = self.message
+        self.effective_user = SimpleNamespace(id=user_id)
+        self.effective_chat = SimpleNamespace(id=chat_id)
+        self.callback_query = None
+
+
+class FakeContext:
+    def __init__(self):
+        self.user_data = {}
+        self.args = []
 
 
 class CoreLogicTest(unittest.TestCase):
@@ -104,6 +129,59 @@ class CoreLogicTest(unittest.TestCase):
         self.assertIsNone(bot.load_client(user_id))
         self.assertEqual(bot.recent_orders(user_id), [])
         self.assertEqual(bot.favorite_items(user_id), [])
+
+
+class AdminAccessTest(unittest.TestCase):
+    def setUp(self):
+        self.original_admins = bot.ADMIN_TELEGRAM_IDS
+
+    def tearDown(self):
+        bot.ADMIN_TELEGRAM_IDS = self.original_admins
+
+    def test_no_admin_configured_blocks_everyone(self):
+        bot.ADMIN_TELEGRAM_IDS = set()
+
+        self.assertFalse(bot.is_admin(123))
+        self.assertFalse(bot.is_admin(None))
+
+    def test_only_configured_ids_are_admin(self):
+        bot.ADMIN_TELEGRAM_IDS = {123}
+
+        self.assertTrue(bot.is_admin(123))
+        self.assertFalse(bot.is_admin(456))
+        self.assertFalse(bot.is_admin(None))
+
+
+class FreeTextOrderTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.tmp = tempfile.NamedTemporaryFile(delete=False)
+        self.tmp.close()
+        bot.DB_PATH = Path(self.tmp.name)
+        bot.init_db()
+        self.user_id = 321
+        bot.save_client(self.user_id, 999, "Cliente Veg", "11999998888", "Centro", "Vegetariana", "Manter equilibrio")
+
+    def tearDown(self):
+        try:
+            Path(self.tmp.name).unlink(missing_ok=True)
+        except PermissionError:
+            pass
+
+    async def test_incompatible_dish_typed_as_text_is_not_recorded(self):
+        update = FakeUpdate("Quero pedir o Peixe Assado com Legumes", self.user_id)
+
+        await bot.handle_message(update, FakeContext())
+
+        self.assertEqual(bot.recent_orders(self.user_id), [])
+        self.assertIn("nao registrei esse pedido", update.message.replies[-1])
+
+    async def test_compatible_dish_typed_as_text_is_recorded(self):
+        update = FakeUpdate("Quero pedir a Sopa de Lentilha", self.user_id)
+
+        await bot.handle_message(update, FakeContext())
+
+        orders = bot.recent_orders(self.user_id)
+        self.assertEqual([row["dish_key"] for row in orders], ["soup"])
 
 
 if __name__ == "__main__":

@@ -23,6 +23,8 @@ MVP de bot Telegram da Apetit com fluxos inspirados no simulador HTML:
 Se um token foi colado em chat, issue, commit ou qualquer lugar publico, gere outro no BotFather.
 Nao salve o token diretamente no codigo.
 
+Um token de verdade ja esteve versionado no `.env.example` deste repositorio, que e publico. O valor foi removido do arquivo, mas continua acessivel no historico do Git, entao **esse token precisa ser revogado no BotFather** (`/revoke`) mesmo que o arquivo atual esteja limpo. Remover de um commit posterior nao invalida a credencial.
+
 ## Rodar localmente
 
 ```powershell
@@ -187,7 +189,11 @@ Peixe Assado com Legumes
 Sopa de Lentilha
 ```
 
-Para restringir esse comando a administradores, configure no `.env`:
+## Comandos administrativos
+
+`/cardapio_add`, `/cardapio_list`, `/cardapio_semana` e `/relatorio` sao restritos a administradores.
+
+A lista de administradores e obrigatoria: enquanto `ADMIN_TELEGRAM_IDS` estiver vazio, **ninguem** consegue usar esses comandos. Isso e proposital, porque `/relatorio` expoe nome de clientes e historico de pedidos e `/cardapio_semana` dispara mensagem para toda a base.
 
 ```env
 ADMIN_TELEGRAM_IDS=123456789,987654321
