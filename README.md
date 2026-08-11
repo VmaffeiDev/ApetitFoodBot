@@ -20,13 +20,17 @@ publicado, e o funcionario monta o prato e registra o consumo.
 | Comando | O que faz |
 |---|---|
 | `/start` | Cadastro ou menu principal |
+| `/montar` | Monta o prato passo a passo, na ordem da fila |
 | `/cardapio` | Cardapio de hoje com alerta de alergenico |
-| `/prato` | Prato em montagem |
-| `/meu_dia` | Consumo de hoje e historico |
+| `/meu_dia` | O que comeu hoje e nos dias anteriores |
 | `/favoritos` | Pratos guardados |
-| `/pontos` | Extrato de pontos |
+| `/progresso` | Sequencia e conquistas da pessoa |
+| `/ajuda` | Como usar |
 | `/meus_dados` `/excluir_dados` | LGPD |
 | `/recadastrar` | Refaz o cadastro |
+
+Os comandos sao publicados no menu do Telegram (`setMyCommands`), entao aparecem
+sozinhos na interface.
 
 Administracao e nutricionista:
 
@@ -52,6 +56,24 @@ Testes:
 ```powershell
 python -m unittest discover -s tests
 ```
+
+## Decisoes de interface
+
+O app e de acompanhamento **pessoal**. Quem usa quer comer melhor, nao ler
+macronutriente. Tres decisoes seguem disso:
+
+**Montar o prato segue a ordem da fila do refeitorio** — prato principal,
+guarnicao, arroz, feijao, salada, sobremesa — uma categoria por vez, com "Passo
+3 de 6". O app acompanha a bandeja em vez de mostrar uma lista unica com tudo.
+
+**Numero vem com leitura em palavras.** "Prato leve para o seu objetivo",
+"Faltam 12 g de proteina", "Sem salada nem fruta — vale somar uma". O numero fica,
+mas em segundo plano. A leitura descreve onde o prato esta; nunca manda comer
+menos, porque quem prescreve e o nutricionista.
+
+**O cadastro oferece, nao pergunta codigo.** Refeitorio, empresa e setor viram
+botoes com o que ja existe no banco, com saida para digitar quando for novo. O
+funcionario nao sabe que a unidade dele se chama `SM` no sistema da operacao.
 
 ## Importacao do cardapio
 
@@ -107,7 +129,11 @@ Celula vazia continua como nao declarado.
 
 Quando nao houver essas colunas, o nutricionista declara pelo `/alergenico`.
 
-## Pontos
+## Progresso
+
+E acompanhamento pessoal: **nao existe ranking e ninguem compara o funcionario
+com colega nenhum.** O que aparece e a propria sequencia ("voce registrou 3 de 5
+dias desta semana") e as proprias conquistas.
 
 Pontuam **constancia** (registrar), **composicao** (incluir salada ou fruta),
 **variedade** na semana e **meta de proteina**.

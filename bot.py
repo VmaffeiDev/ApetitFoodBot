@@ -1,12 +1,18 @@
 """Bot da Apetit para controle nutricional do funcionario.
 
-O produto nao vende comida: a empresa serve o refeitorio e o funcionario
-acompanha o que come. Por isso nao existe preco, carrinho nem pedido — o que
-existe e montar o prato do dia a partir do cardapio publicado e registrar o
-consumo.
+E uma ferramenta de acompanhamento pessoal: quem usa quer comer melhor e
+enxergar o proprio dia. Nao ha venda, nao ha pedido e nao ha comparacao com
+colega — nem ranking, nem media de setor exibida para a pessoa.
 
-Toda a regra de dominio vive em apetit/. Este arquivo e so a camada do Telegram,
-para que o mesmo dominio sirva depois a um painel do nutricionista.
+Duas escolhas de interface guiam o arquivo inteiro:
+
+- montar o prato segue a ordem da fila do refeitorio, uma categoria por vez,
+  em vez de uma lista unica com tudo;
+- o numero vem acompanhado de leitura em palavras, porque "prato leve, boa
+  fonte de proteina" ajuda mais que "134 kcal, 12 g PTN".
+
+Toda a regra de dominio vive em apetit/, para servir depois a um painel do
+nutricionista sem reescrita.
 """
 
 import logging
@@ -16,7 +22,7 @@ from html import escape
 from pathlib import Path
 
 from dotenv import load_dotenv
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
@@ -33,11 +39,29 @@ from apetit.catalog import (
     connect,
     init_schema,
     item_allergens,
+    known_units,
     menu_for_date,
     pending_issues,
     set_item_allergens,
 )
-from apetit.profile import Employee, aggregate_by_sector, delete_employee_data, load_employee, save_employee
+from apetit.humanize import (
+    FRESH_CATEGORIES,
+    category_label,
+    dish_hint,
+    friendly_date,
+    order_categories,
+    plate_reading,
+    week_summary,
+)
+from apetit.profile import (
+    Employee,
+    aggregate_by_sector,
+    delete_employee_data,
+    known_companies,
+    known_sectors,
+    load_employee,
+    save_employee,
+)
 from apetit.tracking import (
     RULES,
     add_favorite,
@@ -60,6 +84,7 @@ logger = logging.getLogger(__name__)
 DB_PATH = Path(os.getenv("APETIT_DB_PATH", "apetit.db"))
 STEP = "cadastro_step"
 TRAY = "prato"
+FLOW = "monta_categoria"
 
 ADMIN_IDS = {
     int(value.strip())
@@ -68,20 +93,21 @@ ADMIN_IDS = {
 }
 
 GOALS = {
-    "goal_perder": "Perder peso",
-    "goal_manter": "Manter equilibrio",
-    "goal_massa": "Ganhar massa",
     "goal_saudavel": "Comer melhor no dia a dia",
+    "goal_manter": "Manter o equilibrio",
+    "goal_perder": "Comer mais leve",
+    "goal_massa": "Reforcar a proteina",
 }
 
-# Alvos ilustrativos por objetivo. Quem define faixa individual e o nutricionista
-# responsavel: o bot informa e acompanha, nao prescreve.
+# Alvos ilustrativos. Quem define faixa individual e o nutricionista
+# responsavel: o app informa e acompanha, nao prescreve.
 TARGETS = {
-    "Perder peso": {"kcal": 550, "ptn": 25},
-    "Manter equilibrio": {"kcal": 700, "ptn": 30},
-    "Ganhar massa": {"kcal": 850, "ptn": 45},
     "Comer melhor no dia a dia": {"kcal": 700, "ptn": 30},
+    "Manter o equilibrio": {"kcal": 700, "ptn": 30},
+    "Comer mais leve": {"kcal": 550, "ptn": 25},
+    "Reforcar a proteina": {"kcal": 850, "ptn": 45},
 }
+TARGET_PADRAO = {"kcal": 700, "ptn": 30}
 
 VERDICT_MARK = {
     Verdict.BLOQUEIO: "⛔",
@@ -89,6 +115,17 @@ VERDICT_MARK = {
     Verdict.LIBERADO: "✅",
     Verdict.SEM_RESTRICAO: "",
 }
+
+COMMANDS = [
+    BotCommand("cardapio", "Ver o cardapio de hoje"),
+    BotCommand("montar", "Montar meu prato passo a passo"),
+    BotCommand("meu_dia", "O que eu comi hoje e nos ultimos dias"),
+    BotCommand("favoritos", "Pratos que eu guardei"),
+    BotCommand("progresso", "Minha sequencia e conquistas"),
+    BotCommand("meus_dados", "Ver tudo o que o app guarda de mim"),
+    BotCommand("excluir_dados", "Apagar meus dados"),
+    BotCommand("ajuda", "Como usar o app"),
+]
 
 
 def db():
@@ -135,10 +172,15 @@ async def reply(update: Update, text: str, buttons=None, edit: bool = False) -> 
 
 def main_menu() -> list[list[tuple[str, str]]]:
     return [
-        [("\U0001f37d️ Cardapio de hoje", "cardapio"), ("\U0001f4dd Meu prato", "prato")],
+        [("\U0001f37d️ Montar meu prato", "montar")],
+        [("\U0001f4c5 Cardapio de hoje", "cardapio"), ("\U0001f4c8 Meu progresso", "progresso")],
         [("\U0001f4ca Meu dia", "meu_dia"), ("⭐ Favoritos", "favoritos")],
-        [("\U0001f3c5 Meus pontos", "pontos"), ("\U0001f464 Meu cadastro", "perfil")],
+        [("\U0001f464 Meu cadastro", "perfil"), ("❓ Ajuda", "ajuda")],
     ]
+
+
+def target_for(pessoa: Employee) -> dict:
+    return TARGETS.get(pessoa.goal, TARGET_PADRAO)
 
 
 # --------------------------------------------------------------------------
@@ -149,36 +191,93 @@ def draft(context: ContextTypes.DEFAULT_TYPE) -> dict:
     return context.user_data.setdefault("cadastro", {})
 
 
+def options_keyboard(valores: list[str], prefixo: str, rotulo_outro: str) -> list[list[tuple[str, str]]]:
+    """Botoes com o que ja existe, mais a saida para digitar algo novo."""
+    linhas = [[(valor[:40], f"{prefixo}:{indice}")] for indice, valor in enumerate(valores[:8])]
+    linhas.append([(rotulo_outro, f"{prefixo}:outro")])
+    return linhas
+
+
 async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     context.user_data[STEP] = "nome"
     await reply(
         update,
-        "\U0001f37d️ <b>Bem-vindo ao acompanhamento nutricional da Apetit.</b>\n\n"
-        "Vou fazer um cadastro rapido para mostrar o cardapio certo e avisar sobre o que voce nao pode comer.\n\n"
-        "Qual e o seu nome?",
+        "\U0001f37d️ <b>Ola! Sou o acompanhamento nutricional da Apetit.</b>\n\n"
+        "Eu te mostro o cardapio do refeitorio, aviso o que voce nao pode comer "
+        "e te ajudo a acompanhar o que voce anda comendo.\n\n"
+        "E so seu: ninguem compara voce com colega nenhum.\n\n"
+        "<b>Como voce quer ser chamado?</b>",
         edit=edit,
     )
 
 
-async def ask_unit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def ask_unit(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     context.user_data[STEP] = "unidade"
-    await reply(update, "Em qual <b>unidade da Apetit</b> voce almoca? (ex.: SM, OFL, DP)")
+    conn = db()
+    try:
+        unidades = known_units(conn)
+    finally:
+        conn.close()
+    draft(context)["_unidades"] = unidades
+    if unidades:
+        await reply(
+            update,
+            "\U0001f4cd <b>Onde voce almoca?</b>\n\nEscolha o refeitorio:",
+            options_keyboard(unidades, "unit", "Nao vejo o meu aqui"),
+            edit=edit,
+        )
+        return
+    await reply(update, "\U0001f4cd Qual e o <b>refeitorio</b> onde voce almoca?", edit=edit)
 
 
-async def ask_company(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def ask_company(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     context.user_data[STEP] = "empresa"
-    await reply(update, "Em qual <b>empresa</b> voce trabalha?")
+    conn = db()
+    try:
+        empresas = known_companies(conn, draft(context).get("unidade", ""))
+    finally:
+        conn.close()
+    draft(context)["_empresas"] = empresas
+    if empresas:
+        await reply(
+            update,
+            "\U0001f3e2 <b>Em qual empresa voce trabalha?</b>",
+            options_keyboard(empresas, "comp", "Outra empresa"),
+            edit=edit,
+        )
+        return
+    await reply(update, "\U0001f3e2 Em qual <b>empresa</b> voce trabalha?", edit=edit)
 
 
-async def ask_sector(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def ask_sector(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     context.user_data[STEP] = "setor"
-    await reply(update, "E em qual <b>setor</b>?")
+    conn = db()
+    try:
+        setores = known_sectors(conn, draft(context).get("empresa", ""))
+    finally:
+        conn.close()
+    draft(context)["_setores"] = setores
+    if setores:
+        await reply(
+            update,
+            "\U0001f477 <b>E em qual setor?</b>",
+            options_keyboard(setores, "setor", "Outro setor"),
+            edit=edit,
+        )
+        return
+    await reply(update, "\U0001f477 E em qual <b>setor</b>?", edit=edit)
 
 
 async def ask_goal(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     context.user_data[STEP] = "objetivo"
     botoes = [[(label, code)] for code, label in GOALS.items()]
-    await reply(update, "\U0001f3af Qual e o seu foco com a alimentacao agora?", botoes, edit=edit)
+    await reply(
+        update,
+        "\U0001f3af <b>O que voce quer do app?</b>\n\n"
+        "Isso so ajusta as dicas que eu te dou. Da para mudar quando quiser.",
+        botoes,
+        edit=edit,
+    )
 
 
 def restriction_buttons(selecionadas: set[str]) -> list[list[tuple[str, str]]]:
@@ -186,7 +285,8 @@ def restriction_buttons(selecionadas: set[str]) -> list[list[tuple[str, str]]]:
     for code, label in ALLERGENS.items():
         marca = "☑️" if code in selecionadas else "⬜"
         linhas.append([(f"{marca} {label}", f"restr:{code}")])
-    linhas.append([("✅ Terminei", "restr_ok")])
+    rotulo = "✅ Confirmar" if selecionadas else "Nao tenho nenhuma"
+    linhas.append([(rotulo, "restr_ok")])
     return linhas
 
 
@@ -195,9 +295,9 @@ async def ask_restrictions(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     selecionadas = set(draft(context).get("restricoes", []))
     await reply(
         update,
-        "\U0001f6a8 <b>Alergia ou intolerancia?</b>\n\n"
-        "Marque tudo o que se aplica. Vou conferir cada prato do cardapio contra essa lista.\n\n"
-        "Se nao tiver nenhuma, e so tocar em <b>Terminei</b>.",
+        "\U0001f6a8 <b>Voce tem alergia ou intolerancia?</b>\n\n"
+        "Marque tudo o que se aplica. Vou conferir <b>cada prato</b> do cardapio contra essa lista "
+        "e te avisar antes de voce se servir.",
         restriction_buttons(selecionadas),
         edit=edit,
     )
@@ -207,22 +307,22 @@ async def ask_consent(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: 
     context.user_data[STEP] = "consentimento"
     await reply(
         update,
-        "\U0001f512 <b>Privacidade</b>\n\n"
-        "Para funcionar, preciso guardar seu nome, unidade, empresa, setor, restricoes alimentares "
+        "\U0001f512 <b>Antes de terminar</b>\n\n"
+        "Preciso guardar seu nome, onde voce almoca, empresa, setor, suas restricoes "
         "e o que voce registrar que comeu.\n\n"
-        "<b>Sua empresa nao ve nada disso individualmente.</b> O que a Apetit enxerga e so numero "
-        "agregado, e recorte com menos de 5 pessoas nem aparece.\n\n"
-        "Voce pode ver tudo com /meus_dados e apagar tudo com /excluir_dados, quando quiser.",
-        [[("✅ Aceito", "consent_sim")], [("❌ Nao aceito", "consent_nao")]],
+        "<b>Sua empresa nao ve nada disso sobre voce.</b> Nem o que voce come, nem seu objetivo, "
+        "nem suas restricoes. A Apetit so enxerga quantas pessoas usam, por setor, e mesmo assim "
+        "setor com menos de 5 pessoas nem aparece.\n\n"
+        "Voce ve tudo com /meus_dados e apaga tudo com /excluir_dados, quando quiser.",
+        [[("✅ Pode guardar", "consent_sim")], [("❌ Prefiro nao", "consent_nao")]],
         edit=edit,
     )
 
 
 async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     dados = draft(context)
-    user_id = tg_id(update)
     pessoa = Employee(
-        telegram_id=user_id,
+        telegram_id=tg_id(update),
         name=dados.get("nome", ""),
         apetit_unit=dados.get("unidade", ""),
         client_company=dados.get("empresa", ""),
@@ -240,17 +340,21 @@ async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data.pop(STEP, None)
     context.user_data.pop("cadastro", None)
 
-    restricoes = ", ".join(ALLERGENS[c] for c in dados.get("restricoes", [])) or "nenhuma"
+    restricoes = dados.get("restricoes", [])
+    if restricoes:
+        aviso = (
+            "\U0001f6a8 Vou conferir cada prato contra: "
+            + ", ".join(ALLERGENS[c] for c in restricoes)
+            + "."
+        )
+    else:
+        aviso = "Voce nao marcou restricoes. Da para incluir depois em Meu cadastro."
+
     await reply(
         update,
-        "✅ <b>Cadastro concluido!</b>\n\n"
-        f"<b>Nome:</b> {escape(pessoa.name)}\n"
-        f"<b>Unidade Apetit:</b> {escape(pessoa.apetit_unit)}\n"
-        f"<b>Empresa:</b> {escape(pessoa.client_company)}\n"
-        f"<b>Setor:</b> {escape(pessoa.sector)}\n"
-        f"<b>Objetivo:</b> {escape(pessoa.goal)}\n"
-        f"<b>Restricoes:</b> {escape(restricoes)}\n\n"
-        "Agora e so ver o cardapio \U0001f37d️",
+        f"✅ <b>Pronto, {escape(pessoa.name)}!</b>\n\n"
+        f"{aviso}\n\n"
+        "Comece por <b>Montar meu prato</b>: eu te levo pela fila, categoria por categoria.",
         main_menu(),
         edit=True,
     )
@@ -276,67 +380,164 @@ async def require_registration(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 # --------------------------------------------------------------------------
-# Cardapio e prato
+# Cardapio
 # --------------------------------------------------------------------------
 
-def menu_lines(pessoa: Employee, dia: str) -> tuple[str, list[list[tuple[str, str]]], int]:
+def load_menu(pessoa: Employee, dia: str) -> list[dict]:
     conn = db()
     try:
-        itens = check_menu_for_employee(conn, dia, pessoa.restrictions, unit=pessoa.apetit_unit)
+        return check_menu_for_employee(conn, dia, pessoa.restrictions, unit=pessoa.apetit_unit)
     finally:
         conn.close()
 
-    if not itens:
-        return (
-            f"\U0001f4c5 Ainda nao tem cardapio publicado para {escape(dia)} na unidade {escape(pessoa.apetit_unit)}.",
-            [[("\U0001f519 Menu", "menu")]],
-            0,
-        )
 
-    linhas = [f"\U0001f37d️ <b>Cardapio de {escape(dia)}</b>"]
-    botoes: list[list[tuple[str, str]]] = []
-    sem_declaracao = 0
-    categoria_atual = ""
-
+def group_by_category(itens: list[dict]) -> dict[str, list[dict]]:
+    grupos: dict[str, list[dict]] = {}
     for item in itens:
-        if item["category"] != categoria_atual:
-            categoria_atual = item["category"]
-            linhas.append(f"\n<b>{escape(categoria_atual)}</b>")
-        check = item["check"]
-        marca = VERDICT_MARK[check.verdict]
-        kcal = f"{item['kcal']:.0f} kcal" if item["kcal"] is not None else "sem info nutricional"
-        ptn = f" · {item['ptn_g']:.1f} g ptn" if item["ptn_g"] is not None else ""
-        linhas.append(f"{marca} {escape(item['name'])} — {kcal}{ptn}")
-        if check.verdict is Verdict.BLOQUEIO:
-            linhas.append(f"   <b>{escape(check.message())}</b>")
-        elif check.verdict is Verdict.ATENCAO:
-            sem_declaracao += 1
-            linhas.append(f"   <i>{escape(check.message())}</i>")
-        if check.verdict is not Verdict.BLOQUEIO:
-            botoes.append([(f"➕ {item['name'][:28]}", f"add:{item['item_code']}")])
-
-    botoes.append([("\U0001f4dd Ver meu prato", "prato"), ("\U0001f519 Menu", "menu")])
-    return "\n".join(linhas), botoes, sem_declaracao
+        grupos.setdefault(item["category"], []).append(item)
+    return grupos
 
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     pessoa = await require_registration(update, context, edit=edit)
     if not pessoa:
         return
-    texto, botoes, sem_declaracao = menu_lines(pessoa, today())
-    if sem_declaracao and pessoa.restrictions:
-        texto += (
-            f"\n\n⚠️ <b>{sem_declaracao} prato(s) sem declaracao de alergenico.</b> "
-            "Nao consigo confirmar que sao seguros para voce — confirme no balcao antes de se servir."
+    dia = today()
+    itens = load_menu(pessoa, dia)
+    if not itens:
+        await reply(
+            update,
+            f"\U0001f4c5 Ainda nao tem cardapio publicado para {escape(friendly_date(dia))}.\n\n"
+            "Assim que a cozinha publicar, ele aparece aqui.",
+            [[("\U0001f519 Voltar", "menu")]],
+            edit=edit,
         )
-    await reply(update, texto, botoes, edit=edit)
+        return
 
+    grupos = group_by_category(itens)
+    linhas = [f"\U0001f4c5 <b>{escape(friendly_date(dia))}</b>"]
+    sem_declaracao = 0
+    for categoria in order_categories(grupos):
+        linhas.append(f"\n<b>{escape(category_label(categoria))}</b>")
+        for item in grupos[categoria]:
+            check = item["check"]
+            marca = VERDICT_MARK[check.verdict]
+            dica = dish_hint(item["kcal"], item["ptn_g"])
+            linhas.append(f"{marca} {escape(item['name'])} — <i>{escape(dica)}</i>")
+            if check.verdict is Verdict.BLOQUEIO:
+                linhas.append(f"    <b>Nao pode: {escape(', '.join(ALLERGENS[c] for c in check.contem))}</b>")
+            elif check.verdict is Verdict.ATENCAO:
+                sem_declaracao += 1
+
+    if sem_declaracao and pessoa.restrictions:
+        linhas.append(
+            f"\n⚠️ <b>{sem_declaracao} prato(s) sem informacao de alergenico.</b> "
+            "Nao consigo garantir que sao seguros para voce — pergunte no balcao antes de se servir."
+        )
+
+    await reply(
+        update,
+        "\n".join(linhas),
+        [[("\U0001f37d️ Montar meu prato", "montar")], [("\U0001f519 Voltar", "menu")]],
+        edit=edit,
+    )
+
+
+# --------------------------------------------------------------------------
+# Montar o prato, categoria por categoria
+# --------------------------------------------------------------------------
 
 def tray(context: ContextTypes.DEFAULT_TYPE) -> list[str]:
     return context.user_data.setdefault(TRAY, [])
 
 
-async def show_tray(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+def flow_categories(context: ContextTypes.DEFAULT_TYPE) -> list[str]:
+    return context.user_data.get("monta_ordem", [])
+
+
+async def start_flow(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+    pessoa = await require_registration(update, context, edit=edit)
+    if not pessoa:
+        return
+    itens = load_menu(pessoa, today())
+    if not itens:
+        await show_menu(update, context, edit=edit)
+        return
+    grupos = group_by_category(itens)
+    context.user_data["monta_ordem"] = order_categories(grupos)
+    context.user_data[FLOW] = 0
+    context.user_data[TRAY] = []
+    await show_flow_step(update, context, edit=edit)
+
+
+async def show_flow_step(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = True) -> None:
+    pessoa = await require_registration(update, context, edit=edit)
+    if not pessoa:
+        return
+    ordem = flow_categories(context)
+    indice = context.user_data.get(FLOW, 0)
+    if indice >= len(ordem):
+        await show_plate_summary(update, context, edit=edit)
+        return
+
+    categoria = ordem[indice]
+    itens = [i for i in load_menu(pessoa, today()) if i["category"] == categoria]
+    escolhidos = set(tray(context))
+
+    linhas = [
+        f"<b>Passo {indice + 1} de {len(ordem)}</b> · {escape(category_label(categoria))}",
+        "",
+        "Toque no que voce pegou:",
+    ]
+    botoes: list[list[tuple[str, str]]] = []
+    for item in itens:
+        check = item["check"]
+        dica = dish_hint(item["kcal"], item["ptn_g"])
+        if check.verdict is Verdict.BLOQUEIO:
+            alergenicos = ", ".join(ALLERGENS[c] for c in check.contem)
+            linhas.append(f"⛔ <s>{escape(item['name'])}</s> — <b>contem {escape(alergenicos)}</b>")
+            continue
+        marca = "☑️" if item["item_code"] in escolhidos else "⬜"
+        atencao = " ⚠️" if check.verdict is Verdict.ATENCAO else ""
+        linhas.append(f"{marca} {escape(item['name'])} — <i>{escape(dica)}</i>{atencao}")
+        botoes.append([(f"{marca} {item['name'][:30]}", f"pick:{item['item_code']}")])
+
+    if any(i["check"].verdict is Verdict.ATENCAO for i in itens) and pessoa.restrictions:
+        linhas.append("\n⚠️ = sem informacao de alergenico. Pergunte no balcao.")
+
+    navegacao = []
+    if indice > 0:
+        navegacao.append(("\U0001f519 Voltar", "flow_prev"))
+    navegacao.append(("Pular ➡️" if not escolhidos else "Proximo ➡️", "flow_next"))
+    botoes.append(navegacao)
+    botoes.append([("✋ Terminei de montar", "flow_fim")])
+
+    await reply(update, "\n".join(linhas), botoes, edit=edit)
+
+
+def plate_totals(pessoa: Employee, codigos: list[str]) -> tuple[dict, list[str], set[str]]:
+    conn = db()
+    try:
+        linhas = {l["item_code"]: l for l in menu_for_date(conn, today(), unit=pessoa.apetit_unit)}
+    finally:
+        conn.close()
+    totais = {"kcal": 0.0, "cho": 0.0, "lip": 0.0, "ptn": 0.0}
+    nomes: list[str] = []
+    categorias: set[str] = set()
+    for code in codigos:
+        linha = linhas.get(code)
+        if not linha:
+            continue
+        totais["kcal"] += linha["kcal"] or 0
+        totais["cho"] += linha["cho_g"] or 0
+        totais["lip"] += linha["lip_g"] or 0
+        totais["ptn"] += linha["ptn_g"] or 0
+        nomes.append(linha["name"])
+        categorias.add(linha["category"])
+    return totais, nomes, categorias
+
+
+async def show_plate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = True) -> None:
     pessoa = await require_registration(update, context, edit=edit)
     if not pessoa:
         return
@@ -344,39 +545,32 @@ async def show_tray(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bo
     if not codigos:
         await reply(
             update,
-            "\U0001f4dd Seu prato esta vazio.\n\nAbra o cardapio e toque em <b>+</b> nos itens que voce pegou.",
-            [[("\U0001f37d️ Ver cardapio", "cardapio")], [("\U0001f519 Menu", "menu")]],
+            "Seu prato esta vazio.\n\nQuer comecar de novo?",
+            [[("\U0001f37d️ Montar meu prato", "montar")], [("\U0001f519 Voltar", "menu")]],
             edit=edit,
         )
         return
 
-    conn = db()
-    try:
-        itens = {linha["item_code"]: linha for linha in menu_for_date(conn, today(), unit=pessoa.apetit_unit)}
-    finally:
-        conn.close()
-
-    kcal = cho = lip = ptn = 0.0
-    linhas = ["\U0001f4dd <b>Seu prato de hoje</b>\n"]
-    botoes = []
-    for code in codigos:
-        linha = itens.get(code)
-        if not linha:
-            continue
-        kcal += linha["kcal"] or 0
-        cho += linha["cho_g"] or 0
-        lip += linha["lip_g"] or 0
-        ptn += linha["ptn_g"] or 0
-        linhas.append(f"• {escape(linha['name'])}")
-        botoes.append([(f"➖ {linha['name'][:24]}", f"del:{code}"), (f"⭐ {linha['name'][:14]}", f"fav:{code}")])
-
-    alvo = TARGETS.get(pessoa.goal, TARGETS["Manter equilibrio"])
-    linhas.append(
-        f"\n<b>Total:</b> {kcal:.0f} kcal · {cho:.0f} g carbo · {lip:.0f} g gordura · {ptn:.1f} g proteina\n"
-        f"<b>Seu alvo:</b> {alvo['kcal']} kcal · {alvo['ptn']} g proteina"
+    alvo = target_for(pessoa)
+    totais, nomes, categorias = plate_totals(pessoa, codigos)
+    leitura = plate_reading(
+        totais["kcal"], totais["ptn"], alvo["kcal"], alvo["ptn"], bool(categorias & FRESH_CATEGORIES)
     )
-    botoes.append([("✅ Registrar almoco", "registrar")])
-    botoes.append([("\U0001f37d️ Cardapio", "cardapio"), ("\U0001f519 Menu", "menu")])
+
+    linhas = ["\U0001f37d️ <b>Seu prato</b>\n"]
+    linhas.extend(f"• {escape(nome)}" for nome in nomes)
+    linhas.append("")
+    linhas.extend(escape(frase) for frase in leitura)
+    linhas.append(
+        f"\n<i>{totais['kcal']:.0f} kcal · {totais['cho']:.0f} g carboidrato · "
+        f"{totais['lip']:.0f} g gordura · {totais['ptn']:.0f} g proteina</i>"
+    )
+
+    botoes = [
+        [("✅ Registrar este prato", "registrar")],
+        [("✏️ Mudar o prato", "montar")],
+        [("⭐ Guardar um prato", "fav_lista"), ("\U0001f519 Voltar", "menu")],
+    ]
     await reply(update, "\n".join(linhas), botoes, edit=edit)
 
 
@@ -386,30 +580,30 @@ async def register_meal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     codigos = tray(context)
     if not codigos:
-        await show_tray(update, context, edit=True)
+        await show_plate_summary(update, context, edit=True)
         return
 
     dia = today()
-    alvo = TARGETS.get(pessoa.goal, TARGETS["Manter equilibrio"])
+    alvo = target_for(pessoa)
     conn = db()
     try:
         log_consumption(conn, pessoa.telegram_id, dia, codigos)
         ganhas = score_day(conn, pessoa.telegram_id, dia, protein_target_g=alvo["ptn"])
         ganhas += score_week(conn, pessoa.telegram_id, week_start(dia))
-        totais = consumption_totals(conn, pessoa.telegram_id, dia)
-        pontos = total_points(conn, pessoa.telegram_id)
+        dias = {linha["service_date"] for linha in consumption_history(conn, pessoa.telegram_id, 60)}
     finally:
         conn.close()
 
     context.user_data[TRAY] = []
-    linhas = [
-        "✅ <b>Almoco registrado!</b>\n",
-        f"{totais['kcal']:.0f} kcal · {totais['ptn_g']:.1f} g de proteina",
-    ]
+    context.user_data.pop(FLOW, None)
+
+    inicio = week_start(dia)
+    dias_semana = sum(1 for d in dias if inicio <= d <= dia)
+
+    linhas = ["✅ <b>Registrado!</b>\n", escape(week_summary(dias_semana))]
     if ganhas:
-        linhas.append("\n\U0001f3c5 <b>Pontos de hoje:</b>")
-        linhas.extend(f"• {escape(regra.label)} +{regra.points}" for regra in ganhas)
-    linhas.append(f"\n<b>Total acumulado:</b> {pontos} pontos")
+        linhas.append("\n\U0001f331 <b>Voce conquistou hoje:</b>")
+        linhas.extend(f"• {escape(regra.label)}" for regra in ganhas)
     await reply(update, "\n".join(linhas), main_menu(), edit=True)
 
 
@@ -424,27 +618,29 @@ async def show_day(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: boo
     conn = db()
     try:
         totais = consumption_totals(conn, pessoa.telegram_id, today())
-        historico = consumption_history(conn, pessoa.telegram_id, 15)
+        historico = consumption_history(conn, pessoa.telegram_id, 20)
     finally:
         conn.close()
 
-    alvo = TARGETS.get(pessoa.goal, TARGETS["Manter equilibrio"])
-    linhas = ["\U0001f4ca <b>Seu dia</b>\n"]
+    alvo = target_for(pessoa)
+    linhas = ["\U0001f4ca <b>Meu dia</b>\n"]
     if totais.get("itens"):
-        linhas.append(
-            f"Hoje: {totais['kcal']:.0f} kcal de {alvo['kcal']} · "
-            f"{totais['ptn_g']:.1f} g de proteina de {alvo['ptn']}"
-        )
+        leitura = plate_reading(totais["kcal"], totais["ptn_g"], alvo["kcal"], alvo["ptn"], True)
+        linhas.append(escape(leitura[0]))
+        linhas.append(escape(leitura[1]))
+        linhas.append(f"\n<i>{totais['kcal']:.0f} kcal · {totais['ptn_g']:.0f} g de proteina</i>")
     else:
         linhas.append("Voce ainda nao registrou o almoco de hoje.")
 
     if historico:
-        linhas.append("\n<b>Registrado antes:</b>")
+        linhas.append("\n<b>Antes disso:</b>")
         dia_atual = ""
         for linha in historico:
+            if linha["service_date"] == today():
+                continue
             if linha["service_date"] != dia_atual:
                 dia_atual = linha["service_date"]
-                linhas.append(f"\n<i>{escape(dia_atual)}</i>")
+                linhas.append(f"\n<i>{escape(friendly_date(dia_atual))}</i>")
             linhas.append(f"• {escape(linha['name'])}")
     await reply(update, "\n".join(linhas), main_menu(), edit=edit)
 
@@ -461,43 +657,63 @@ async def show_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE, edi
     if not lista:
         await reply(
             update,
-            "⭐ Voce ainda nao guardou nenhum prato.\n\n"
-            "Ao montar o prato, toque na estrela do item — eu te aviso quando ele voltar ao cardapio.",
-            main_menu(),
+            "⭐ <b>Voce ainda nao guardou nenhum prato.</b>\n\n"
+            "Depois de montar o prato, toque em <b>Guardar um prato</b>. "
+            "Quando ele voltar ao cardapio, eu te aviso.",
+            [[("\U0001f37d️ Montar meu prato", "montar")], [("\U0001f519 Voltar", "menu")]],
             edit=edit,
         )
         return
-    linhas = ["⭐ <b>Seus pratos guardados</b>\n", "Aviso voce quando algum deles voltar ao cardapio.\n"]
-    botoes = [[(f"❌ Remover {linha['name'][:22]}", f"unfav:{linha['item_code']}")] for linha in lista]
+    linhas = ["⭐ <b>Pratos que voce guardou</b>\n", "Eu te aviso quando algum voltar ao cardapio.\n"]
     linhas.extend(f"• {escape(linha['name'])}" for linha in lista)
-    botoes.append([("\U0001f519 Menu", "menu")])
+    botoes = [[(f"Remover {linha['name'][:24]}", f"unfav:{linha['item_code']}")] for linha in lista]
+    botoes.append([("\U0001f519 Voltar", "menu")])
     await reply(update, "\n".join(linhas), botoes, edit=edit)
 
 
-async def show_points(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+async def show_favorite_picker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    pessoa = await require_registration(update, context, edit=True)
+    if not pessoa:
+        return
+    codigos = tray(context)
+    if not codigos:
+        await show_favorites(update, context, edit=True)
+        return
+    _, nomes, _ = plate_totals(pessoa, codigos)
+    botoes = [[(nome[:32], f"fav:{code}")] for code, nome in zip(codigos, nomes)]
+    botoes.append([("\U0001f519 Voltar", "flow_fim")])
+    await reply(update, "⭐ <b>Qual prato voce quer guardar?</b>", botoes, edit=True)
+
+
+async def show_progress(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     pessoa = await require_registration(update, context, edit=edit)
     if not pessoa:
         return
+    dia = today()
+    inicio = week_start(dia)
     conn = db()
     try:
         pontos = total_points(conn, pessoa.telegram_id)
         extrato = points_breakdown(conn, pessoa.telegram_id)
+        dias = {linha["service_date"] for linha in consumption_history(conn, pessoa.telegram_id, 60)}
     finally:
         conn.close()
 
+    dias_semana = sum(1 for d in dias if inicio <= d <= dia)
     rotulos = {regra.code: regra.label for regra in RULES}
-    linhas = [f"\U0001f3c5 <b>Voce tem {pontos} pontos</b>\n"]
+
+    linhas = ["\U0001f4c8 <b>Meu progresso</b>\n", escape(week_summary(dias_semana))]
     if extrato:
-        linhas.append("<b>De onde vieram:</b>")
+        linhas.append("\n<b>Minhas conquistas:</b>")
         linhas.extend(
-            f"• {escape(rotulos.get(linha['rule_code'], linha['rule_code']))}: {linha['pontos']} ({linha['vezes']}x)"
+            f"• {escape(rotulos.get(linha['rule_code'], linha['rule_code']))} — {linha['vezes']}x"
             for linha in extrato
         )
+        linhas.append(f"\n<b>{pontos} pontos</b> acumulados.")
     else:
-        linhas.append("Registre um almoco para comecar a pontuar.")
+        linhas.append("\nRegistre um almoco para comecar a acompanhar.")
     linhas.append(
-        "\n<i>Os pontos premiam constancia, variedade e composicao do prato. "
-        "Nada aqui pontua comer menos, e nao existe ranking entre colegas.</i>"
+        "\n<i>Isso e so seu. Nao existe ranking, e ninguem compara voce com colega nenhum.</i>"
     )
     await reply(update, "\n".join(linhas), main_menu(), edit=edit)
 
@@ -509,59 +725,83 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE, edit:
     restricoes = ", ".join(ALLERGENS[r.allergen] for r in pessoa.restrictions) or "nenhuma"
     await reply(
         update,
-        "\U0001f464 <b>Seu cadastro</b>\n\n"
+        "\U0001f464 <b>Meu cadastro</b>\n\n"
         f"<b>Nome:</b> {escape(pessoa.name)}\n"
-        f"<b>Unidade Apetit:</b> {escape(pessoa.apetit_unit)}\n"
+        f"<b>Refeitorio:</b> {escape(pessoa.apetit_unit)}\n"
         f"<b>Empresa:</b> {escape(pessoa.client_company)}\n"
         f"<b>Setor:</b> {escape(pessoa.sector)}\n"
         f"<b>Objetivo:</b> {escape(pessoa.goal)}\n"
         f"<b>Restricoes:</b> {escape(restricoes)}",
-        [[("✏️ Refazer cadastro", "recadastrar")], [("\U0001f519 Menu", "menu")]],
+        [[("✏️ Refazer cadastro", "recadastrar")], [("\U0001f512 Meus dados", "meus_dados")], [("\U0001f519 Voltar", "menu")]],
         edit=edit,
     )
 
 
-async def show_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+    await reply(
+        update,
+        "❓ <b>Como usar</b>\n\n"
+        "<b>Montar meu prato</b> — eu te levo pela fila, uma categoria por vez. "
+        "Voce toca no que pegou e eu mostro como ficou o prato.\n\n"
+        "<b>Cardapio de hoje</b> — o que tem hoje, com aviso do que voce nao pode comer.\n\n"
+        "<b>Meu dia</b> — o que voce ja registrou hoje e nos dias anteriores.\n\n"
+        "<b>Favoritos</b> — pratos que voce gostou. Aviso quando voltarem.\n\n"
+        "<b>Meu progresso</b> — sua sequencia e suas conquistas. So suas.\n\n"
+        "<b>Sobre os simbolos</b>\n"
+        "⛔ contem algo que voce marcou como alergia\n"
+        "⚠️ sem informacao de alergenico — pergunte no balcao\n"
+        "✅ conferido e liberado para voce\n\n"
+        "Seus dados sao seus: /meus_dados mostra tudo, /excluir_dados apaga tudo. "
+        "Sua empresa nao ve nada disso sobre voce.",
+        main_menu(),
+        edit=edit,
+    )
+
+
+async def show_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     pessoa = current_employee(update)
     if not pessoa:
-        await reply(update, "\U0001f4cb Nao encontrei cadastro seu. Envie /start para comecar.")
+        await reply(update, "Nao encontrei cadastro seu. Envie /start para comecar.", edit=edit)
         return
     conn = db()
     try:
-        historico = consumption_history(conn, pessoa.telegram_id, 100)
+        historico = consumption_history(conn, pessoa.telegram_id, 200)
         guardados = favorites(conn, pessoa.telegram_id)
         pontos = total_points(conn, pessoa.telegram_id)
     finally:
         conn.close()
     restricoes = ", ".join(ALLERGENS[r.allergen] for r in pessoa.restrictions) or "nenhuma"
+    dias = len({linha["service_date"] for linha in historico})
     await reply(
         update,
-        "\U0001f512 <b>Tudo o que guardo sobre voce</b>\n\n"
+        "\U0001f512 <b>Tudo o que eu guardo sobre voce</b>\n\n"
         f"<b>Nome:</b> {escape(pessoa.name)}\n"
-        f"<b>Unidade:</b> {escape(pessoa.apetit_unit)}\n"
+        f"<b>Refeitorio:</b> {escape(pessoa.apetit_unit)}\n"
         f"<b>Empresa:</b> {escape(pessoa.client_company)}\n"
         f"<b>Setor:</b> {escape(pessoa.sector)}\n"
         f"<b>Objetivo:</b> {escape(pessoa.goal)}\n"
         f"<b>Restricoes:</b> {escape(restricoes)}\n"
-        f"<b>Consentimento:</b> aceito em {escape(pessoa.consented_at or 'nao informado')}\n\n"
-        f"<b>Refeicoes registradas:</b> {len(historico)}\n"
+        f"<b>Aceite:</b> {escape(pessoa.consented_at or 'nao informado')}\n\n"
+        f"<b>Dias com refeicao registrada:</b> {dias}\n"
         f"<b>Pratos guardados:</b> {len(guardados)}\n"
         f"<b>Pontos:</b> {pontos}\n\n"
-        "Sua empresa nao ve nada disso individualmente.\n"
-        "Para apagar tudo, envie /excluir_dados.",
+        "<b>Sua empresa nao ve nada disso sobre voce.</b>\n"
+        "Para apagar tudo: /excluir_dados",
+        [[("\U0001f519 Voltar", "menu")]],
+        edit=edit,
     )
 
 
 async def confirm_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not current_employee(update):
-        await reply(update, "\U0001f4cb Nao encontrei dados seus para excluir.")
+        await reply(update, "Nao encontrei dados seus para excluir.")
         return
     await reply(
         update,
         "⚠️ <b>Apagar tudo?</b>\n\n"
-        "Vou remover cadastro, restricoes, historico de refeicoes, pratos guardados e pontos. "
+        "Vou remover seu cadastro, restricoes, historico, pratos guardados e progresso. "
         "Isso nao tem volta.",
-        [[("✅ Sim, apagar", "del_sim")], [("❌ Cancelar", "del_nao")]],
+        [[("Sim, apagar tudo", "del_sim")], [("Nao, cancelar", "del_nao")]],
     )
 
 
@@ -593,8 +833,7 @@ async def show_pending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     agrupado: dict[str, dict] = {}
     for linha in fila:
-        chave = linha["item_name"]
-        registro = agrupado.setdefault(chave, {"vezes": 0, "detail": linha["detail"]})
+        registro = agrupado.setdefault(linha["item_name"], {"vezes": 0, "detail": linha["detail"]})
         registro["vezes"] += 1
     linhas = [f"\U0001f9ea {len(agrupado)} ficha(s) aguardando revisao:\n"]
     for nome, registro in agrupado.items():
@@ -660,7 +899,6 @@ async def show_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def notify_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Avisa quem guardou um prato que volta ao cardapio nos proximos dias."""
     if not is_admin(tg_id(update)):
         await deny_admin(update, "disparar avisos de favorito")
         return
@@ -678,13 +916,15 @@ async def notify_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     avisados = 0
     for telegram_id, linhas in por_pessoa.items():
-        pratos = "\n".join(f"• {escape(l['item_name'])} em {escape(l['service_date'])}" for l in linhas)
+        pratos = "\n".join(
+            f"• {escape(l['item_name'])} — {escape(friendly_date(l['service_date']))}" for l in linhas
+        )
         try:
             await context.bot.send_message(
                 chat_id=telegram_id,
                 text=f"⭐ <b>Um prato que voce guardou esta voltando!</b>\n\n{pratos}",
                 parse_mode=ParseMode.HTML,
-                reply_markup=keyboard([[("\U0001f37d️ Ver cardapio", "cardapio")]]),
+                reply_markup=keyboard([[("\U0001f4c5 Ver cardapio", "cardapio")]]),
             )
             avisados += 1
         except Exception:
@@ -699,11 +939,7 @@ async def notify_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     pessoa = current_employee(update)
     if pessoa and pessoa.registered:
-        await reply(
-            update,
-            f"\U0001f37d️ <b>Ola, {escape(pessoa.name)}!</b>\n\nO que voce quer ver?",
-            main_menu(),
-        )
+        await reply(update, f"\U0001f37d️ <b>Ola, {escape(pessoa.name)}!</b>", main_menu())
         return
     await ask_name(update, context)
 
@@ -719,7 +955,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not step:
         pessoa = current_employee(update)
         if pessoa and pessoa.registered:
-            await reply(update, "Escolha uma opcao \U0001f447", main_menu())
+            await reply(update, "Toque numa opcao \U0001f447", main_menu())
         else:
             await ask_name(update, context)
         return
@@ -745,19 +981,45 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await reply(update, "Use os botoes acima para continuar \U0001f60a")
 
 
+async def handle_registration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str) -> bool:
+    """Botoes de unidade, empresa e setor. Devolve se tratou o callback."""
+    mapa = {
+        "unit": ("_unidades", "unidade", ask_company, "Qual e o <b>refeitorio</b> onde voce almoca?"),
+        "comp": ("_empresas", "empresa", ask_sector, "Em qual <b>empresa</b> voce trabalha?"),
+        "setor": ("_setores", "setor", ask_goal, "Em qual <b>setor</b> voce trabalha?"),
+    }
+    for prefixo, (cache, campo, proximo, pergunta) in mapa.items():
+        if not data.startswith(f"{prefixo}:"):
+            continue
+        escolha = data.removeprefix(f"{prefixo}:")
+        dados = draft(context)
+        if escolha == "outro":
+            context.user_data[STEP] = campo
+            await reply(update, pergunta, edit=True)
+            return True
+        opcoes = dados.get(cache, [])
+        indice = int(escolha) if escolha.isdigit() else -1
+        if 0 <= indice < len(opcoes):
+            dados[campo] = opcoes[indice]
+            await proximo(update, context, edit=True)
+        return True
+    return False
+
+
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     data = query.data or ""
 
+    if await handle_registration_choice(update, context, data):
+        return
     if data in GOALS:
         draft(context)["objetivo"] = GOALS[data]
         await ask_restrictions(update, context, edit=True)
         return
     if data.startswith("restr:"):
-        code = data.removeprefix("restr:")
         selecionadas = set(draft(context).get("restricoes", []))
-        selecionadas.symmetric_difference_update({code})
+        selecionadas.symmetric_difference_update({data.removeprefix("restr:")})
         draft(context)["restricoes"] = sorted(selecionadas)
         await ask_restrictions(update, context, edit=True)
         return
@@ -771,7 +1033,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         context.user_data.clear()
         await reply(
             update,
-            "\U0001f512 Sem o aceite eu nao consigo guardar seus dados nem acompanhar suas refeicoes.\n\n"
+            "\U0001f512 Sem o aceite eu nao consigo guardar nada nem te acompanhar.\n\n"
             "Se mudar de ideia, envie /start.",
             edit=True,
         )
@@ -780,26 +1042,41 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         context.user_data.clear()
         await ask_name(update, context, edit=True)
         return
+
     if data == "menu":
-        await reply(update, "O que voce quer ver?", main_menu(), edit=True)
+        await reply(update, "O que voce quer fazer?", main_menu(), edit=True)
         return
     if data == "cardapio":
         await show_menu(update, context, edit=True)
         return
-    if data == "prato":
-        await show_tray(update, context, edit=True)
+    if data == "montar":
+        await start_flow(update, context, edit=True)
         return
-    if data.startswith("add:"):
-        code = data.removeprefix("add:")
-        if code not in tray(context):
-            tray(context).append(code)
-        await show_tray(update, context, edit=True)
+    if data.startswith("pick:"):
+        code = data.removeprefix("pick:")
+        bandeja = tray(context)
+        if code in bandeja:
+            bandeja.remove(code)
+        else:
+            bandeja.append(code)
+        await show_flow_step(update, context)
         return
-    if data.startswith("del:"):
-        code = data.removeprefix("del:")
-        if code in tray(context):
-            tray(context).remove(code)
-        await show_tray(update, context, edit=True)
+    if data == "flow_next":
+        context.user_data[FLOW] = context.user_data.get(FLOW, 0) + 1
+        await show_flow_step(update, context)
+        return
+    if data == "flow_prev":
+        context.user_data[FLOW] = max(0, context.user_data.get(FLOW, 0) - 1)
+        await show_flow_step(update, context)
+        return
+    if data == "flow_fim":
+        await show_plate_summary(update, context, edit=True)
+        return
+    if data == "registrar":
+        await register_meal(update, context)
+        return
+    if data == "fav_lista":
+        await show_favorite_picker(update, context)
         return
     if data.startswith("fav:"):
         pessoa = await require_registration(update, context, edit=True)
@@ -812,7 +1089,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await reply(
                 update,
                 "⭐ Guardado! Te aviso quando esse prato voltar ao cardapio.",
-                [[("\U0001f4dd Meu prato", "prato"), ("\U0001f519 Menu", "menu")]],
+                main_menu(),
                 edit=True,
             )
         return
@@ -826,20 +1103,23 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 conn.close()
             await show_favorites(update, context, edit=True)
         return
-    if data == "registrar":
-        await register_meal(update, context)
-        return
     if data == "meu_dia":
         await show_day(update, context, edit=True)
         return
     if data == "favoritos":
         await show_favorites(update, context, edit=True)
         return
-    if data == "pontos":
-        await show_points(update, context, edit=True)
+    if data == "progresso":
+        await show_progress(update, context, edit=True)
         return
     if data == "perfil":
         await show_profile(update, context, edit=True)
+        return
+    if data == "ajuda":
+        await show_help(update, context, edit=True)
+        return
+    if data == "meus_dados":
+        await show_my_data(update, context, edit=True)
         return
     if data == "del_sim":
         user_id = tg_id(update)
@@ -856,24 +1136,29 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await reply(update, "Tudo bem, mantive seus dados como estavam \U0001f60a", main_menu(), edit=True)
         return
 
-    await reply(update, "O que voce quer ver?", main_menu(), edit=True)
+    await reply(update, "O que voce quer fazer?", main_menu(), edit=True)
+
+
+async def register_commands(app: Application) -> None:
+    """Publica o menu de comandos, para o Telegram mostrar as opcoes sozinho."""
+    await app.bot.set_my_commands(COMMANDS)
 
 
 def main() -> None:
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
         raise RuntimeError("Defina TELEGRAM_BOT_TOKEN no arquivo .env antes de iniciar o bot.")
-    conn = db()
-    conn.close()
+    db().close()
 
-    app = Application.builder().token(token).build()
+    app = Application.builder().token(token).post_init(register_commands).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("ajuda", show_help))
     app.add_handler(CommandHandler("recadastrar", restart_registration))
     app.add_handler(CommandHandler("cardapio", show_menu))
-    app.add_handler(CommandHandler("prato", show_tray))
+    app.add_handler(CommandHandler("montar", start_flow))
     app.add_handler(CommandHandler("meu_dia", show_day))
     app.add_handler(CommandHandler("favoritos", show_favorites))
-    app.add_handler(CommandHandler("pontos", show_points))
+    app.add_handler(CommandHandler("progresso", show_progress))
     app.add_handler(CommandHandler("meus_dados", show_my_data))
     app.add_handler(CommandHandler("excluir_dados", confirm_delete))
     app.add_handler(CommandHandler("pendencias", show_pending))

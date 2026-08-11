@@ -140,7 +140,7 @@ class CadastroTest(BotBase):
 
         await bot.handle_callback(update, context)
 
-        self.assertIn("cadastro rapido", update.last)
+        self.assertIn("Como voce quer ser chamado", update.last)
 
 
 class CardapioTest(BotBase):
@@ -168,8 +168,8 @@ class CardapioTest(BotBase):
         update = FakeUpdate(callback="cardapio")
         await bot.handle_callback(update, context)
 
-        self.assertIn("sem declaracao de alergenico", update.last)
-        self.assertIn("confirme no balcao", update.last.lower())
+        self.assertIn("sem informacao de alergenico", update.last)
+        self.assertIn("pergunte no balcao", update.last.lower())
 
     async def test_person_without_restrictions_sees_no_warning(self):
         context = FakeContext()
@@ -187,10 +187,25 @@ class PratoTest(BotBase):
         self.context = FakeContext()
         await self.registrar(self.context, restricoes=())
         bot.today = lambda: "2025-09-01"
+        await bot.handle_callback(FakeUpdate(callback="montar"), self.context)
+
+    async def test_guided_flow_walks_the_serving_line_in_order(self):
+        ordem = self.context.user_data["monta_ordem"]
+
+        # Prato principal antes de guarnicao, salada antes de sobremesa:
+        # a ordem da bandeja, nao a ordem alfabetica.
+        self.assertEqual(ordem[0], "PRATO PRINCIPAL")
+        self.assertLess(ordem.index("GUARNICAO"), ordem.index("SALADA"))
+
+    async def test_step_shows_progress_and_advances(self):
+        update = FakeUpdate(callback="flow_next")
+        await bot.handle_callback(update, self.context)
+
+        self.assertIn("Passo 2 de", update.last)
 
     async def test_building_and_registering_the_plate_logs_consumption(self):
-        await bot.handle_callback(FakeUpdate(callback="add:carne_assada_ao_molho"), self.context)
-        await bot.handle_callback(FakeUpdate(callback="add:sal_mix_de_alface"), self.context)
+        await bot.handle_callback(FakeUpdate(callback="pick:carne_assada_ao_molho"), self.context)
+        await bot.handle_callback(FakeUpdate(callback="pick:sal_mix_de_alface"), self.context)
 
         update = FakeUpdate(callback="registrar")
         await bot.handle_callback(update, self.context)
@@ -203,16 +218,25 @@ class PratoTest(BotBase):
             conn.close()
         self.assertEqual({linha["name"] for linha in historico}, {"CARNE ASSADA AO MOLHO", "SAL. MIX DE ALFACE"})
         self.assertEqual(pontos, 15)  # registro + composicao
-        self.assertIn("Almoco registrado", update.last)
+        self.assertIn("Registrado", update.last)
         self.assertEqual(self.context.user_data[bot.TRAY], [])
 
-    async def test_removing_an_item_from_the_plate(self):
-        await bot.handle_callback(FakeUpdate(callback="add:carne_assada_ao_molho"), self.context)
-        await bot.handle_callback(FakeUpdate(callback="del:carne_assada_ao_molho"), self.context)
+    async def test_tapping_the_same_item_twice_removes_it(self):
+        await bot.handle_callback(FakeUpdate(callback="pick:carne_assada_ao_molho"), self.context)
+        await bot.handle_callback(FakeUpdate(callback="pick:carne_assada_ao_molho"), self.context)
 
         self.assertEqual(self.context.user_data[bot.TRAY], [])
 
-    async def test_favoriting_from_the_plate(self):
+    async def test_summary_reads_the_plate_in_words(self):
+        await bot.handle_callback(FakeUpdate(callback="pick:carne_assada_ao_molho"), self.context)
+
+        update = FakeUpdate(callback="flow_fim")
+        await bot.handle_callback(update, self.context)
+
+        self.assertIn("Prato leve para o seu objetivo", update.last)
+        self.assertIn("Sem salada nem fruta", update.last)
+
+    async def test_favoriting_a_dish(self):
         await bot.handle_callback(FakeUpdate(callback="fav:arroz_parboilizado"), self.context)
 
         conn = bot.db()
@@ -244,13 +268,14 @@ class LgpdTest(BotBase):
 
         self.assertIn("Mariana", update.last)
         self.assertIn("Industria Exemplo", update.last)
-        self.assertIn("Sua empresa nao ve nada disso individualmente", update.last)
+        self.assertIn("Sua empresa nao ve nada disso sobre voce", update.last)
 
     async def test_delete_wipes_everything(self):
         context = FakeContext()
         await self.registrar(context, restricoes=())
         bot.today = lambda: "2025-09-01"
-        await bot.handle_callback(FakeUpdate(callback="add:carne_assada_ao_molho"), context)
+        await bot.handle_callback(FakeUpdate(callback="montar"), context)
+        await bot.handle_callback(FakeUpdate(callback="pick:carne_assada_ao_molho"), context)
         await bot.handle_callback(FakeUpdate(callback="registrar"), context)
 
         await bot.handle_callback(FakeUpdate(callback="del_sim"), context)

@@ -138,6 +138,30 @@ def delete_employee_data(conn: sqlite3.Connection, telegram_id: int) -> None:
     conn.commit()
 
 
+def known_companies(conn: sqlite3.Connection, apetit_unit: str = "") -> list[str]:
+    """Empresas que ja aparecem em cadastros, para virar botao em vez de digitacao."""
+    where, params = [], []
+    if apetit_unit:
+        where.append("apetit_unit = ?")
+        params.append(apetit_unit)
+    filtro = f"WHERE {' AND '.join(where)}" if where else ""
+    linhas = conn.execute(
+        f"SELECT client_company, COUNT(*) AS total FROM employee {filtro} "
+        "GROUP BY client_company ORDER BY total DESC, client_company",
+        params,
+    ).fetchall()
+    return [linha["client_company"] for linha in linhas if linha["client_company"].strip()]
+
+
+def known_sectors(conn: sqlite3.Connection, client_company: str) -> list[str]:
+    linhas = conn.execute(
+        "SELECT sector, COUNT(*) AS total FROM employee WHERE client_company = ? "
+        "GROUP BY sector ORDER BY total DESC, sector",
+        (client_company,),
+    ).fetchall()
+    return [linha["sector"] for linha in linhas if linha["sector"].strip()]
+
+
 def aggregate_by_sector(
     conn: sqlite3.Connection,
     client_company: str = "",

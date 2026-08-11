@@ -356,6 +356,18 @@ def check_menu_for_employee(
     return resultado
 
 
+def known_units(conn: sqlite3.Connection) -> list[str]:
+    """Unidades que ja tem cardapio publicado.
+
+    O funcionario nao sabe o codigo interno da operacao, entao o cadastro
+    oferece o que existe em vez de pedir a sigla de cabeca.
+    """
+    linhas = conn.execute(
+        "SELECT unit, COUNT(*) AS total FROM menu_entry GROUP BY unit ORDER BY total DESC, unit"
+    ).fetchall()
+    return [linha["unit"] for linha in linhas if linha["unit"].strip()]
+
+
 def pending_issues(conn: sqlite3.Connection, batch: str = "") -> list[sqlite3.Row]:
     """Fila de revisao do nutricionista: o que foi barrado na importacao."""
     if batch:
