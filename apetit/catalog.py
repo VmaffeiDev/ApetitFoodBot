@@ -243,6 +243,8 @@ def import_menu_csv(
             """,
             (entry.unit, entry.service_date, entry.meal, entry.category, entry.slot, item.code, timestamp),
         )
+        if item.allergens:
+            set_item_allergens(conn, item.code, item.allergens, source="importacao")
 
     for issue in result.issues:
         conn.execute(

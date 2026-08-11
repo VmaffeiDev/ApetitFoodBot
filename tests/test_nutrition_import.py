@@ -3,7 +3,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from apetit.catalog import import_menu_csv, init_schema, menu_for_date, pending_issues
+from apetit.allergens import Declaration, Restriction, Verdict
+from apetit.catalog import (
+    check_menu_for_employee,
+    import_menu_csv,
+    init_schema,
+    item_allergens,
+    menu_for_date,
+    pending_issues,
+)
 from apetit.csv_import import parse_menu_csv, parse_number, split_category
 from apetit.model import MenuItem, Nutrition
 from apetit.validation import validate_item
@@ -64,6 +72,50 @@ class LongCsvTest(unittest.TestCase):
         self.assertEqual(contra_file.item.code, "01.01.04.280-0.9")
         self.assertEqual(contra_file.item.portion_g, 100)
         self.assertEqual(contra_file.meal, "almoco")
+
+
+class AllergenCsvTest(unittest.TestCase):
+    """Quando a ficha tecnica passar a exportar alergenico, o alerta liga sozinho."""
+
+    def setUp(self):
+        self.tmp = tempfile.NamedTemporaryFile(delete=False)
+        self.tmp.close()
+        self.conn = sqlite3.connect(self.tmp.name)
+        self.conn.row_factory = sqlite3.Row
+        init_schema(self.conn)
+
+    def tearDown(self):
+        self.conn.close()
+        Path(self.tmp.name).unlink(missing_ok=True)
+
+    def test_allergen_columns_are_imported(self):
+        import_menu_csv(self.conn, load("cardapio_alergenicos.csv"), unit="SM")
+
+        declarado = item_allergens(self.conn, "01.01.01.010")
+        self.assertEqual(declarado["leite"], Declaration.CONTEM)
+        self.assertEqual(declarado["gluten"], Declaration.NAO_CONTEM)
+
+    def test_traces_become_may_contain(self):
+        import_menu_csv(self.conn, load("cardapio_alergenicos.csv"), unit="SM")
+
+        declarado = item_allergens(self.conn, "03.01.01.010")
+        self.assertEqual(declarado["amendoim"], Declaration.PODE_CONTER)
+
+    def test_blank_cell_stays_undeclared_instead_of_becoming_free(self):
+        import_menu_csv(self.conn, load("cardapio_alergenicos.csv"), unit="SM")
+
+        declarado = item_allergens(self.conn, "01.03.01.032")
+        self.assertEqual(declarado, {})
+
+    def test_imported_declaration_drives_the_safety_check(self):
+        import_menu_csv(self.conn, load("cardapio_alergenicos.csv"), unit="SM")
+
+        cardapio = check_menu_for_employee(self.conn, "2025-09-01", [Restriction("leite")], unit="SM")
+        strogonoff = next(i for i in cardapio if i["item_code"] == "01.01.01.010")
+        alface = next(i for i in cardapio if i["item_code"] == "04.01.01.005")
+
+        self.assertIs(strogonoff["check"].verdict, Verdict.BLOQUEIO)
+        self.assertIs(alface["check"].verdict, Verdict.LIBERADO)
 
 
 class ValidationTest(unittest.TestCase):

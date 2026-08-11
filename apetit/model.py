@@ -57,6 +57,8 @@ class MenuItem:
     name: str
     nutrition: Nutrition = field(default_factory=Nutrition)
     portion_g: float | None = None
+    # Alergenico ausente do dicionario e "nao declarado", nunca "nao contem".
+    allergens: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

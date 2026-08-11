@@ -1,0 +1,5 @@
+data;refeicao;categoria;codigo;item;porcao;kcal;cho;lip;ptn;alerg_leite;alerg_gluten;alerg_ovos;alerg_amendoim
+01/09/2025;almoco;PRATO PRINCIPAL;01.01.01.010;STROGONOFF DE CARNE;100;134;2,3;8,6;12;sim;nao;nao;nao
+01/09/2025;almoco;GUARNICAO;03.01.01.010;MACARRAO GRATINADO;80;126;18;4,9;2,5;sim;sim;nao;traços
+01/09/2025;almoco;SALADA;04.01.01.005;SAL. ALFACE;40;4;0,2;0,1;0,6;nao;nao;nao;nao
+02/09/2025;almoco;PRATO PRINCIPAL;01.03.01.032;FRANGO ASSADO;180;252;0;11;35;;;;

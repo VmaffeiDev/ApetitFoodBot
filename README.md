@@ -1,29 +1,41 @@
 # ApetitFoodBot
 
-MVP de bot Telegram da Apetit com fluxos inspirados no simulador HTML:
+Bot de controle nutricional para funcionarios atendidos pela Apetit.
 
-- boas-vindas com `/start`
-- cadastro obrigatorio antes de pedidos
-- aceite LGPD antes de salvar dados pessoais
-- objetivo do cliente no cadastro: perder peso, ganhar massa, manter equilibrio, alimentacao saudavel ou praticidade
-- banco SQLite com clientes e historico de pedidos
-- comandos `/meus_dados` e `/excluir_dados`
-- cardapio real no banco com preco, dia, ingredientes, alergenicos e tags
-- cardapio do dia
-- cardapio sem carne
-- recomendacao inteligente baseada no cadastro e historico do cliente
-- bloqueio de pedido incompatavel com restricao alimentar cadastrada
-- reclamacao com escuta empatica
-- feedback positivo
-- alerta de restricao alimentar
-- perfil nutricional demonstrativo
+A empresa serve o refeitorio; o funcionario acompanha o que come. **Nao ha venda,
+preco, carrinho nem pedido.** O cardapio da operacao e importado, validado e
+publicado, e o funcionario monta o prato e registra o consumo.
 
-## Seguranca do token
+## O que o funcionario faz
 
-Se um token foi colado em chat, issue, commit ou qualquer lugar publico, gere outro no BotFather.
-Nao salve o token diretamente no codigo.
+- cadastra unidade da Apetit, empresa, setor, objetivo e restricoes alimentares
+- ve o cardapio do dia **ja conferido contra as proprias alergias**
+- monta o prato e ve kcal e macros somarem contra o alvo do objetivo
+- registra o almoco e acumula pontos
+- guarda pratos favoritos e e avisado quando voltam ao cardapio
+- consulta e apaga os proprios dados quando quiser
 
-Um token de verdade ja esteve versionado no `.env.example` deste repositorio, que e publico. O valor foi removido do arquivo, mas continua acessivel no historico do Git, entao **esse token precisa ser revogado no BotFather** (`/revoke`) mesmo que o arquivo atual esteja limpo. Remover de um commit posterior nao invalida a credencial.
+## Comandos
+
+| Comando | O que faz |
+|---|---|
+| `/start` | Cadastro ou menu principal |
+| `/cardapio` | Cardapio de hoje com alerta de alergenico |
+| `/prato` | Prato em montagem |
+| `/meu_dia` | Consumo de hoje e historico |
+| `/favoritos` | Pratos guardados |
+| `/pontos` | Extrato de pontos |
+| `/meus_dados` `/excluir_dados` | LGPD |
+| `/recadastrar` | Refaz o cadastro |
+
+Administracao e nutricionista:
+
+| Comando | O que faz |
+|---|---|
+| `/pendencias` | Fila de revisao da importacao |
+| `/alergenico <prato> <alergenico> <estado>` | Declara alergenico de um prato |
+| `/relatorio` | Adesao **agregada** por setor |
+| `/avisar_favoritos` | Dispara aviso de prato favorito voltando |
 
 ## Rodar localmente
 
@@ -32,304 +44,182 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
-```
-
-Edite o arquivo `.env` e coloque o token novo:
-
-```env
-TELEGRAM_BOT_TOKEN=seu_token_novo
-APETIT_USER_NAME=Mariana
-APETIT_DB_PATH=apetit.db
-```
-
-Depois inicie:
-
-```powershell
 python bot.py
 ```
 
-Para rodar os testes:
+Testes:
 
 ```powershell
 python -m unittest discover -s tests
 ```
 
-No Telegram, abra o bot e envie:
+## Importacao do cardapio
 
-```text
-/start
-```
-
-O bot vai pedir nome, telefone, endereco/bairro, objetivo alimentar, restricao alimentar e aceite LGPD antes de liberar cardapio, recomendacoes ou pedidos.
-Quando o cliente escolhe um prato, o bot confere os alergenicos, ingredientes e tags antes de registrar o pedido. Se houver conflito com a restricao cadastrada, o pedido nao e gravado e o bot sugere alternativas mais seguras.
-As recomendacoes consideram o objetivo do cliente e o historico de pedidos.
-
-Para refazer o cadastro, envie:
-
-```text
-/recadastrar
-```
-
-Para ver o historico de pedidos:
-
-```text
-/historico
-```
-
-Para ver o cardapio disponivel:
-
-```text
-/cardapio
-```
-
-Para consultar ou excluir os dados do cliente:
-
-```text
-/meus_dados
-/excluir_dados
-```
-
-## Importacao do cardapio com informacao nutricional
-
-O cardapio da operacao chega em CSV, com uma coluna de nome por categoria seguida
-de KCAL, CHO, LIP e PTN. O importador aceita os dois layouts observados (largo,
-uma linha por dia; e longo, uma linha por item), separador `;` ou `,` e decimal
-com virgula.
+O cardapio chega em CSV. O importador aceita os dois layouts observados — largo
+(uma linha por dia, cinco colunas por categoria) e longo (uma linha por item) —
+com separador `;` ou `,` e decimal com virgula.
 
 ```powershell
 python scripts/import_cardapio.py cardapio.csv --unidade SM --refeicao almoco
-```
-
-Antes de publicar, cada item passa por validacao:
-
-- **energia inconsistente** — a kcal declarada e comparada com a conta de Atwater
-  (4 kcal/g de carboidrato, 9 de lipideo, 4 de proteina). So bloqueia quando a
-  divergencia passa de 25% **e** de 30 kcal, para nao acusar arredondamento de
-  salada de 4 kcal
-- **macro maior que a porcao** — quando o export traz a gramagem
-- **valor negativo**
-- **macro incompleto** — publica, mas marcado como sem informacao nutricional
-
-O que nao passa **nao e publicado**: fica na fila de revisao com o motivo, porque
-num app que orienta o funcionario um macro errado vira orientacao errada.
-
-```powershell
 python scripts/import_cardapio.py --pendencias
 ```
 
-A fila agrupa por ficha tecnica, nao por ocorrencia: um item errado que aparece
-em doze dias do mes e uma correcao, nao doze.
+Categoria com numero, como `PRATO PRINCIPAL 2`, e a mesma categoria em outro slot.
 
-Colunas de **custo e per capita sao descartadas** na importacao. Sao dado
-comercial da operacao e nao podem chegar ao app do funcionario.
+Colunas de **custo e per capita sao descartadas**: sao dado comercial da operacao
+e nao podem chegar ao app do funcionario.
 
-## Cadastro do funcionario
+### Validacao antes de publicar
 
-O vinculo e triplo: unidade da Apetit que serve, empresa onde a pessoa trabalha
-e setor. O cadastro so vale com o aceite do termo e com os tres preenchidos.
+| Regra | Acao |
+|---|---|
+| Energia declarada x Atwater (4/9/4) divergindo mais de 25% **e** de 30 kcal | bloqueia |
+| Macros somando mais que a porcao | bloqueia |
+| Valor negativo | bloqueia |
+| Macro incompleto | publica marcado como sem informacao |
 
-Como setor pequeno mais dado alimentar reidentifica alguem sem precisar do nome,
-qualquer leitura agregada passa por `aggregate_by_sector`, que **suprime recortes
-com menos de 5 pessoas** em vez de mostrar a media.
+O limite duplo na primeira regra e o que faz ela funcionar: so o relativo barraria
+salada de 4 kcal por 2 kcal de arredondamento.
 
-## Alergenicos e alerta no momento da escolha
+Item bloqueado **nao chega ao cardapio** — vai para a fila de revisao com o motivo,
+agrupada por ficha tecnica, ja que a mesma ficha errada reaparece em varios dias
+do mes e a correcao e uma so.
+
+## Alergenicos
 
 A lista segue os alergenicos de declaracao obrigatoria da RDC 26/2015 da ANVISA.
 A conferencia tem **tres estados, nao dois**:
 
-| Situacao | Resposta ao funcionario |
+| Ficha tecnica diz | Resposta ao funcionario |
 |---|---|
-| Ficha declara que contem | Bloqueio, com o alergenico nomeado |
-| Ficha declara "pode conter" | Atencao — confirmar no balcao |
-| **Ninguem declarou** | Atencao — o app nao afirma que e seguro |
-| Todos os alergenicos da pessoa constam como nao contem | Liberado |
+| Contem | Bloqueio, com o alergenico nomeado |
+| Pode conter / tracos | Atencao — confirmar no balcao |
+| **Nada** | Atencao — o app nao afirma que e seguro |
+| Todos os alergenicos da pessoa como nao contem | Liberado |
 
-A regra que sustenta isso: **falta de informacao nunca vira liberacao**. Deduzir
-alergenico do nome do prato e o erro que machuca — "STROGONOFF DE CARNE" nao
-avisa que leva creme de leite, "FILE DE FRANGO A MILANESA" nao avisa que leva
-ovo e trigo.
+**Falta de informacao nunca vira liberacao.** Deduzir alergenico do nome do prato
+e o erro que machuca: "STROGONOFF DE CARNE" nao avisa que leva creme de leite,
+"FILE DE FRANGO A MILANESA" nao avisa que leva ovo e trigo.
 
-`coverage()` mede quanto da lista obrigatoria cada prato declara, para o
-nutricionista saber se o cardapio ja sustenta a funcao de alerta.
+Se o CSV trouxer colunas de alergenico (`alerg_leite`, `contem_gluten`, ...), elas
+sao importadas automaticamente. Valores aceitos: `sim`/`nao`/`pode conter`/`tracos`.
+Celula vazia continua como nao declarado.
 
-## Historico, favoritos e pontos
+Quando nao houver essas colunas, o nutricionista declara pelo `/alergenico`.
 
-- todo prato montado fica registrado, com os macros somados no dia
-- o funcionario favorita um prato e recebe aviso quando ele volta ao cardapio
-- pontos por **constancia, composicao, variedade e meta de proteina**
+## Pontos
 
-Nenhuma regra de pontuacao premia deficit calorico ou perda de peso, e nao ha
-ranking entre colegas. Num app corporativo, premiar comer menos sob o olhar do
-empregador empurra para uma relacao ruim com comida. Cada regra carrega o campo
-`basis` e existe teste garantindo que nenhuma se apoie em deficit ou peso.
+Pontuam **constancia** (registrar), **composicao** (incluir salada ou fruta),
+**variedade** na semana e **meta de proteina**.
 
-## Banco de dados
+Nenhuma regra premia deficit calorico ou perda de peso, e **nao ha ranking entre
+colegas**. Num app corporativo, premiar comer menos sob o olhar do empregador
+empurra para uma relacao ruim com comida. Cada regra carrega o campo `basis` e ha
+teste garantindo que nenhuma se apoie em deficit ou peso.
 
-O bot cria automaticamente o arquivo `apetit.db` com:
+Os alvos de kcal e proteina por objetivo sao **ilustrativos**. Quem define faixa
+individual e o nutricionista responsavel: o app informa e acompanha, nao prescreve.
 
-- clientes cadastrados
-- aceite LGPD e data do consentimento
-- historico de pedidos
-- pratos cadastrados no cardapio
-- pratos favoritos/aguardados
-- atualizacoes de cardapio semanal
+## Privacidade
 
-Esse arquivo fica fora do Git por seguranca e privacidade.
+O app guarda dado de saude de funcionario dentro de uma relacao de emprego, o que
+exige cuidado alem do aviso de consentimento:
 
-## LGPD e consentimento
+- a empresa **nunca ve dado individual** — nem consumo, nem objetivo, nem restricao
+- `/relatorio` mostra so adesao agregada por setor
+- recorte com menos de **5 pessoas** e suprimido, porque setor pequeno mais dado
+  alimentar reidentifica alguem sem precisar do nome
+- `/excluir_dados` apaga cadastro, restricoes, consumo, favoritos e pontos
 
-Como o bot guarda telefone, endereco/bairro, historico e preferencias, o cadastro so e concluido depois do aceite do cliente.
+## Seguranca do token
 
-O cliente pode:
+Se um token foi colado em chat, issue, commit ou qualquer lugar publico, gere outro
+no BotFather. Nao salve o token no codigo.
 
-- ver os dados salvos com `/meus_dados`
-- excluir cadastro, historico e favoritos com `/excluir_dados`
-- refazer o cadastro com `/recadastrar`
-
-O banco guarda `consent_accepted` e `consented_at`. Se o cliente nao aceitar, o bot nao conclui o cadastro nem libera pedidos.
-
-## Grafo do fluxo
-
-```mermaid
-flowchart TD
-    A["Cliente abre o bot no Telegram"] --> B{Cliente ja tem cadastro?}
-    B -- "Nao" --> C["Cadastro obrigatorio: nome, telefone, endereco/bairro, objetivo e restricao alimentar"]
-    C --> LGPD{Cliente aceita guardar dados?}
-    LGPD -- "Nao" --> X["Bot nao conclui cadastro nem libera pedidos"]
-    LGPD -- "Sim" --> D["Salvar cliente no SQLite com data do consentimento"]
-    B -- "Sim" --> E["Menu principal"]
-    D --> E
-
-    E --> F["Ver cardapio"]
-    E --> G["Receber recomendacao"]
-    E --> H["Ver perfil e historico"]
-    E --> LGPD2["/meus_dados ou /excluir_dados"]
-
-    F --> I["Bot lista pratos com preco, dia, tags e alergenicos"]
-    G --> J["Bot cruza objetivo + restricao + historico + cardapio disponivel"]
-    J --> K["Sugere prato compativel"]
-    K --> L["Cliente escolhe prato"]
-    I --> L
-
-    L --> M{Prato conflita com restricao?}
-    M -- "Sim" --> N["Pedido nao e registrado"]
-    N --> O["Bot avisa o motivo e sugere alternativas seguras"]
-    O --> L
-    M -- "Nao" --> P["Registrar pedido no historico"]
-    P --> Q["Oferecer aviso quando o prato voltar"]
-    Q --> R{Cliente quer ser avisado?}
-    R -- "Sim" --> S["Salvar prato em favoritos/aguardados"]
-    R -- "Nao" --> E
-    S --> E
-
-    T["Admin atualiza cardapio semanal"] --> U["Salvar semana no SQLite"]
-    U --> V["Buscar clientes com prato favorito ou recorrente"]
-    V --> W["Enviar alerta no Telegram quando o prato voltar"]
-```
-
-## Cadastrar pratos
-
-Administradores podem cadastrar ou atualizar pratos assim:
-
-```text
-/cardapio_add Nome do prato | 29,90 | segunda | ingredientes | alergenicos | tags | disponivel
-```
-
-Exemplo:
-
-```text
-/cardapio_add Frango Grelhado | 31,90 | quinta | frango, arroz, legumes | nenhum | proteico, caseiro | sim
-```
-
-Para listar o cardapio cadastrado:
-
-```text
-/cardapio_list
-```
-
-Para ver um resumo administrativo com clientes, pedidos, favoritos e pratos mais pedidos:
-
-```text
-/relatorio
-```
-
-## Atualizar cardapio semanal
-
-Envie o comando abaixo no Telegram para registrar os pratos da semana e avisar clientes que aguardam algum deles ou ja pediram o prato varias vezes:
-
-```text
-/cardapio_semana Lasanha de Legumes
-Peixe Assado com Legumes
-Sopa de Lentilha
-```
+Um token de verdade ja esteve versionado no `.env.example` deste repositorio, que e
+publico. O valor foi removido do arquivo, mas continua acessivel no historico do
+Git, entao **esse token precisa ser revogado no BotFather** (`/revoke`) mesmo com o
+arquivo atual limpo. Remover num commit posterior nao invalida a credencial.
 
 ## Comandos administrativos
 
-`/cardapio_add`, `/cardapio_list`, `/cardapio_semana` e `/relatorio` sao restritos a administradores.
+`/pendencias`, `/alergenico`, `/relatorio` e `/avisar_favoritos` sao restritos.
 
-A lista de administradores e obrigatoria: enquanto `ADMIN_TELEGRAM_IDS` estiver vazio, **ninguem** consegue usar esses comandos. Isso e proposital, porque `/relatorio` expoe nome de clientes e historico de pedidos e `/cardapio_semana` dispara mensagem para toda a base.
+A lista de administradores e obrigatoria: enquanto `ADMIN_TELEGRAM_IDS` estiver
+vazio, **ninguem** usa esses comandos. Isso e proposital, porque `/avisar_favoritos`
+dispara mensagem para a base e `/alergenico` altera informacao de seguranca alimentar.
 
 ```env
+TELEGRAM_BOT_TOKEN=seu_token
 ADMIN_TELEGRAM_IDS=123456789,987654321
 APETIT_DB_PATH=apetit.db
 ```
 
 ## Deploy
 
-Para operar de verdade, use webhook em producao e deixe polling apenas para testes locais.
-
-Variaveis recomendadas:
+Com `TELEGRAM_WEBHOOK_URL` preenchido o bot sobe em webhook; sem ela, em polling.
 
 ```env
-TELEGRAM_BOT_TOKEN=seu_token_novo
-ADMIN_TELEGRAM_IDS=123456789
-APETIT_DB_PATH=apetit.db
 TELEGRAM_WEBHOOK_URL=https://seu-app.onrender.com
 TELEGRAM_WEBHOOK_PATH=telegram-webhook
 TELEGRAM_WEBHOOK_SECRET_TOKEN=um-segredo-forte
 PORT=8000
 ```
 
-Com `TELEGRAM_WEBHOOK_URL` preenchido, o bot sobe com webhook automaticamente. Sem essa variavel, ele continua usando polling.
+SQLite atende o piloto. Para operacao real, migre para PostgreSQL: em Render,
+Railway ou Fly o disco e efemero e o banco some no redeploy.
 
-Opcoes de hospedagem:
-
-- Render, Railway ou Fly para uma primeira versao gerenciada
-- VPS quando voce quiser mais controle de sistema, disco e backups
-- SQLite funciona para MVP; para escala maior, considere migrar para PostgreSQL
-
-Backup do banco:
+Backup:
 
 ```powershell
 python scripts/backup_db.py
 ```
 
-O script cria uma copia em `backups/`. Em producao, agende esse comando no provedor ou na VPS e guarde copias fora da maquina principal.
+## Estrutura
 
-Logs e monitoramento:
+```
+apetit/
+  model.py       entidades do cardapio
+  csv_import.py  leitura dos dois layouts de CSV
+  validation.py  regras nutricionais de entrada
+  catalog.py     persistencia, publicacao e conferencia
+  allergens.py   alergenicos e verificacao em tres estados
+  profile.py     cadastro e agregacao com n minimo
+  tracking.py    consumo, favoritos e pontos
+bot.py           camada do Telegram
+```
 
-- os logs saem no stdout do processo, que Render/Railway/Fly/VPS conseguem capturar
-- monitore reinicios, erros de webhook e espaco em disco
-- mantenha um alerta simples para queda do servico e falhas de backup
+A regra de dominio fica fora do `bot.py` de proposito, para servir depois a um
+painel do nutricionista sem reescrita.
 
-## Checklist antes de usar com clientes
+## Fluxo
 
-- gerar um token novo no BotFather se o token antigo foi exposto
-- preencher `TELEGRAM_BOT_TOKEN` no `.env`
-- configurar `ADMIN_TELEGRAM_IDS` para proteger comandos administrativos
-- preencher `TELEGRAM_WEBHOOK_URL` em producao
-- configurar rotina de backup do banco
-- cadastrar pratos reais com ingredientes, alergenicos e tags
-- testar um cadastro novo com `/start`
-- testar aceite LGPD, `/meus_dados` e `/excluir_dados`
-- testar objetivos diferentes, como perder peso e ganhar massa
-- testar uma restricao alimentar e confirmar que prato incompatavel e bloqueado
-- testar `/cardapio_semana` com um prato favorito para confirmar o alerta
+```mermaid
+flowchart TD
+    A["Operacao exporta o cardapio em CSV"] --> B["Importador valida"]
+    B -->|"passou"| C["Cardapio publicado"]
+    B -->|"barrado"| D["Fila de revisao do nutricionista"]
+    D --> B
 
-## Exemplos de frases
+    E["Funcionario abre o bot"] --> F{Tem cadastro?}
+    F -- Nao --> G["Nome, unidade, empresa, setor, objetivo, restricoes"]
+    G --> H{Aceita o termo?}
+    H -- Nao --> X["Nada e salvo"]
+    H -- Sim --> I["Cadastro salvo"]
+    F -- Sim --> J["Menu"]
+    I --> J
 
-- `O que tem hoje sem carne?`
-- `O que voce recomenda hoje?`
-- `A comida estava fria.`
-- `Gostei muito do almoco de hoje!`
-- `Posso pedir o estrogonofe de cogumelos?`
+    C --> K["Cardapio do dia"]
+    J --> K
+    K --> L{Confere com as alergias}
+    L -->|"contem"| M["Bloqueado, com o motivo"]
+    L -->|"sem declaracao"| N["Atencao: confirmar no balcao"]
+    L -->|"declarado sem"| O["Liberado"]
+
+    N --> P["Monta o prato"]
+    O --> P
+    P --> Q["Registra o almoco"]
+    Q --> R["Macros do dia + pontos"]
+    P --> S["Guarda favorito"]
+    S --> T["Aviso quando o prato voltar"]
+```

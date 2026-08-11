@@ -16,9 +16,29 @@ import re
 import unicodedata
 from datetime import datetime
 
+from .allergens import ALLERGENS
 from .model import DISCARDED_COLUMNS, Issue, MenuEntry, MenuItem, Nutrition
 
 MACRO_HEADERS = ("KCAL", "CHO", "LIP", "PTN")
+
+# Como a operacao costuma preencher a celula de alergenico. Celula vazia ou
+# valor desconhecido fica de fora de proposito: vira "nao declarado", nunca
+# liberacao.
+ALLERGEN_VALUES = {
+    "sim": "contem",
+    "s": "contem",
+    "contem": "contem",
+    "x": "contem",
+    "1": "contem",
+    "nao": "nao_contem",
+    "n": "nao_contem",
+    "nao contem": "nao_contem",
+    "0": "nao_contem",
+    "pode conter": "pode_conter",
+    "traco": "pode_conter",
+    "tracos": "pode_conter",
+    "pode": "pode_conter",
+}
 
 # Aliases aceitos no layout longo, ja normalizados.
 LONG_ALIASES = {
@@ -171,6 +191,25 @@ def parse_wide(rows: list[list[str]], header_index: int, unit: str, meal: str) -
     return entries, issues
 
 
+def _allergen_columns(header: list[str]) -> dict[str, int]:
+    """Colunas de alergenico no layout longo.
+
+    Aceita "alerg_leite", "alergenico gluten", "contem_ovos" — qualquer coluna
+    cujo nome termine num codigo conhecido. Quando a ficha tecnica passar a
+    exportar esses campos, o alerta liga sem mudar mais nada.
+    """
+    encontradas: dict[str, int] = {}
+    for index, cell in enumerate(header):
+        label = normalize(cell).replace("-", " ").replace("_", " ")
+        if not any(label.startswith(p) for p in ("alerg", "contem")):
+            continue
+        for code in ALLERGENS:
+            if label.endswith(code):
+                encontradas[code] = index
+                break
+    return encontradas
+
+
 def parse_long(rows: list[list[str]], header_index: int, unit: str, meal: str) -> tuple[list[MenuEntry], list[Issue]]:
     header = [normalize(cell) for cell in rows[header_index]]
     column: dict[str, int] = {}
@@ -179,6 +218,7 @@ def parse_long(rows: list[list[str]], header_index: int, unit: str, meal: str) -
             if label in aliases:
                 column[field] = index
                 break
+    colunas_alergenico = _allergen_columns(rows[header_index])
 
     issues: list[Issue] = []
     faltando = [field for field in ("data", "category", "name") if field not in column]
@@ -201,6 +241,12 @@ def parse_long(rows: list[list[str]], header_index: int, unit: str, meal: str) -
             continue
         category, slot = split_category(cell("category"))
         code = cell("code") or slugify(name)
+        declarados: dict[str, str] = {}
+        for allergen_code, index in colunas_alergenico.items():
+            bruto = normalize(row[index]) if index < len(row) else ""
+            estado = ALLERGEN_VALUES.get(bruto)
+            if estado:
+                declarados[allergen_code] = estado
         entries.append(
             MenuEntry(
                 unit=unit,
@@ -218,6 +264,7 @@ def parse_long(rows: list[list[str]], header_index: int, unit: str, meal: str) -
                         lip_g=parse_number(cell("lip")),
                         ptn_g=parse_number(cell("ptn")),
                     ),
+                    allergens=declarados,
                 ),
             )
         )
