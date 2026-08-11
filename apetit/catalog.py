@@ -9,6 +9,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
+from .allergens import ALLERGENS, Declaration, Restriction, check_item, coverage
 from .csv_import import parse_menu_csv
 from .model import Issue, MenuEntry
 from .validation import validate_item
@@ -47,6 +48,69 @@ CREATE TABLE IF NOT EXISTS menu_import_issue (
     service_date TEXT NOT NULL DEFAULT '',
     category TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
+);
+
+-- Alergenico declarado por prato. A ausencia de linha significa "nao declarado",
+-- que o app trata como incerteza, nunca como liberacao.
+CREATE TABLE IF NOT EXISTS menu_item_allergen (
+    item_code TEXT NOT NULL REFERENCES menu_item(code),
+    allergen_code TEXT NOT NULL,
+    status TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (item_code, allergen_code)
+);
+
+CREATE TABLE IF NOT EXISTS employee (
+    telegram_id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    apetit_unit TEXT NOT NULL DEFAULT '',
+    client_company TEXT NOT NULL DEFAULT '',
+    sector TEXT NOT NULL DEFAULT '',
+    goal TEXT NOT NULL DEFAULT '',
+    consent_accepted INTEGER NOT NULL DEFAULT 0,
+    consented_at TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_employee_org ON employee (client_company, sector);
+
+CREATE TABLE IF NOT EXISTS employee_restriction (
+    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    allergen_code TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'alergia',
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (telegram_id, allergen_code)
+);
+
+CREATE TABLE IF NOT EXISTS consumption (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    telegram_id INTEGER NOT NULL,
+    service_date TEXT NOT NULL,
+    meal TEXT NOT NULL DEFAULT 'almoco',
+    item_code TEXT NOT NULL REFERENCES menu_item(code),
+    logged_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_consumption_pessoa ON consumption (telegram_id, service_date);
+
+CREATE TABLE IF NOT EXISTS favorite (
+    telegram_id INTEGER NOT NULL,
+    item_code TEXT NOT NULL REFERENCES menu_item(code),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (telegram_id, item_code)
+);
+
+-- A restricao unica e o que torna a pontuacao idempotente: reavaliar o mesmo
+-- dia nao concede pontos de novo.
+CREATE TABLE IF NOT EXISTS points_event (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    telegram_id INTEGER NOT NULL,
+    rule_code TEXT NOT NULL,
+    points INTEGER NOT NULL,
+    reference_date TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    UNIQUE (telegram_id, rule_code, reference_date)
 );
 """
 
@@ -214,7 +278,7 @@ def menu_for_date(conn: sqlite3.Connection, service_date: str, unit: str = "", m
         params.append(meal)
     return conn.execute(
         f"""
-        SELECT e.category, e.slot, e.meal, e.unit,
+        SELECT e.category, e.slot, e.meal, e.unit, e.item_code,
                i.name, i.portion_g, i.kcal, i.cho_g, i.lip_g, i.ptn_g
         FROM menu_entry e
         JOIN menu_item i ON i.code = e.item_code
@@ -223,6 +287,71 @@ def menu_for_date(conn: sqlite3.Connection, service_date: str, unit: str = "", m
         """,
         params,
     ).fetchall()
+
+
+def set_item_allergens(
+    conn: sqlite3.Connection,
+    item_code: str,
+    declarations: dict[str, str],
+    source: str = "ficha tecnica",
+) -> None:
+    """Grava a declaracao de alergenicos de um prato."""
+    timestamp = now_iso()
+    for allergen_code, status in declarations.items():
+        if allergen_code not in ALLERGENS:
+            raise ValueError(f"Alergenico desconhecido: {allergen_code}")
+        Declaration(status)  # valida o estado
+        conn.execute(
+            """
+            INSERT INTO menu_item_allergen (item_code, allergen_code, status, source, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(item_code, allergen_code) DO UPDATE SET
+                status = excluded.status,
+                source = excluded.source,
+                updated_at = excluded.updated_at
+            """,
+            (item_code, allergen_code, Declaration(status).value, source, timestamp),
+        )
+    conn.commit()
+
+
+def item_allergens(conn: sqlite3.Connection, item_code: str) -> dict[str, Declaration]:
+    linhas = conn.execute(
+        "SELECT allergen_code, status FROM menu_item_allergen WHERE item_code = ?",
+        (item_code,),
+    ).fetchall()
+    return {linha["allergen_code"]: Declaration(linha["status"]) for linha in linhas}
+
+
+def check_menu_for_employee(
+    conn: sqlite3.Connection,
+    service_date: str,
+    restrictions: list[Restriction],
+    unit: str = "",
+    meal: str = "",
+) -> list[dict]:
+    """Cardapio do dia ja conferido contra a ficha da pessoa.
+
+    E o que sustenta o aviso no momento da escolha: cada item volta com o
+    veredito e a mensagem, incluindo o caso em que nao da para afirmar nada.
+    """
+    resultado = []
+    for linha in menu_for_date(conn, service_date, unit=unit, meal=meal):
+        declarado = item_allergens(conn, linha["item_code"])
+        verificacao = check_item(restrictions, declarado)
+        resultado.append(
+            {
+                "category": linha["category"],
+                "slot": linha["slot"],
+                "item_code": linha["item_code"],
+                "name": linha["name"],
+                "kcal": linha["kcal"],
+                "ptn_g": linha["ptn_g"],
+                "check": verificacao,
+                "allergen_coverage": coverage(declarado),
+            }
+        )
+    return resultado
 
 
 def pending_issues(conn: sqlite3.Connection, batch: str = "") -> list[sqlite3.Row]:

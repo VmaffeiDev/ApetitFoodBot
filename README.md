@@ -123,6 +123,46 @@ em doze dias do mes e uma correcao, nao doze.
 Colunas de **custo e per capita sao descartadas** na importacao. Sao dado
 comercial da operacao e nao podem chegar ao app do funcionario.
 
+## Cadastro do funcionario
+
+O vinculo e triplo: unidade da Apetit que serve, empresa onde a pessoa trabalha
+e setor. O cadastro so vale com o aceite do termo e com os tres preenchidos.
+
+Como setor pequeno mais dado alimentar reidentifica alguem sem precisar do nome,
+qualquer leitura agregada passa por `aggregate_by_sector`, que **suprime recortes
+com menos de 5 pessoas** em vez de mostrar a media.
+
+## Alergenicos e alerta no momento da escolha
+
+A lista segue os alergenicos de declaracao obrigatoria da RDC 26/2015 da ANVISA.
+A conferencia tem **tres estados, nao dois**:
+
+| Situacao | Resposta ao funcionario |
+|---|---|
+| Ficha declara que contem | Bloqueio, com o alergenico nomeado |
+| Ficha declara "pode conter" | Atencao — confirmar no balcao |
+| **Ninguem declarou** | Atencao — o app nao afirma que e seguro |
+| Todos os alergenicos da pessoa constam como nao contem | Liberado |
+
+A regra que sustenta isso: **falta de informacao nunca vira liberacao**. Deduzir
+alergenico do nome do prato e o erro que machuca — "STROGONOFF DE CARNE" nao
+avisa que leva creme de leite, "FILE DE FRANGO A MILANESA" nao avisa que leva
+ovo e trigo.
+
+`coverage()` mede quanto da lista obrigatoria cada prato declara, para o
+nutricionista saber se o cardapio ja sustenta a funcao de alerta.
+
+## Historico, favoritos e pontos
+
+- todo prato montado fica registrado, com os macros somados no dia
+- o funcionario favorita um prato e recebe aviso quando ele volta ao cardapio
+- pontos por **constancia, composicao, variedade e meta de proteina**
+
+Nenhuma regra de pontuacao premia deficit calorico ou perda de peso, e nao ha
+ranking entre colegas. Num app corporativo, premiar comer menos sob o olhar do
+empregador empurra para uma relacao ruim com comida. Cada regra carrega o campo
+`basis` e existe teste garantindo que nenhuma se apoie em deficit ou peso.
+
 ## Banco de dados
 
 O bot cria automaticamente o arquivo `apetit.db` com:
