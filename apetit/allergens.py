@@ -64,6 +64,9 @@ class SafetyCheck:
     contem: list[str] = field(default_factory=list)
     pode_conter: list[str] = field(default_factory=list)
     nao_declarado: list[str] = field(default_factory=list)
+    # Termos que a pessoa escreveu e o app nao sabe conferir, por nao existirem
+    # como campo na ficha tecnica (ex.: "legumes", "pimenta").
+    nao_verificavel: list[str] = field(default_factory=list)
 
     @property
     def safe_to_affirm(self) -> bool:
@@ -85,6 +88,8 @@ class SafetyCheck:
                 partes.append(f"pode conter {rotulo(self.pode_conter)}")
             if self.nao_declarado:
                 partes.append(f"nao tem declaracao sobre {rotulo(self.nao_declarado)}")
+            if self.nao_verificavel:
+                partes.append(f"nao consigo checar {', '.join(self.nao_verificavel)}")
             return (
                 "Nao consigo confirmar que este prato e seguro para voce: "
                 + " e ".join(partes)
@@ -96,14 +101,23 @@ class SafetyCheck:
 def check_item(
     restrictions: list[Restriction],
     declared: dict[str, Declaration | str],
+    unverifiable: list[str] | tuple[str, ...] = (),
 ) -> SafetyCheck:
     """Cruza as restricoes da pessoa com o que a ficha do prato declara.
 
     `declared` mapeia codigo de alergenico para a declaracao daquele prato.
     Alergenico ausente do dicionario conta como NAO_DECLARADO de proposito:
     a falta de informacao nunca vira liberacao.
+
+    `unverifiable` sao termos que a pessoa escreveu e que nao existem como campo
+    em ficha tecnica ("legumes", "pimenta"). Enquanto houver um deles, o prato
+    nunca sai como liberado — mostrar visto verde a quem tem restricao que o app
+    nao checa e pior do que nao mostrar nada.
     """
+    nao_verificavel = list(unverifiable)
     if not restrictions:
+        if nao_verificavel:
+            return SafetyCheck(Verdict.ATENCAO, nao_verificavel=nao_verificavel)
         return SafetyCheck(Verdict.SEM_RESTRICAO)
 
     contem: list[str] = []
@@ -122,12 +136,12 @@ def check_item(
 
     if contem:
         verdict = Verdict.BLOQUEIO
-    elif pode_conter or nao_declarado:
+    elif pode_conter or nao_declarado or nao_verificavel:
         verdict = Verdict.ATENCAO
     else:
         verdict = Verdict.LIBERADO
 
-    return SafetyCheck(verdict, contem, pode_conter, nao_declarado)
+    return SafetyCheck(verdict, contem, pode_conter, nao_declarado, nao_verificavel)
 
 
 def coverage(declared: dict[str, Declaration | str]) -> float:

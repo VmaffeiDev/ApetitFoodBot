@@ -33,6 +33,9 @@ class Employee:
     consent_accepted: bool = False
     consented_at: str = ""
     restrictions: list[Restriction] = field(default_factory=list)
+    # Termos que a pessoa escreveu e que nao existem como campo em ficha
+    # tecnica. Guardados para virar aviso, nunca descartados em silencio.
+    free_restrictions: list[str] = field(default_factory=list)
 
     @property
     def registered(self) -> bool:
@@ -94,6 +97,13 @@ def save_employee(conn: sqlite3.Connection, employee: Employee) -> None:
         ),
     )
     conn.execute("DELETE FROM employee_restriction WHERE telegram_id = ?", (employee.telegram_id,))
+    conn.execute("DELETE FROM employee_free_restriction WHERE telegram_id = ?", (employee.telegram_id,))
+    for termo in employee.free_restrictions:
+        if termo.strip():
+            conn.execute(
+                "INSERT INTO employee_free_restriction (telegram_id, term, created_at) VALUES (?, ?, ?)",
+                (employee.telegram_id, termo.strip(), timestamp),
+            )
     for restriction in employee.restrictions:
         if restriction.allergen not in ALLERGENS:
             raise ValueError(f"Alergenico desconhecido: {restriction.allergen}")
@@ -118,6 +128,13 @@ def load_employee(conn: sqlite3.Connection, telegram_id: int) -> Employee | None
             (telegram_id,),
         ).fetchall()
     ]
+    livres = [
+        r["term"]
+        for r in conn.execute(
+            "SELECT term FROM employee_free_restriction WHERE telegram_id = ? ORDER BY term",
+            (telegram_id,),
+        ).fetchall()
+    ]
     return Employee(
         telegram_id=row["telegram_id"],
         name=row["name"],
@@ -128,12 +145,16 @@ def load_employee(conn: sqlite3.Connection, telegram_id: int) -> Employee | None
         consent_accepted=bool(row["consent_accepted"]),
         consented_at=row["consented_at"],
         restrictions=restricoes,
+        free_restrictions=livres,
     )
 
 
 def delete_employee_data(conn: sqlite3.Connection, telegram_id: int) -> None:
     """Exclusao completa pedida pelo titular, incluindo consumo e pontos."""
-    for tabela in ("points_event", "favorite", "consumption", "employee_restriction", "employee"):
+    for tabela in (
+        "points_event", "favorite", "consumption",
+        "employee_free_restriction", "employee_restriction", "employee",
+    ):
         conn.execute(f"DELETE FROM {tabela} WHERE telegram_id = ?", (telegram_id,))
     conn.commit()
 

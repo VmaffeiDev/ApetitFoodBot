@@ -83,6 +83,15 @@ CREATE TABLE IF NOT EXISTS employee_restriction (
     PRIMARY KEY (telegram_id, allergen_code)
 );
 
+-- Alergia que a pessoa escreveu e o app nao sabe conferir ("legumes",
+-- "pimenta"). Fica registrada e vira aviso, em vez de sumir.
+CREATE TABLE IF NOT EXISTS employee_free_restriction (
+    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    term TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (telegram_id, term)
+);
+
 CREATE TABLE IF NOT EXISTS consumption (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     telegram_id INTEGER NOT NULL,
@@ -331,6 +340,7 @@ def check_menu_for_employee(
     restrictions: list[Restriction],
     unit: str = "",
     meal: str = "",
+    unverifiable: list[str] | tuple[str, ...] = (),
 ) -> list[dict]:
     """Cardapio do dia ja conferido contra a ficha da pessoa.
 
@@ -340,7 +350,7 @@ def check_menu_for_employee(
     resultado = []
     for linha in menu_for_date(conn, service_date, unit=unit, meal=meal):
         declarado = item_allergens(conn, linha["item_code"])
-        verificacao = check_item(restrictions, declarado)
+        verificacao = check_item(restrictions, declarado, unverifiable)
         resultado.append(
             {
                 "category": linha["category"],

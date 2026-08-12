@@ -35,6 +35,7 @@ from telegram.ext import (
 
 from apetit.allergens import ALLERGENS, Restriction, RestrictionKind, Verdict
 from apetit.allergen_sheet import coverage_summary
+from apetit.allergy_text import describe, recognize
 from apetit.catalog import (
     allergen_coverage,
     check_menu_for_employee,
@@ -293,13 +294,51 @@ def restriction_buttons(selecionadas: set[str]) -> list[list[tuple[str, str]]]:
 
 
 async def ask_restrictions(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+    """Pergunta em texto livre. A pessoa escreve do jeito dela."""
+    context.user_data[STEP] = "restricoes_texto"
+    await reply(
+        update,
+        "\U0001f6a8 <b>Voce tem alguma alergia ou intolerancia alimentar?</b>\n\n"
+        "Pode escrever do seu jeito. Por exemplo:\n"
+        "<i>alergia a frutos do mar</i>\n"
+        "<i>nao posso leite nem ovo</i>\n"
+        "<i>intolerante a lactose</i>\n\n"
+        "Vou conferir <b>cada prato</b> do cardapio contra o que voce escrever.",
+        [[("Nao tenho nenhuma", "restr_nenhuma")], [("Prefiro escolher numa lista", "restr_lista")]],
+        edit=edit,
+    )
+
+
+async def confirm_restrictions(update: Update, context: ContextTypes.DEFAULT_TYPE, texto: str) -> None:
+    """Mostra o que o app entendeu e pede confirmacao antes de salvar."""
+    reconhecidos, livres = recognize(texto)
+    dados = draft(context)
+    dados["restricoes"] = reconhecidos
+    dados["restricoes_livres"] = livres
+    context.user_data[STEP] = "restricoes_confirma"
+
+    linhas = [f"Voce escreveu: <i>{escape(texto)}</i>\n", escape(describe(reconhecidos, livres))]
+    if not reconhecidos and not livres:
+        linhas.append("\nSe voce tem alguma alergia, tente escrever so o alimento, como <i>camarao</i>.")
+    await reply(
+        update,
+        "\n".join(linhas),
+        [
+            [("✅ Esta certo", "restr_ok")],
+            [("✏️ Escrever de novo", "restr_refazer")],
+            [("\U0001f4cb Escolher numa lista", "restr_lista")],
+        ],
+        edit=False,
+    )
+
+
+async def ask_restrictions_list(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = True) -> None:
+    """Saida por lista, para quem prefere marcar do que escrever."""
     context.user_data[STEP] = "restricoes"
     selecionadas = set(draft(context).get("restricoes", []))
     await reply(
         update,
-        "\U0001f6a8 <b>Voce tem alergia ou intolerancia?</b>\n\n"
-        "Marque tudo o que se aplica. Vou conferir <b>cada prato</b> do cardapio contra essa lista "
-        "e te avisar antes de voce se servir.",
+        "\U0001f6a8 <b>Marque o que se aplica a voce:</b>",
         restriction_buttons(selecionadas),
         edit=edit,
     )
@@ -332,6 +371,7 @@ async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE
         goal=dados.get("objetivo", ""),
         consent_accepted=True,
         restrictions=[Restriction(code, RestrictionKind.ALERGIA) for code in dados.get("restricoes", [])],
+        free_restrictions=dados.get("restricoes_livres", []),
     )
     conn = db()
     try:
@@ -342,15 +382,12 @@ async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data.pop(STEP, None)
     context.user_data.pop("cadastro", None)
 
-    restricoes = dados.get("restricoes", [])
-    if restricoes:
-        aviso = (
-            "\U0001f6a8 Vou conferir cada prato contra: "
-            + ", ".join(ALLERGENS[c] for c in restricoes)
-            + "."
-        )
+    reconhecidos = dados.get("restricoes", [])
+    livres = dados.get("restricoes_livres", [])
+    if reconhecidos or livres:
+        aviso = "\U0001f6a8 " + describe(reconhecidos, livres)
     else:
-        aviso = "Voce nao marcou restricoes. Da para incluir depois em Meu cadastro."
+        aviso = "Voce nao informou restricoes. Da para incluir depois em Meu cadastro."
 
     await reply(
         update,
@@ -385,10 +422,22 @@ async def require_registration(update: Update, context: ContextTypes.DEFAULT_TYP
 # Cardapio
 # --------------------------------------------------------------------------
 
+def describe_restrictions(pessoa: Employee) -> str:
+    partes = [ALLERGENS[r.allergen] for r in pessoa.restrictions]
+    partes += [f"{termo} (nao conferido pelo app)" for termo in pessoa.free_restrictions]
+    return ", ".join(partes) or "nenhuma"
+
+
 def load_menu(pessoa: Employee, dia: str) -> list[dict]:
     conn = db()
     try:
-        return check_menu_for_employee(conn, dia, pessoa.restrictions, unit=pessoa.apetit_unit)
+        return check_menu_for_employee(
+            conn,
+            dia,
+            pessoa.restrictions,
+            unit=pessoa.apetit_unit,
+            unverifiable=pessoa.free_restrictions,
+        )
     finally:
         conn.close()
 
@@ -724,7 +773,7 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE, edit:
     pessoa = await require_registration(update, context, edit=edit)
     if not pessoa:
         return
-    restricoes = ", ".join(ALLERGENS[r.allergen] for r in pessoa.restrictions) or "nenhuma"
+    restricoes = describe_restrictions(pessoa)
     await reply(
         update,
         "\U0001f464 <b>Meu cadastro</b>\n\n"
@@ -772,7 +821,7 @@ async def show_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE, edit:
         pontos = total_points(conn, pessoa.telegram_id)
     finally:
         conn.close()
-    restricoes = ", ".join(ALLERGENS[r.allergen] for r in pessoa.restrictions) or "nenhuma"
+    restricoes = describe_restrictions(pessoa)
     dias = len({linha["service_date"] for linha in historico})
     await reply(
         update,
@@ -1002,6 +1051,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     elif step == "setor":
         dados["setor"] = texto
         await ask_goal(update, context)
+    elif step in ("restricoes_texto", "restricoes_confirma"):
+        await confirm_restrictions(update, context, texto)
     else:
         await reply(update, "Use os botoes acima para continuar \U0001f60a")
 
@@ -1046,6 +1097,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         selecionadas = set(draft(context).get("restricoes", []))
         selecionadas.symmetric_difference_update({data.removeprefix("restr:")})
         draft(context)["restricoes"] = sorted(selecionadas)
+        await ask_restrictions(update, context, edit=True)
+        return
+    if data == "restr_nenhuma":
+        dados = draft(context)
+        dados["restricoes"] = []
+        dados["restricoes_livres"] = []
+        await ask_consent(update, context, edit=True)
+        return
+    if data == "restr_lista":
+        await ask_restrictions_list(update, context, edit=True)
+        return
+    if data == "restr_refazer":
         await ask_restrictions(update, context, edit=True)
         return
     if data == "restr_ok":

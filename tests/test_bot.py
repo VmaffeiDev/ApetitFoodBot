@@ -7,6 +7,7 @@ from types import SimpleNamespace
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-token")
 
 import bot
+from apetit.allergens import ALLERGENS
 from apetit.catalog import import_menu_csv, init_schema, set_item_allergens
 from apetit.profile import load_employee
 from apetit.tracking import consumption_history, favorites, total_points
@@ -126,6 +127,58 @@ class CadastroTest(BotBase):
         finally:
             conn.close()
         self.assertIn("Sem o aceite", update.last)
+
+    async def test_written_allergy_is_recognized_and_saved(self):
+        context = FakeContext()
+        await bot.start(FakeUpdate(), context)
+        for texto in ("Mariana", "SM", "Industria Exemplo", "Producao"):
+            await bot.handle_message(FakeUpdate(text=texto), context)
+        await bot.handle_callback(FakeUpdate(callback="goal_manter"), context)
+
+        escrita = FakeUpdate(text="tenho alergia a frutos do mar e a legumes")
+        await bot.handle_message(escrita, context)
+
+        # O app devolve o que entendeu antes de salvar.
+        self.assertIn("Crustaceos", escrita.last)
+        self.assertIn("legumes", escrita.last)
+        self.assertIn("nao consigo conferir sozinho", escrita.last)
+
+        await bot.handle_callback(FakeUpdate(callback="restr_ok"), context)
+        await bot.handle_callback(FakeUpdate(callback="consent_sim"), context)
+
+        conn = bot.db()
+        try:
+            pessoa = load_employee(conn, self.user)
+        finally:
+            conn.close()
+        self.assertEqual(set(r.allergen for r in pessoa.restrictions), {"crustaceos", "peixes"})
+        self.assertEqual(pessoa.free_restrictions, ["legumes"])
+
+    async def test_unverifiable_term_keeps_the_menu_out_of_green(self):
+        context = FakeContext()
+        await bot.start(FakeUpdate(), context)
+        for texto in ("Mariana", "SM", "Industria Exemplo", "Producao"):
+            await bot.handle_message(FakeUpdate(text=texto), context)
+        await bot.handle_callback(FakeUpdate(callback="goal_manter"), context)
+        await bot.handle_message(FakeUpdate(text="alergia a legumes"), context)
+        await bot.handle_callback(FakeUpdate(callback="restr_ok"), context)
+        await bot.handle_callback(FakeUpdate(callback="consent_sim"), context)
+
+        conn = bot.db()
+        try:
+            for code in ("carne_assada_ao_molho", "sal_mix_de_alface"):
+                set_item_allergens(conn, code, {c: "nao_contem" for c in ALLERGENS})
+        finally:
+            conn.close()
+        bot.today = lambda: "2025-09-01"
+
+        update = FakeUpdate(callback="cardapio")
+        await bot.handle_callback(update, context)
+
+        # Mesmo com toda a ficha declarada, nao pode aparecer visto verde:
+        # o app nao sabe checar "legumes".
+        self.assertNotIn("✅", update.last)
+        self.assertIn("⚠️", update.last)
 
     async def test_restriction_toggles_off_when_tapped_twice(self):
         context = FakeContext()

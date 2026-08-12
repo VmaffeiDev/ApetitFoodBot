@@ -123,6 +123,32 @@ A conferencia tem **tres estados, nao dois**:
 e o erro que machuca: "STROGONOFF DE CARNE" nao avisa que leva creme de leite,
 "FILE DE FRANGO A MILANESA" nao avisa que leva ovo e trigo.
 
+### O funcionario escreve, o app reconhece
+
+No cadastro a pessoa escreve do jeito dela — "alergia a frutos do mar", "nao
+posso leite nem ovo", "sou celiaco" — e o app traduz para os codigos da lista.
+Antes de salvar, ele mostra o que entendeu para a pessoa confirmar.
+
+| A pessoa escreve | O app entende |
+|---|---|
+| alergia a frutos do mar | Crustaceos + Peixes |
+| intolerante a lactose | Leite e derivados |
+| sou celiaco | Gluten |
+| nao posso leite nem ovo | Leite + Ovos |
+
+Duas regras seguram a honestidade:
+
+**Nada e adivinhado por semelhanca.** So casa com sinonimo conhecido. Errar para
+o lado do "reconheci" e pior que pedir para a pessoa confirmar.
+
+**O que nao for reconhecido nao e descartado.** "Alergia a legumes" nao existe
+como campo em ficha tecnica nenhuma. O termo fica guardado, aparece no cadastro
+marcado como *nao conferido pelo app*, e — o ponto importante — **enquanto a
+pessoa tiver um termo desses, nenhum prato aparece como liberado.** Mostrar visto
+verde a quem tem restricao que o app nao checa e pior que nao mostrar nada.
+
+Quem preferir marcar numa lista em vez de escrever tem essa saida no proprio passo.
+
 ### Os dois lados do alerta
 
 O aviso so funciona cruzando duas informacoes, que vem de fontes diferentes:
