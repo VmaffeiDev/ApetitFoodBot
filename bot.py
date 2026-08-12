@@ -34,7 +34,9 @@ from telegram.ext import (
 )
 
 from apetit.allergens import ALLERGENS, Restriction, RestrictionKind, Verdict
+from apetit.allergen_sheet import coverage_summary
 from apetit.catalog import (
+    allergen_coverage,
     check_menu_for_employee,
     connect,
     init_schema,
@@ -871,6 +873,29 @@ async def declare_allergen(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     )
 
 
+async def show_coverage(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Quanto do cardapio ja sustenta o alerta de alergia."""
+    if not is_admin(tg_id(update)):
+        await deny_admin(update, "ver a cobertura de alergenicos")
+        return
+    conn = db()
+    try:
+        cobertura = allergen_coverage(conn)
+    finally:
+        conn.close()
+
+    linhas = ["\U0001f9ea <b>Cobertura de alergenicos</b>\n"]
+    linhas.append(escape(coverage_summary(cobertura["total"], cobertura["completos"], cobertura["parciais"])))
+    if cobertura["faltando"]:
+        linhas.append("\n<b>Declarar primeiro (aparecem mais no cardapio):</b>")
+        linhas.extend(f"• {escape(nome)}" for _, nome, _ in cobertura["faltando"][:10])
+        linhas.append(
+            "\n<i>Para declarar em lote: scripts/alergenicos.py --exportar, "
+            "preencher no Excel e --importar.</i>"
+        )
+    await update.effective_message.reply_text("\n".join(linhas), parse_mode=ParseMode.HTML)
+
+
 async def show_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Relatorio agregado. Nunca individual: e dado de saude de funcionario."""
     if not is_admin(tg_id(update)):
@@ -1163,6 +1188,7 @@ def main() -> None:
     app.add_handler(CommandHandler("excluir_dados", confirm_delete))
     app.add_handler(CommandHandler("pendencias", show_pending))
     app.add_handler(CommandHandler("alergenico", declare_allergen))
+    app.add_handler(CommandHandler("cobertura", show_coverage))
     app.add_handler(CommandHandler("relatorio", show_report))
     app.add_handler(CommandHandler("avisar_favoritos", notify_favorites))
     app.add_handler(CallbackQueryHandler(handle_callback))

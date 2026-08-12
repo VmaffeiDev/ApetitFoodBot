@@ -356,6 +356,59 @@ def check_menu_for_employee(
     return resultado
 
 
+def items_with_allergens(conn: sqlite3.Connection) -> list[tuple[str, str, dict[str, Declaration]]]:
+    """Todas as fichas publicadas com o que ja se sabe do alergenico delas.
+
+    Ordenado por quantas vezes o prato aparece no cardapio: declarar primeiro o
+    arroz que sai 22 vezes rende mais que o prato que saiu uma vez.
+    """
+    linhas = conn.execute(
+        """
+        SELECT i.code, i.name, COUNT(e.id) AS vezes
+        FROM menu_item i
+        LEFT JOIN menu_entry e ON e.item_code = i.code
+        GROUP BY i.code, i.name
+        ORDER BY vezes DESC, i.name
+        """
+    ).fetchall()
+    return [(linha["code"], linha["name"], item_allergens(conn, linha["code"])) for linha in linhas]
+
+
+def allergen_coverage(conn: sqlite3.Connection) -> dict:
+    """Quanto do cardapio ja sustenta o alerta de alergia."""
+    total = completos = parciais = 0
+    faltando: list[tuple[str, str, int]] = []
+    for code, name, declarado in items_with_allergens(conn):
+        total += 1
+        quantos = len(declarado)
+        if quantos >= len(ALLERGENS):
+            completos += 1
+        elif quantos:
+            parciais += 1
+            faltando.append((code, name, len(ALLERGENS) - quantos))
+        else:
+            faltando.append((code, name, len(ALLERGENS)))
+    return {"total": total, "completos": completos, "parciais": parciais, "faltando": faltando}
+
+
+def apply_allergen_sheet(conn: sqlite3.Connection, declaracoes: dict[str, dict[str, str]]) -> tuple[int, list[str]]:
+    """Grava a planilha preenchida. Devolve quantas fichas mudaram e os erros."""
+    conhecidos = {linha["code"] for linha in conn.execute("SELECT code FROM menu_item").fetchall()}
+    aplicadas = 0
+    erros: list[str] = []
+    for code, estados in declaracoes.items():
+        if code not in conhecidos:
+            erros.append(f"Prato desconhecido, ignorado: {code}")
+            continue
+        try:
+            set_item_allergens(conn, code, estados, source="planilha do nutricionista")
+        except ValueError as erro:
+            erros.append(f"{code}: {erro}")
+            continue
+        aplicadas += 1
+    return aplicadas, erros
+
+
 def known_units(conn: sqlite3.Connection) -> list[str]:
     """Unidades que ja tem cardapio publicado.
 

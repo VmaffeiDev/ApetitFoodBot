@@ -123,11 +123,42 @@ A conferencia tem **tres estados, nao dois**:
 e o erro que machuca: "STROGONOFF DE CARNE" nao avisa que leva creme de leite,
 "FILE DE FRANGO A MILANESA" nao avisa que leva ovo e trigo.
 
-Se o CSV trouxer colunas de alergenico (`alerg_leite`, `contem_gluten`, ...), elas
-sao importadas automaticamente. Valores aceitos: `sim`/`nao`/`pode conter`/`tracos`.
+### Os dois lados do alerta
+
+O aviso so funciona cruzando duas informacoes, que vem de fontes diferentes:
+
+| Lado | Quem informa |
+|---|---|
+| **A que a pessoa e alergica** | O proprio funcionario, no cadastro |
+| **O que cada prato contem** | So a cozinha sabe |
+
+O funcionario declarar a alergia dele nao resolve o segundo lado: ele sabe que
+nao pode leite, mas nao tem como saber se o strogonoff de hoje leva creme de
+leite. Por isso, sem o dado do prato, a resposta e "nao consigo confirmar".
+
+### Como declarar o que cada prato contem
+
+**1. No proprio CSV do cardapio.** Colunas como `alerg_leite` ou `contem_gluten`
+sao importadas automaticamente, aceitando `sim`/`nao`/`pode conter`/`tracos`.
 Celula vazia continua como nao declarado.
 
-Quando nao houver essas colunas, o nutricionista declara pelo `/alergenico`.
+**2. Planilha do nutricionista**, enquanto o export nao tiver o campo:
+
+```powershell
+python scripts/alergenicos.py --exportar alergenicos.csv
+# nutricionista preenche no Excel: sim / nao / pode conter
+python scripts/alergenicos.py --importar alergenicos.csv
+python scripts/alergenicos.py --cobertura
+```
+
+O trabalho e finito e se paga: num mes real, **110 fichas cobriram 312
+ocorrencias** do cardapio. A planilha sai ordenada pelos pratos que mais
+aparecem, entao declarar arroz, feijao e refresco ja resolve boa parte do
+cardapio.
+
+**3. Prato a prato**, pelo `/alergenico` no Telegram.
+
+Acompanhe com `/cobertura` ou `--cobertura`.
 
 ## Progresso
 
