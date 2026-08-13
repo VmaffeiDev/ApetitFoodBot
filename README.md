@@ -149,6 +149,35 @@ verde a quem tem restricao que o app nao checa e pior que nao mostrar nada.
 
 Quem preferir marcar numa lista em vez de escrever tem essa saida no proprio passo.
 
+### O nome do prato tambem conta
+
+O cardapio ja diz em voz alta o que o prato e: "FEIJAO PRETO" tem feijao,
+"SALADA DE CAMARAO" tem camarao. Entao quem escreve "nao posso feijao" tem o
+prato bloqueado sem precisar de ficha tecnica nenhuma.
+
+Isso vale **numa direcao so**: o nome prova presenca, nunca ausencia.
+"Strogonoff de carne" nao ter "leite" no nome nao prova que nao leva creme de
+leite. Por isso o casamento por nome bloqueia, mas nunca libera.
+
+Casa variacao de palavra — "feijao" pega "feijoada", "carne" pega "carnes" — e
+na duvida casa: um bloqueio a mais a pessoa percebe e contorna; um bloqueio a
+menos ela come.
+
+### Alergia ou so prefiro evitar
+
+Quando o termo nao e um alergenico conhecido, o app pergunta o quanto ser
+rigoroso, porque as duas coisas pedem tratamento diferente:
+
+| A pessoa responde | O que o app faz |
+|---|---|
+| **E alergia** | Bloqueia pelo nome **e** avisa em todo prato que nao consegue confirmar |
+| **So prefiro evitar** | Bloqueia so quando aparece no nome; fica quieto no resto |
+
+A diferenca e grande na pratica. Num cardapio real de 13 itens, "nao posso
+feijao" como alergia gera **12 avisos**; como preferencia, gera **1 bloqueio e
+nenhum aviso**. Tratar preferencia com rigor de alergia enche a tela de alerta
+ate a pessoa parar de ler o que importa.
+
 ### Os dois lados do alerta
 
 O aviso so funciona cruzando duas informacoes, que vem de fontes diferentes:

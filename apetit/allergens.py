@@ -67,6 +67,9 @@ class SafetyCheck:
     # Termos que a pessoa escreveu e o app nao sabe conferir, por nao existirem
     # como campo na ficha tecnica (ex.: "legumes", "pimenta").
     nao_verificavel: list[str] = field(default_factory=list)
+    # Termos que aparecem no proprio nome do prato ("feijao" em "FEIJAO PRETO").
+    # O cardapio diz isso em voz alta, entao da para bloquear com confianca.
+    no_nome: list[str] = field(default_factory=list)
 
     @property
     def safe_to_affirm(self) -> bool:
@@ -78,10 +81,12 @@ class SafetyCheck:
         if self.verdict is Verdict.SEM_RESTRICAO:
             return "Voce nao tem restricao cadastrada."
         if self.verdict is Verdict.BLOQUEIO:
-            return (
-                f"Este prato contem {rotulo(self.contem)}, que esta na sua ficha. "
-                "Nao recomendo pedir."
-            )
+            motivos = []
+            if self.contem:
+                motivos.append(f"contem {rotulo(self.contem)}")
+            if self.no_nome:
+                motivos.append(f"o proprio nome indica {', '.join(self.no_nome)}")
+            return "Este prato " + " e ".join(motivos) + ", que voce evita. Nao recomendo pedir."
         if self.verdict is Verdict.ATENCAO:
             partes = []
             if self.pode_conter:
@@ -102,6 +107,8 @@ def check_item(
     restrictions: list[Restriction],
     declared: dict[str, Declaration | str],
     unverifiable: list[str] | tuple[str, ...] = (),
+    dish_text: str = "",
+    avoid_terms: list[str] | tuple[str, ...] = (),
 ) -> SafetyCheck:
     """Cruza as restricoes da pessoa com o que a ficha do prato declara.
 
@@ -113,9 +120,30 @@ def check_item(
     em ficha tecnica ("legumes", "pimenta"). Enquanto houver um deles, o prato
     nunca sai como liberado — mostrar visto verde a quem tem restricao que o app
     nao checa e pior do que nao mostrar nada.
+
+    `dish_text` e o nome do prato. Quando um desses termos aparece ali
+    ("feijao" em "FEIJAO PRETO"), da para bloquear com confianca, porque o
+    cardapio esta dizendo em voz alta. O contrario nao vale: nao achar o nome
+    nao prova ausencia, entao isso nunca libera.
+
+    `avoid_terms` sao alimentos que a pessoa so prefere evitar, sem risco de
+    saude. A diferenca esta no silencio: eles bloqueiam quando aparecem no nome
+    do prato, mas nao enchem o resto do cardapio de aviso. Tratar preferencia
+    com o rigor de alergia gera tanto alerta que a pessoa para de ler o que
+    importa.
     """
+    from .allergy_text import terms_in_dish  # import local: allergy_text importa este modulo
+
     nao_verificavel = list(unverifiable)
+    evitar = list(avoid_terms)
+    no_nome: list[str] = []
+    if dish_text:
+        no_nome = terms_in_dish(dish_text, nao_verificavel + evitar)
+        nao_verificavel = [t for t in nao_verificavel if t not in no_nome]
+
     if not restrictions:
+        if no_nome:
+            return SafetyCheck(Verdict.BLOQUEIO, nao_verificavel=nao_verificavel, no_nome=no_nome)
         if nao_verificavel:
             return SafetyCheck(Verdict.ATENCAO, nao_verificavel=nao_verificavel)
         return SafetyCheck(Verdict.SEM_RESTRICAO)
@@ -134,14 +162,14 @@ def check_item(
         elif estado is Declaration.NAO_DECLARADO:
             nao_declarado.append(restriction.allergen)
 
-    if contem:
+    if contem or no_nome:
         verdict = Verdict.BLOQUEIO
     elif pode_conter or nao_declarado or nao_verificavel:
         verdict = Verdict.ATENCAO
     else:
         verdict = Verdict.LIBERADO
 
-    return SafetyCheck(verdict, contem, pode_conter, nao_declarado, nao_verificavel)
+    return SafetyCheck(verdict, contem, pode_conter, nao_declarado, nao_verificavel, no_nome)
 
 
 def coverage(declared: dict[str, Declaration | str]) -> float:

@@ -36,6 +36,9 @@ class Employee:
     # Termos que a pessoa escreveu e que nao existem como campo em ficha
     # tecnica. Guardados para virar aviso, nunca descartados em silencio.
     free_restrictions: list[str] = field(default_factory=list)
+    # Alimentos que a pessoa so prefere evitar. Bloqueiam quando aparecem no
+    # nome do prato, mas nao geram aviso no resto do cardapio.
+    avoid_foods: list[str] = field(default_factory=list)
 
     @property
     def registered(self) -> bool:
@@ -101,8 +104,14 @@ def save_employee(conn: sqlite3.Connection, employee: Employee) -> None:
     for termo in employee.free_restrictions:
         if termo.strip():
             conn.execute(
-                "INSERT INTO employee_free_restriction (telegram_id, term, created_at) VALUES (?, ?, ?)",
-                (employee.telegram_id, termo.strip(), timestamp),
+                "INSERT INTO employee_free_restriction (telegram_id, term, kind, created_at) VALUES (?, ?, ?, ?)",
+                (employee.telegram_id, termo.strip(), "alergia", timestamp),
+            )
+    for termo in employee.avoid_foods:
+        if termo.strip():
+            conn.execute(
+                "INSERT INTO employee_free_restriction (telegram_id, term, kind, created_at) VALUES (?, ?, ?, ?)",
+                (employee.telegram_id, termo.strip(), "evitar", timestamp),
             )
     for restriction in employee.restrictions:
         if restriction.allergen not in ALLERGENS:
@@ -128,13 +137,12 @@ def load_employee(conn: sqlite3.Connection, telegram_id: int) -> Employee | None
             (telegram_id,),
         ).fetchall()
     ]
-    livres = [
-        r["term"]
-        for r in conn.execute(
-            "SELECT term FROM employee_free_restriction WHERE telegram_id = ? ORDER BY term",
-            (telegram_id,),
-        ).fetchall()
-    ]
+    linhas_livres = conn.execute(
+        "SELECT term, kind FROM employee_free_restriction WHERE telegram_id = ? ORDER BY term",
+        (telegram_id,),
+    ).fetchall()
+    livres = [r["term"] for r in linhas_livres if r["kind"] != "evitar"]
+    evitar = [r["term"] for r in linhas_livres if r["kind"] == "evitar"]
     return Employee(
         telegram_id=row["telegram_id"],
         name=row["name"],
@@ -146,6 +154,7 @@ def load_employee(conn: sqlite3.Connection, telegram_id: int) -> Employee | None
         consented_at=row["consented_at"],
         restrictions=restricoes,
         free_restrictions=livres,
+        avoid_foods=evitar,
     )
 
 

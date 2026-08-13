@@ -138,6 +138,45 @@ def recognize(text: str) -> tuple[list[str], list[str]]:
     return reconhecidos, nao_reconhecidos
 
 
+# Prefixo minimo para casar variacao de palavra ("feijao" x "feijoada",
+# "carne" x "carnes"). Abaixo disso, so casa a palavra inteira.
+MIN_PREFIX = 4
+
+
+def mentions_term(dish_text: str, term: str) -> bool:
+    """O nome do prato menciona o alimento que a pessoa evita?
+
+    Serve para o que o cardapio diz em voz alta: "FEIJAO PRETO" tem feijao,
+    "SALADA DE CAMARAO" tem camarao. Nao serve para o que fica escondido no
+    preparo — por isso o resultado so e usado para **bloquear**, nunca para
+    liberar. Nao achar o nome nao prova que o prato nao leva.
+
+    Na duvida, casa: um bloqueio a mais a pessoa percebe e contorna; um
+    bloqueio a menos ela come.
+    """
+    alvo = normalize(dish_text)
+    procurado = normalize(term)
+    if not alvo or not procurado:
+        return False
+
+    palavras_alvo = alvo.split()
+    for palavra in procurado.split():
+        if len(palavra) < 3:
+            continue
+        if palavra in palavras_alvo:
+            return True
+        if len(palavra) >= MIN_PREFIX:
+            prefixo = palavra[:MIN_PREFIX]
+            if any(p.startswith(prefixo) for p in palavras_alvo):
+                return True
+    return False
+
+
+def terms_in_dish(dish_text: str, terms: list[str] | tuple[str, ...]) -> list[str]:
+    """Quais dos termos da pessoa aparecem no nome do prato."""
+    return [term for term in terms if mentions_term(dish_text, term)]
+
+
 def describe(reconhecidos: list[str], nao_reconhecidos: list[str]) -> str:
     """Devolve para a pessoa o que o app entendeu, para ela confirmar."""
     partes: list[str] = []

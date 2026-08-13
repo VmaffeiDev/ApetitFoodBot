@@ -85,9 +85,12 @@ CREATE TABLE IF NOT EXISTS employee_restriction (
 
 -- Alergia que a pessoa escreveu e o app nao sabe conferir ("legumes",
 -- "pimenta"). Fica registrada e vira aviso, em vez de sumir.
+-- kind separa o que e alergia (avisa sempre que houver duvida) do que a
+-- pessoa so prefere evitar (avisa so quando aparece no nome do prato).
 CREATE TABLE IF NOT EXISTS employee_free_restriction (
     telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
     term TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'alergia',
     created_at TEXT NOT NULL,
     PRIMARY KEY (telegram_id, term)
 );
@@ -341,6 +344,7 @@ def check_menu_for_employee(
     unit: str = "",
     meal: str = "",
     unverifiable: list[str] | tuple[str, ...] = (),
+    avoid_terms: list[str] | tuple[str, ...] = (),
 ) -> list[dict]:
     """Cardapio do dia ja conferido contra a ficha da pessoa.
 
@@ -350,7 +354,12 @@ def check_menu_for_employee(
     resultado = []
     for linha in menu_for_date(conn, service_date, unit=unit, meal=meal):
         declarado = item_allergens(conn, linha["item_code"])
-        verificacao = check_item(restrictions, declarado, unverifiable)
+        # A categoria entra junto: o cardapio publica "FEIJAO" como categoria e
+        # "FEIJAO PRETO" como prato, e as duas coisas dizem o mesmo.
+        texto_prato = f"{linha['name']} {linha['category']}"
+        verificacao = check_item(
+            restrictions, declarado, unverifiable, dish_text=texto_prato, avoid_terms=avoid_terms
+        )
         resultado.append(
             {
                 "category": linha["category"],

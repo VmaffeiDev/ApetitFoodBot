@@ -318,7 +318,27 @@ async def confirm_restrictions(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data[STEP] = "restricoes_confirma"
 
     linhas = [f"Voce escreveu: <i>{escape(texto)}</i>\n", escape(describe(reconhecidos, livres))]
-    if not reconhecidos and not livres:
+
+    if livres:
+        # Alergia e preferencia pedem rigor diferente. Tratar as duas igual
+        # enche o cardapio de aviso e a pessoa para de ler o que importa.
+        termos = ", ".join(livres)
+        linhas.append(
+            f"\n<b>Sobre {escape(termos)}:</b> preciso saber o quanto ser rigoroso."
+        )
+        await reply(
+            update,
+            "\n".join(linhas),
+            [
+                [("\U0001f6a8 E alergia — me avise sempre que houver duvida", "livre_alergia")],
+                [("\U0001f44c So prefiro evitar — avise se aparecer no prato", "livre_evitar")],
+                [("✏️ Escrever de novo", "restr_refazer")],
+            ],
+            edit=False,
+        )
+        return
+
+    if not reconhecidos:
         linhas.append("\nSe voce tem alguma alergia, tente escrever so o alimento, como <i>camarao</i>.")
     await reply(
         update,
@@ -372,6 +392,7 @@ async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE
         consent_accepted=True,
         restrictions=[Restriction(code, RestrictionKind.ALERGIA) for code in dados.get("restricoes", [])],
         free_restrictions=dados.get("restricoes_livres", []),
+        avoid_foods=dados.get("evitar", []),
     )
     conn = db()
     try:
@@ -384,8 +405,11 @@ async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     reconhecidos = dados.get("restricoes", [])
     livres = dados.get("restricoes_livres", [])
-    if reconhecidos or livres:
+    evitar = dados.get("evitar", [])
+    if reconhecidos or livres or evitar:
         aviso = "\U0001f6a8 " + describe(reconhecidos, livres)
+        if evitar:
+            aviso += f" Tambem aviso quando {', '.join(evitar)} aparecer no prato."
     else:
         aviso = "Voce nao informou restricoes. Da para incluir depois em Meu cadastro."
 
@@ -424,7 +448,8 @@ async def require_registration(update: Update, context: ContextTypes.DEFAULT_TYP
 
 def describe_restrictions(pessoa: Employee) -> str:
     partes = [ALLERGENS[r.allergen] for r in pessoa.restrictions]
-    partes += [f"{termo} (nao conferido pelo app)" for termo in pessoa.free_restrictions]
+    partes += [f"{termo} (alergia, sem conferencia automatica)" for termo in pessoa.free_restrictions]
+    partes += [f"{termo} (prefiro evitar)" for termo in pessoa.avoid_foods]
     return ", ".join(partes) or "nenhuma"
 
 
@@ -437,6 +462,7 @@ def load_menu(pessoa: Employee, dia: str) -> list[dict]:
             pessoa.restrictions,
             unit=pessoa.apetit_unit,
             unverifiable=pessoa.free_restrictions,
+            avoid_terms=pessoa.avoid_foods,
         )
     finally:
         conn.close()
@@ -1104,6 +1130,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         dados["restricoes"] = []
         dados["restricoes_livres"] = []
         await ask_consent(update, context, edit=True)
+        return
+    if data in ("livre_alergia", "livre_evitar"):
+        dados = draft(context)
+        termos = dados.get("restricoes_livres", [])
+        if data == "livre_evitar":
+            dados["evitar"] = termos
+            dados["restricoes_livres"] = []
+            aviso = (
+                "\U0001f44c Anotado. Vou avisar quando " + escape(", ".join(termos))
+                + " aparecer no nome do prato."
+            )
+        else:
+            dados["evitar"] = []
+            aviso = (
+                "\U0001f6a8 Anotado como alergia. Vou avisar sempre que nao conseguir "
+                "confirmar que o prato esta livre de " + escape(", ".join(termos)) + "."
+            )
+        await reply(update, aviso, [[("Continuar", "restr_ok")]], edit=True)
         return
     if data == "restr_lista":
         await ask_restrictions_list(update, context, edit=True)

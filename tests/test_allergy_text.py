@@ -1,7 +1,7 @@
 import unittest
 
 from apetit.allergens import Declaration, Restriction, Verdict, check_item
-from apetit.allergy_text import describe, recognize
+from apetit.allergy_text import describe, mentions_term, recognize, terms_in_dish
 
 
 class ReconhecimentoTest(unittest.TestCase):
@@ -63,6 +63,103 @@ class ReconhecimentoTest(unittest.TestCase):
 
         self.assertEqual(codigos, [])
         self.assertEqual(livres, ["morango"])
+
+
+class NomeDoPratoTest(unittest.TestCase):
+    """O cardapio diz em voz alta o que o prato e: da para usar isso."""
+
+    def test_dish_name_reveals_the_food(self):
+        self.assertTrue(mentions_term("FEIJAO PRETO", "feijao"))
+        self.assertTrue(mentions_term("SALADA DE CAMARAO", "camarao"))
+        self.assertTrue(mentions_term("FILE DE FRANGO GRELHADO", "frango"))
+
+    def test_word_variations_still_match(self):
+        # "feijao" tem que pegar "feijoada"; "carne" tem que pegar "carnes".
+        self.assertTrue(mentions_term("FEIJOADA COMPLETA", "feijao"))
+        self.assertTrue(mentions_term("CARNES ASSADAS", "carne"))
+
+    def test_accents_and_case_do_not_matter(self):
+        self.assertTrue(mentions_term("FEIJÃO PRETO", "feijão"))
+        self.assertTrue(mentions_term("feijao preto", "FEIJÃO"))
+
+    def test_unrelated_dish_does_not_match(self):
+        self.assertFalse(mentions_term("ARROZ PARBOILIZADO", "feijao"))
+        self.assertFalse(mentions_term("MIX DE ALFACE", "camarao"))
+
+    def test_finds_every_term_that_appears(self):
+        achados = terms_in_dish("FEIJOADA COM COUVE", ["feijao", "couve", "peixe"])
+
+        self.assertEqual(achados, ["feijao", "couve"])
+
+
+class BloqueioPeloNomeTest(unittest.TestCase):
+    """Nome do prato prova presenca, nunca ausencia."""
+
+    def test_name_in_the_dish_blocks(self):
+        check = check_item([], {}, unverifiable=["feijao"], dish_text="FEIJAO PRETO")
+
+        self.assertIs(check.verdict, Verdict.BLOQUEIO)
+        self.assertEqual(check.no_nome, ["feijao"])
+        self.assertIn("o proprio nome indica feijao", check.message())
+
+    def test_absence_of_the_name_never_releases(self):
+        # "Strogonoff de carne" nao tem "feijao" no nome, mas isso nao prova
+        # que nao leva. Fica em atencao, nunca liberado.
+        check = check_item([], {}, unverifiable=["feijao"], dish_text="STROGONOFF DE CARNE")
+
+        self.assertIs(check.verdict, Verdict.ATENCAO)
+        self.assertFalse(check.safe_to_affirm)
+
+    def test_name_blocks_even_with_the_technical_sheet_clean(self):
+        check = check_item(
+            [Restriction("leite")],
+            {"leite": Declaration.NAO_CONTEM},
+            unverifiable=["feijao"],
+            dish_text="FEIJAO CARIOCA",
+        )
+
+        self.assertIs(check.verdict, Verdict.BLOQUEIO)
+
+    def test_term_found_in_the_name_leaves_the_unverifiable_list(self):
+        # Deixa de ser incerteza: virou certeza de bloqueio.
+        check = check_item([], {}, unverifiable=["feijao", "pimenta"], dish_text="FEIJAO PRETO")
+
+        self.assertEqual(check.no_nome, ["feijao"])
+        self.assertEqual(check.nao_verificavel, ["pimenta"])
+
+
+class PreferenciaTest(unittest.TestCase):
+    """Alergia e preferencia pedem rigor diferente."""
+
+    def test_preference_blocks_when_the_name_shows_it(self):
+        check = check_item([], {}, avoid_terms=["feijao"], dish_text="FEIJAO PRETO")
+
+        self.assertIs(check.verdict, Verdict.BLOQUEIO)
+        self.assertEqual(check.no_nome, ["feijao"])
+
+    def test_preference_stays_quiet_on_every_other_dish(self):
+        # Quem so evita feijao nao precisa de aviso na alface. Tratar
+        # preferencia com rigor de alergia gera tanto alerta que a pessoa
+        # para de ler o que importa.
+        check = check_item([], {}, avoid_terms=["feijao"], dish_text="SAL. MIX DE ALFACE")
+
+        self.assertIs(check.verdict, Verdict.SEM_RESTRICAO)
+        self.assertTrue(check.safe_to_affirm)
+
+    def test_allergy_term_still_warns_everywhere(self):
+        check = check_item([], {}, unverifiable=["feijao"], dish_text="SAL. MIX DE ALFACE")
+
+        self.assertIs(check.verdict, Verdict.ATENCAO)
+
+    def test_preference_does_not_block_release_of_a_declared_dish(self):
+        check = check_item(
+            [Restriction("leite")],
+            {"leite": Declaration.NAO_CONTEM},
+            avoid_terms=["feijao"],
+            dish_text="SAL. MIX DE ALFACE",
+        )
+
+        self.assertIs(check.verdict, Verdict.LIBERADO)
 
 
 class DescricaoTest(unittest.TestCase):
