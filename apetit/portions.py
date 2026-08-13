@@ -49,6 +49,12 @@ PESO_PROTEINA = 15.0
 TOLERANCIA_ESTOURO = 1.10
 
 
+def measure_label(category: str, quantity: int) -> str:
+    """"2 conchas", "1 colher" — a medida sozinha, para reler o historico."""
+    singular, plural, _ = MEASURES.get(category, MEDIDA_PADRAO)
+    return f"{quantity} {singular if quantity == 1 else plural}"
+
+
 @dataclass
 class Portion:
     category: str
@@ -56,6 +62,7 @@ class Portion:
     quantity: int
     kcal: float
     ptn_g: float
+    code: str = ""
 
     @property
     def total_kcal(self) -> float:
@@ -92,6 +99,14 @@ class PlateSuggestion:
     def lines(self) -> list[str]:
         return [p.label() for p in self.portions]
 
+    def item_codes(self) -> list[str]:
+        """Os codigos repetidos pela quantidade, prontos para virar registro.
+
+        Duas conchas de feijao viram o codigo do feijao duas vezes: e assim que
+        `log_consumption` transforma repeticao em quantidade.
+        """
+        return [p.code for p in self.portions for _ in range(p.quantity) if p.code]
+
     def summary(self) -> str:
         if not self.portions:
             return "Nao consigo sugerir quantidades para o cardapio de hoje."
@@ -124,8 +139,9 @@ def suggest_plate(menu_items: list[dict], target_kcal: int, target_ptn: int) -> 
     """Monta a sugestao de quanto pegar de cada categoria.
 
     `menu_items` sao os itens publicados do dia, com category, name, kcal e
-    ptn_g. Itens sem macro ficam de fora e viram aviso: sugerir quantidade sem
-    saber o que tem dentro seria chute.
+    ptn_g — e `code` quando a sugestao precisar virar registro. Itens sem macro
+    ficam de fora e viram aviso: sugerir quantidade sem saber o que tem dentro
+    seria chute.
     """
     notes: list[str] = []
     por_categoria: dict[str, list[dict]] = {}
@@ -198,6 +214,7 @@ def suggest_plate(menu_items: list[dict], target_kcal: int, target_ptn: int) -> 
             quantity=quantidade,
             kcal=escolhidos[categoria]["kcal"],
             ptn_g=escolhidos[categoria]["ptn_g"],
+            code=escolhidos[categoria].get("code", ""),
         )
         for categoria, quantidade in quantidades.items()
     ]

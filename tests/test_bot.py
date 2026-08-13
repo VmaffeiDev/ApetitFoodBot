@@ -10,7 +10,7 @@ import bot
 from apetit.allergens import ALLERGENS
 from apetit.catalog import import_menu_csv, init_schema, set_item_allergens
 from apetit.profile import load_employee
-from apetit.tracking import consumption_history, favorites, total_points
+from apetit.tracking import consumption_history, favorites, history_by_day, total_points
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -19,9 +19,11 @@ class FakeMessage:
     def __init__(self, text=""):
         self.text = text
         self.replies = []
+        self.markups = []
 
     async def reply_text(self, text=None, parse_mode=None, reply_markup=None):
         self.replies.append(text or "")
+        self.markups.append(reply_markup)
 
 
 class FakeQuery:
@@ -35,6 +37,7 @@ class FakeQuery:
 
     async def edit_message_text(self, text=None, parse_mode=None, reply_markup=None):
         self._message.replies.append(text or "")
+        self._message.markups.append(reply_markup)
 
 
 class FakeUpdate:
@@ -48,6 +51,14 @@ class FakeUpdate:
     @property
     def last(self):
         return self.message.replies[-1] if self.message.replies else ""
+
+    @property
+    def buttons(self) -> list[tuple[str, str]]:
+        """Os botoes da ultima tela, como (rotulo, callback_data)."""
+        markup = self.message.markups[-1] if self.message.markups else None
+        if not markup:
+            return []
+        return [(botao.text, botao.callback_data) for linha in markup.inline_keyboard for botao in linha]
 
 
 class FakeContext:
@@ -288,7 +299,9 @@ class PratoTest(BotBase):
             conn.close()
         self.assertEqual({linha["name"] for linha in historico}, {"CARNE ASSADA AO MOLHO", "SAL. MIX DE ALFACE"})
         self.assertEqual(pontos, 15)  # registro + composicao
-        self.assertIn("Registrado", update.last)
+        self.assertIn("registrada", update.last)
+        # A confirmacao repete o prato guardado: a pessoa confere na hora.
+        self.assertIn("CARNE ASSADA AO MOLHO", update.last)
         self.assertEqual(self.context.user_data[bot.TRAY], [])
 
     async def test_tapping_the_same_item_twice_removes_it(self):
@@ -326,6 +339,104 @@ class PratoTest(BotBase):
         finally:
             conn.close()
         self.assertIn("prato esta vazio", update.last)
+
+
+class SalvarSugestaoTest(BotBase):
+    """Um toque em "Vou pegar isso" tem que virar historico."""
+
+    async def asyncSetUp(self):
+        self.context = FakeContext()
+        await self.registrar(self.context, restricoes=())
+        bot.today = lambda: "2025-09-01"
+
+    async def test_the_portion_screen_offers_to_save_what_it_suggested(self):
+        update = FakeUpdate(callback="quanto")
+        await bot.handle_callback(update, self.context)
+
+        self.assertIn("registrar_sugestao", [data for _, data in update.buttons])
+
+    async def test_saving_the_suggestion_records_the_quantities(self):
+        update = FakeUpdate(callback="registrar_sugestao")
+        await bot.handle_callback(update, self.context)
+
+        conn = bot.db()
+        try:
+            dias = history_by_day(conn, self.user)
+        finally:
+            conn.close()
+        self.assertEqual(len(dias), 1)
+        self.assertEqual(dias[0].service_date, "2025-09-01")
+        self.assertTrue(dias[0].items)
+        # A sugestao pede mais de uma colher de alguma coisa; isso tem que
+        # chegar no historico como quantidade, nao como item repetido.
+        self.assertTrue(any(linha["quantity"] > 1 for linha in dias[0].items))
+        self.assertIn("registrada", update.last)
+
+    async def test_the_confirmation_repeats_what_was_saved(self):
+        update = FakeUpdate(callback="registrar_sugestao")
+        await bot.handle_callback(update, self.context)
+
+        self.assertIn("kcal", update.last)
+        self.assertIn("proteina", update.last)
+
+    async def test_saving_the_suggestion_scores_the_day(self):
+        await bot.handle_callback(FakeUpdate(callback="registrar_sugestao"), self.context)
+
+        conn = bot.db()
+        try:
+            self.assertGreater(total_points(conn, self.user), 0)
+        finally:
+            conn.close()
+
+    async def test_registering_again_replaces_instead_of_stacking(self):
+        await bot.handle_callback(FakeUpdate(callback="registrar_sugestao"), self.context)
+        await bot.handle_callback(FakeUpdate(callback="registrar_sugestao"), self.context)
+
+        conn = bot.db()
+        try:
+            dias = history_by_day(conn, self.user)
+        finally:
+            conn.close()
+        self.assertEqual(len(dias), 1)
+
+
+class MeuDiaTest(BotBase):
+    async def asyncSetUp(self):
+        self.context = FakeContext()
+        await self.registrar(self.context, restricoes=())
+        bot.today = lambda: "2025-09-01"
+
+    async def test_without_a_record_it_says_how_to_start(self):
+        update = FakeUpdate(callback="meu_dia")
+        await bot.handle_callback(update, self.context)
+
+        self.assertIn("ainda nao registrou", update.last)
+        self.assertIn("Vou pegar isso", update.last)
+
+    async def test_shows_the_plate_with_household_measures_and_the_day_total(self):
+        await bot.handle_callback(FakeUpdate(callback="registrar_sugestao"), self.context)
+
+        update = FakeUpdate(callback="meu_dia")
+        await bot.handle_callback(update, self.context)
+
+        self.assertIn("kcal", update.last)
+        # Quantidade em medida de fila, a mesma linguagem da sugestao.
+        self.assertTrue(
+            any(medida in update.last for medida in ("colher", "concha", "porcao", "pegador")),
+            update.last,
+        )
+
+    async def test_previous_days_appear_with_their_own_totals(self):
+        bot.today = lambda: "2025-09-01"
+        await bot.handle_callback(FakeUpdate(callback="registrar_sugestao"), self.context)
+        bot.today = lambda: "2025-09-02"
+        await bot.handle_callback(FakeUpdate(callback="registrar_sugestao"), self.context)
+
+        update = FakeUpdate(callback="meu_dia")
+        await bot.handle_callback(update, self.context)
+
+        self.assertIn("Seu historico", update.last)
+        self.assertIn("g ptn", update.last)
 
 
 class LgpdTest(BotBase):

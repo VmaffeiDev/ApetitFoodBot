@@ -28,6 +28,7 @@ from apetit.tracking import (
     consumption_totals,
     favorites,
     favorites_returning,
+    history_by_day,
     log_consumption,
     points_breakdown,
     score_day,
@@ -243,6 +244,119 @@ class HistoricoEFavoritoTest(BancoBase):
         voltando = favorites_returning(self.conn, "2025-09-01", "2025-09-02", apetit_unit="SM")
 
         self.assertEqual([linha["item_name"] for linha in voltando], [])
+
+    def test_repeating_the_code_becomes_quantity(self):
+        # Duas conchas de feijao chegam como o mesmo codigo duas vezes.
+        log_consumption(self.conn, self.user, "2025-09-01", ["arroz_parboilizado", "arroz_parboilizado"])
+
+        historico = consumption_history(self.conn, self.user)
+        self.assertEqual(len(historico), 1)
+        self.assertEqual(historico[0]["quantity"], 2)
+
+    def test_quantity_multiplies_the_macros_of_the_day(self):
+        log_consumption(self.conn, self.user, "2025-09-01", ["arroz_parboilizado", "arroz_parboilizado"])
+
+        totais = consumption_totals(self.conn, self.user, "2025-09-01")
+        self.assertEqual(totais["itens"], 2)
+        self.assertAlmostEqual(totais["kcal"], 138 * 2, places=0)
+
+    def test_history_records_the_category_it_was_served_in(self):
+        log_consumption(self.conn, self.user, "2025-09-01", ["sal_mix_de_alface"])
+
+        historico = consumption_history(self.conn, self.user)
+        self.assertEqual(historico[0]["category"], "SALADA")
+
+
+class HistoricoEFotografiaTest(BancoBase):
+    """Historico e fotografia: corrigir a ficha tecnica nao reescreve o passado."""
+
+    def test_correcting_the_recipe_does_not_change_what_was_already_eaten(self):
+        log_consumption(self.conn, self.user, "2025-09-01", ["arroz_parboilizado"])
+        antes = consumption_totals(self.conn, self.user, "2025-09-01")["kcal"]
+
+        # A operacao corrige a ficha tecnica meses depois.
+        self.conn.execute("UPDATE menu_item SET kcal = 999, name = 'ARROZ CORRIGIDO' WHERE code = ?",
+                          ("arroz_parboilizado",))
+        self.conn.commit()
+
+        depois = consumption_totals(self.conn, self.user, "2025-09-01")
+        historico = consumption_history(self.conn, self.user)
+
+        self.assertAlmostEqual(depois["kcal"], antes, places=0)
+        self.assertEqual(historico[0]["name"], "ARROZ PARBOILIZADO")
+
+    def test_a_new_meal_uses_the_corrected_recipe(self):
+        # A fotografia congela o passado, nao o futuro.
+        self.conn.execute("UPDATE menu_item SET kcal = 200 WHERE code = ?", ("arroz_parboilizado",))
+        self.conn.commit()
+
+        log_consumption(self.conn, self.user, "2025-09-02", ["arroz_parboilizado"])
+
+        self.assertAlmostEqual(
+            consumption_totals(self.conn, self.user, "2025-09-02")["kcal"], 200, places=0
+        )
+
+    def test_item_missing_from_the_base_keeps_the_record_without_inventing_macros(self):
+        log_consumption(self.conn, self.user, "2025-09-01", ["prato_que_sumiu"])
+
+        historico = consumption_history(self.conn, self.user)
+        self.assertEqual(historico[0]["name"], "prato_que_sumiu")
+        self.assertIsNone(historico[0]["kcal"])
+        self.assertEqual(consumption_totals(self.conn, self.user, "2025-09-01")["sem_macro"], 1)
+
+    def test_history_by_day_groups_the_plate_with_its_totals(self):
+        log_consumption(self.conn, self.user, "2025-09-01", ["carne_assada_ao_molho", "arroz_parboilizado"])
+        log_consumption(self.conn, self.user, "2025-09-02", ["file_de_frango_grelhado"])
+
+        dias = history_by_day(self.conn, self.user)
+
+        self.assertEqual([d.service_date for d in dias], ["2025-09-02", "2025-09-01"])
+        self.assertEqual(len(dias[1].items), 2)
+        self.assertAlmostEqual(dias[1].kcal, 134 + 138, places=0)
+        self.assertFalse(dias[1].incomplete)
+
+    def test_a_day_with_an_unknown_item_is_flagged_as_incomplete(self):
+        log_consumption(self.conn, self.user, "2025-09-01", ["carne_assada_ao_molho", "prato_que_sumiu"])
+
+        dias = history_by_day(self.conn, self.user)
+
+        self.assertTrue(dias[0].incomplete)
+
+    def test_old_database_gets_the_snapshot_backfilled(self):
+        # Banco gravado antes da fotografia existir: a migracao nao pode perder
+        # o historico de ninguem.
+        antigo = tempfile.NamedTemporaryFile(delete=False)
+        antigo.close()
+        self.addCleanup(Path(antigo.name).unlink, missing_ok=True)
+        conn = sqlite3.connect(antigo.name)
+        conn.row_factory = sqlite3.Row
+        conn.executescript(
+            """
+            CREATE TABLE menu_item (code TEXT PRIMARY KEY, name TEXT NOT NULL, portion_g REAL,
+                kcal REAL, cho_g REAL, lip_g REAL, ptn_g REAL, updated_at TEXT NOT NULL);
+            CREATE TABLE menu_entry (id INTEGER PRIMARY KEY AUTOINCREMENT, unit TEXT NOT NULL,
+                service_date TEXT NOT NULL, meal TEXT NOT NULL, category TEXT NOT NULL,
+                slot INTEGER NOT NULL DEFAULT 1, item_code TEXT NOT NULL, created_at TEXT NOT NULL);
+            CREATE TABLE consumption (id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id INTEGER NOT NULL,
+                service_date TEXT NOT NULL, meal TEXT NOT NULL DEFAULT 'almoco',
+                item_code TEXT NOT NULL, logged_at TEXT NOT NULL);
+            INSERT INTO menu_item VALUES ('feijao_preto', 'FEIJAO PRETO', 80, 29, 4, 0.2, 1.8, '2025-09-01');
+            INSERT INTO menu_entry (unit, service_date, meal, category, item_code, created_at)
+                VALUES ('SM', '2025-09-01', 'almoco', 'FEIJAO', 'feijao_preto', '2025-09-01');
+            INSERT INTO consumption (telegram_id, service_date, item_code, logged_at)
+                VALUES (7, '2025-09-01', 'feijao_preto', '2025-09-01T12:00:00+00:00');
+            """
+        )
+        conn.commit()
+
+        init_schema(conn)
+
+        historico = consumption_history(conn, 7)
+        self.assertEqual(historico[0]["name"], "FEIJAO PRETO")
+        self.assertEqual(historico[0]["category"], "FEIJAO")
+        self.assertEqual(historico[0]["quantity"], 1)
+        self.assertAlmostEqual(historico[0]["kcal"], 29, places=0)
+        conn.close()
 
 
 class PontuacaoTest(BancoBase):

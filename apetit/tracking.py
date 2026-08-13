@@ -48,42 +48,85 @@ RULES_BY_CODE = {rule.code: rule for rule in RULES}
 CATEGORIAS_FRESCAS = {"SALADA", "FRUTA"}
 
 
+def _snapshot(conn: sqlite3.Connection, service_date: str, code: str) -> dict:
+    """Congela como o prato estava no momento do registro.
+
+    Nome, categoria e macros saem daqui e vao gravados junto do consumo. Sem
+    isso, corrigir uma ficha tecnica em novembro mudaria retroativamente o que
+    a pessoa comeu em setembro — e historico que muda sozinho nao e historico.
+    """
+    linha = conn.execute(
+        """
+        SELECT i.name, i.kcal, i.cho_g, i.lip_g, i.ptn_g,
+               (SELECT e.category FROM menu_entry e
+                 WHERE e.item_code = i.code AND e.service_date = ?
+                 LIMIT 1) AS category
+        FROM menu_item i
+        WHERE i.code = ?
+        """,
+        (service_date, code),
+    ).fetchone()
+    if not linha:
+        # Item que sumiu da base: guarda o codigo para a pessoa nao perder o
+        # registro, e deixa os macros nulos em vez de inventar zero.
+        return {"name": code, "category": "", "kcal": None, "cho_g": None, "lip_g": None, "ptn_g": None}
+    return dict(linha)
+
+
 def log_consumption(
     conn: sqlite3.Connection,
     telegram_id: int,
     service_date: str,
     item_codes: list[str],
     meal: str = "almoco",
+    source: str = "montado",
 ) -> None:
-    """Registra o prato montado. Regravar o mesmo dia substitui o registro."""
+    """Registra a refeicao do dia. Regravar o mesmo dia substitui o registro.
+
+    Codigo repetido em `item_codes` vira quantidade: ["arroz", "arroz"] e
+    "duas colheres de arroz", que e como a sugestao de porcao fala.
+    """
     conn.execute(
         "DELETE FROM consumption WHERE telegram_id = ? AND service_date = ? AND meal = ?",
         (telegram_id, service_date, meal),
     )
-    timestamp = now_iso()
+    quantidades: dict[str, int] = {}
     for code in item_codes:
+        quantidades[code] = quantidades.get(code, 0) + 1
+
+    timestamp = now_iso()
+    for code, quantidade in quantidades.items():
+        foto = _snapshot(conn, service_date, code)
         conn.execute(
             """
-            INSERT INTO consumption (telegram_id, service_date, meal, item_code, logged_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO consumption (
+                telegram_id, service_date, meal, item_code, item_name, category,
+                quantity, kcal, cho_g, lip_g, ptn_g, source, logged_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (telegram_id, service_date, meal, code, timestamp),
+            (
+                telegram_id, service_date, meal, code, foto["name"], foto["category"] or "",
+                quantidade, foto["kcal"], foto["cho_g"], foto["lip_g"], foto["ptn_g"],
+                source, timestamp,
+            ),
         )
     conn.commit()
 
 
 def consumption_totals(conn: sqlite3.Connection, telegram_id: int, service_date: str) -> dict:
+    """Totais do dia, lidos da fotografia — nao da ficha tecnica de hoje."""
     row = conn.execute(
         """
         SELECT
-            COUNT(*) AS itens,
-            COALESCE(SUM(i.kcal), 0) AS kcal,
-            COALESCE(SUM(i.cho_g), 0) AS cho_g,
-            COALESCE(SUM(i.lip_g), 0) AS lip_g,
-            COALESCE(SUM(i.ptn_g), 0) AS ptn_g
-        FROM consumption c
-        JOIN menu_item i ON i.code = c.item_code
-        WHERE c.telegram_id = ? AND c.service_date = ?
+            COALESCE(SUM(quantity), 0) AS itens,
+            COALESCE(SUM(kcal * quantity), 0) AS kcal,
+            COALESCE(SUM(cho_g * quantity), 0) AS cho_g,
+            COALESCE(SUM(lip_g * quantity), 0) AS lip_g,
+            COALESCE(SUM(ptn_g * quantity), 0) AS ptn_g,
+            SUM(CASE WHEN kcal IS NULL THEN 1 ELSE 0 END) AS sem_macro
+        FROM consumption
+        WHERE telegram_id = ? AND service_date = ?
         """,
         (telegram_id, service_date),
     ).fetchone()
@@ -94,15 +137,69 @@ def consumption_history(conn: sqlite3.Connection, telegram_id: int, limit: int =
     """Tudo o que a pessoa ja registrou, do mais recente para o mais antigo."""
     return conn.execute(
         """
-        SELECT c.service_date, c.meal, i.name, i.kcal, i.ptn_g
-        FROM consumption c
-        JOIN menu_item i ON i.code = c.item_code
-        WHERE c.telegram_id = ?
-        ORDER BY c.service_date DESC, i.name
+        SELECT service_date, meal, item_code, item_name AS name, category,
+               quantity, kcal, ptn_g, source, logged_at
+        FROM consumption
+        WHERE telegram_id = ?
+        ORDER BY service_date DESC, item_name
         LIMIT ?
         """,
         (telegram_id, limit),
     ).fetchall()
+
+
+@dataclass
+class DayRecord:
+    """Um dia do historico, do jeito que a pessoa quer reler: o prato inteiro."""
+
+    service_date: str
+    items: list[sqlite3.Row]
+
+    @property
+    def kcal(self) -> float:
+        return sum((linha["kcal"] or 0) * linha["quantity"] for linha in self.items)
+
+    @property
+    def ptn_g(self) -> float:
+        return sum((linha["ptn_g"] or 0) * linha["quantity"] for linha in self.items)
+
+    @property
+    def incomplete(self) -> bool:
+        """Algum item registrado nao tinha macro. O total do dia e parcial."""
+        return any(linha["kcal"] is None for linha in self.items)
+
+
+def history_by_day(conn: sqlite3.Connection, telegram_id: int, days: int = 14) -> list[DayRecord]:
+    """Historico agrupado por dia, do mais recente para o mais antigo."""
+    datas = [
+        linha["service_date"]
+        for linha in conn.execute(
+            """
+            SELECT DISTINCT service_date FROM consumption
+            WHERE telegram_id = ?
+            ORDER BY service_date DESC
+            LIMIT ?
+            """,
+            (telegram_id, days),
+        ).fetchall()
+    ]
+    if not datas:
+        return []
+    marcadores = ",".join("?" for _ in datas)
+    linhas = conn.execute(
+        f"""
+        SELECT service_date, meal, item_code, item_name AS name, category,
+               quantity, kcal, ptn_g, source
+        FROM consumption
+        WHERE telegram_id = ? AND service_date IN ({marcadores})
+        ORDER BY service_date DESC, item_name
+        """,
+        [telegram_id, *datas],
+    ).fetchall()
+    agrupado: dict[str, list[sqlite3.Row]] = {data: [] for data in datas}
+    for linha in linhas:
+        agrupado[linha["service_date"]].append(linha)
+    return [DayRecord(data, agrupado[data]) for data in datas]
 
 
 def add_favorite(conn: sqlite3.Connection, telegram_id: int, item_code: str) -> None:
@@ -188,11 +285,9 @@ def score_day(
     """Avalia as regras do dia. Reexecutar nao duplica pontos."""
     itens = conn.execute(
         """
-        SELECT e.category, i.ptn_g
-        FROM consumption c
-        JOIN menu_item i ON i.code = c.item_code
-        LEFT JOIN menu_entry e ON e.item_code = c.item_code AND e.service_date = c.service_date
-        WHERE c.telegram_id = ? AND c.service_date = ?
+        SELECT category, quantity, ptn_g
+        FROM consumption
+        WHERE telegram_id = ? AND service_date = ?
         """,
         (telegram_id, service_date),
     ).fetchall()
@@ -210,7 +305,7 @@ def score_day(
             concedidas.append(RULES_BY_CODE["composicao"])
 
     if protein_target_g:
-        total_ptn = sum(linha["ptn_g"] or 0 for linha in itens)
+        total_ptn = sum((linha["ptn_g"] or 0) * linha["quantity"] for linha in itens)
         if total_ptn >= protein_target_g:
             detalhe = f"{total_ptn:.1f} g de {protein_target_g:.0f} g"
             if _award(conn, telegram_id, RULES_BY_CODE["proteina"], service_date, detalhe):

@@ -113,6 +113,57 @@ Salada entra como "a vontade": quase nao move o total e faz bem.
 E sugestao, nao prescricao. Quem define quantidade individual e o nutricionista
 responsavel.
 
+## Historico do funcionario
+
+Da tela de sugestao sai um botao so: **Vou pegar isso**. Um toque grava a refeicao
+do dia com as quantidades sugeridas. Quem prefere ajustar usa **Montar meu prato**
+e marca item por item. Nos dois casos, registrar de novo no mesmo dia substitui o
+registro anterior — nao empilha.
+
+O `/meu_dia` devolve o prato do jeito que foi pego, com o total do dia e os dias
+anteriores:
+
+```
+Meu dia
+
+Prato equilibrado para o seu objetivo.
+Tem salada no prato.
+
+• Carne assada ao molho — 2 porcoes
+• Arroz parboilizado — 2 colheres
+• Feijao preto — 1 concha
+• Mix de alface — 1 pegador
+
+703 kcal · 33 g de proteina
+
+Seu historico
+sexta-feira, 29 de agosto — 612 kcal · 28 g ptn
+• ...
+```
+
+### O historico e fotografia, nao ponteiro
+
+A tabela `consumption` guarda **nome, categoria, quantidade e macros congelados no
+momento do registro**, e nao uma referencia viva para a ficha tecnica.
+
+O motivo e concreto: a operacao reimporta cardapio e corrige ficha tecnica o tempo
+todo. Se o historico apontasse para `menu_item`, corrigir o macro de um prato em
+novembro mudaria retroativamente o que a pessoa comeu em setembro. Histórico que
+muda sozinho nao serve para acompanhar nada.
+
+Consequencias praticas:
+
+- corrigir a ficha tecnica afeta o **proximo** registro, nunca os anteriores
+- item que sai do cardapio nao apaga o registro de quem comeu; o que fica nulo e o
+  macro, e o total do dia se declara incompleto em vez de fingir zero
+- quantidade e coluna: "2 conchas" e uma linha com `quantity = 2`, entao o total do
+  dia multiplica em vez de contar item repetido
+
+Bancos criados antes dessa mudanca sao migrados no `init_schema`: as colunas novas
+sao criadas e preenchidas com o que a ficha tecnica diz no momento da migracao — a
+melhor aproximacao disponivel para um registro feito antes de existir fotografia.
+A partir dali o valor para de mudar sozinho.
+
 ## Importacao do cardapio
 
 O cardapio chega em CSV. O importador aceita os dois layouts observados — largo
@@ -335,7 +386,9 @@ apetit/
   catalog.py     persistencia, publicacao e conferencia
   allergens.py   alergenicos e verificacao em tres estados
   profile.py     cadastro e agregacao com n minimo
-  tracking.py    consumo, favoritos e pontos
+  portions.py    quanto pegar, em concha e colher
+  humanize.py    o texto que o funcionario le
+  tracking.py    historico congelado, favoritos e pontos
 bot.py           camada do Telegram
 ```
 
@@ -366,10 +419,12 @@ flowchart TD
     L -->|"sem declaracao"| N["Atencao: confirmar no balcao"]
     L -->|"declarado sem"| O["Liberado"]
 
-    N --> P["Monta o prato"]
+    N --> P["Quanto pegar / monta o prato"]
     O --> P
-    P --> Q["Registra o almoco"]
-    Q --> R["Macros do dia + pontos"]
+    P --> Q["Registra a refeicao do dia"]
+    Q --> R["Fotografia: nome, quantidade e macros congelados"]
+    R --> U["Meu dia: prato, total e dias anteriores"]
+    R --> V["Pontos por constancia e composicao"]
     P --> S["Guarda favorito"]
     S --> T["Aviso quando o prato voltar"]
 ```

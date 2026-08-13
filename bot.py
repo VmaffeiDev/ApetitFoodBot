@@ -36,7 +36,7 @@ from telegram.ext import (
 from apetit.allergens import ALLERGENS, Restriction, RestrictionKind, Verdict
 from apetit.allergen_sheet import coverage_summary
 from apetit.allergy_text import describe, recognize
-from apetit.portions import suggest_plate
+from apetit.portions import measure_label, suggest_plate
 from apetit.catalog import (
     allergen_coverage,
     check_menu_for_employee,
@@ -51,6 +51,7 @@ from apetit.catalog import (
 from apetit.humanize import (
     FRESH_CATEGORIES,
     category_label,
+    clean_dish_name,
     dish_hint,
     friendly_date,
     order_categories,
@@ -73,6 +74,7 @@ from apetit.tracking import (
     consumption_totals,
     favorites,
     favorites_returning,
+    history_by_day,
     log_consumption,
     points_breakdown,
     remove_favorite,
@@ -535,26 +537,43 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bo
     )
 
 
+def build_suggestion(pessoa: Employee, dia: str):
+    """A sugestao de porcoes do dia, ou None quando nao ha cardapio para ela.
+
+    Fica fora do handler porque a tela mostra a sugestao e o botao de salvar
+    precisa recalcular a mesma coisa. Recalcular e de proposito: guardar a
+    sugestao na sessao deixaria um botao de ontem gravando o prato de ontem.
+    """
+    alvo = target_for(pessoa)
+    # So entra na sugestao o que a pessoa pode comer: sugerir quantidade de um
+    # prato bloqueado seria pior que nao sugerir nada.
+    liberados = [
+        {
+            "code": i["item_code"],
+            "category": i["category"],
+            "name": i["name"],
+            "kcal": i["kcal"],
+            "ptn_g": i["ptn_g"],
+        }
+        for i in load_menu(pessoa, dia)
+        if i["check"].verdict is not Verdict.BLOQUEIO
+    ]
+    if not liberados:
+        return None
+    return suggest_plate(liberados, alvo["kcal"], alvo["ptn"])
+
+
 async def show_portions(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     """Quanto pegar de cada coisa, em concha e colher."""
     pessoa = await require_registration(update, context, edit=edit)
     if not pessoa:
         return
     dia = today()
-    alvo = target_for(pessoa)
 
-    # So entra na sugestao o que a pessoa pode comer: sugerir quantidade de um
-    # prato bloqueado seria pior que nao sugerir nada.
-    liberados = [
-        {"category": i["category"], "name": i["name"], "kcal": i["kcal"], "ptn_g": i["ptn_g"]}
-        for i in load_menu(pessoa, dia)
-        if i["check"].verdict is not Verdict.BLOQUEIO
-    ]
-    if not liberados:
+    sugestao = build_suggestion(pessoa, dia)
+    if sugestao is None:
         await show_menu(update, context, edit=edit)
         return
-
-    sugestao = suggest_plate(liberados, alvo["kcal"], alvo["ptn"])
     if not sugestao.portions:
         await reply(
             update,
@@ -581,7 +600,8 @@ async def show_portions(update: Update, context: ContextTypes.DEFAULT_TYPE, edit
         update,
         "\n".join(linhas),
         [
-            [("\U0001f37d️ Montar meu prato", "montar")],
+            [("✅ Vou pegar isso — registrar", "registrar_sugestao")],
+            [("\U0001f37d️ Montar do meu jeito", "montar")],
             [("\U0001f4c5 Ver cardapio", "cardapio"), ("\U0001f519 Voltar", "menu")],
         ],
         edit=edit,
@@ -719,22 +739,27 @@ async def show_plate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE,
     await reply(update, "\n".join(linhas), botoes, edit=edit)
 
 
-async def register_meal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    pessoa = await require_registration(update, context, edit=True)
-    if not pessoa:
-        return
-    codigos = tray(context)
-    if not codigos:
-        await show_plate_summary(update, context, edit=True)
-        return
+async def save_meal(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    pessoa: Employee,
+    codigos: list[str],
+    resumo: list[str],
+    source: str,
+) -> None:
+    """Grava a refeicao do dia e confirma o que ficou registrado.
 
+    `resumo` e o prato em texto: a confirmacao repete o que foi guardado, para
+    a pessoa conferir na hora em vez de descobrir depois que salvou errado.
+    """
     dia = today()
     alvo = target_for(pessoa)
     conn = db()
     try:
-        log_consumption(conn, pessoa.telegram_id, dia, codigos)
+        log_consumption(conn, pessoa.telegram_id, dia, codigos, source=source)
         ganhas = score_day(conn, pessoa.telegram_id, dia, protein_target_g=alvo["ptn"])
         ganhas += score_week(conn, pessoa.telegram_id, week_start(dia))
+        totais = consumption_totals(conn, pessoa.telegram_id, dia)
         dias = {linha["service_date"] for linha in consumption_history(conn, pessoa.telegram_id, 60)}
     finally:
         conn.close()
@@ -745,49 +770,126 @@ async def register_meal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     inicio = week_start(dia)
     dias_semana = sum(1 for d in dias if inicio <= d <= dia)
 
-    linhas = ["✅ <b>Registrado!</b>\n", escape(week_summary(dias_semana))]
+    linhas = [f"✅ <b>Refeicao de {escape(friendly_date(dia))} registrada</b>\n"]
+    linhas.extend(f"• {escape(item)}" for item in resumo)
+    linhas.append(
+        f"\n<i>{totais['kcal']:.0f} kcal · {totais['ptn_g']:.0f} g de proteina</i>"
+    )
+    if totais.get("sem_macro"):
+        linhas.append(
+            f"⚠️ {totais['sem_macro']} item(ns) sem informacao nutricional — o total esta incompleto."
+        )
+    linhas.append(f"\n{escape(week_summary(dias_semana))}")
     if ganhas:
         linhas.append("\n\U0001f331 <b>Voce conquistou hoje:</b>")
         linhas.extend(f"• {escape(regra.label)}" for regra in ganhas)
-    await reply(update, "\n".join(linhas), main_menu(), edit=True)
+    linhas.append("\nIsso fica no seu <b>Meu dia</b>. Registrar de novo hoje substitui este.")
+
+    await reply(
+        update,
+        "\n".join(linhas),
+        [[("\U0001f4ca Ver meu historico", "meu_dia")], [("\U0001f519 Voltar", "menu")]],
+        edit=True,
+    )
+
+
+async def register_meal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    pessoa = await require_registration(update, context, edit=True)
+    if not pessoa:
+        return
+    codigos = tray(context)
+    if not codigos:
+        await show_plate_summary(update, context, edit=True)
+        return
+    _, nomes, _ = plate_totals(pessoa, codigos)
+    await save_meal(update, context, pessoa, codigos, nomes, source="montado")
+
+
+async def register_suggestion(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Salva a sugestao de porcoes como a refeicao do dia, num toque so.
+
+    A sugestao e recalculada aqui em vez de vir da sessao: o botao continua
+    clicavel amanha, e amanha o cardapio e outro.
+    """
+    pessoa = await require_registration(update, context, edit=True)
+    if not pessoa:
+        return
+    sugestao = build_suggestion(pessoa, today())
+    if sugestao is None or not sugestao.portions:
+        await show_portions(update, context, edit=True)
+        return
+    await save_meal(
+        update, context, pessoa, sugestao.item_codes(), sugestao.lines(), source="sugestao"
+    )
 
 
 # --------------------------------------------------------------------------
 # Consultas do funcionario
 # --------------------------------------------------------------------------
 
+def history_line(linha) -> str:
+    """Uma linha do historico: o prato e quanto foi pego, em medida de fila.
+
+    "Feijao preto — 2 conchas" diz mais para quem comeu do que "Feijao preto",
+    e e a mesma linguagem da sugestao de porcao.
+    """
+    nome = clean_dish_name(linha["name"])
+    categoria = (linha["category"] or "").upper()
+    if not categoria:
+        return nome
+    return f"{nome} — {measure_label(categoria, linha['quantity'])}"
+
+
 async def show_day(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     pessoa = await require_registration(update, context, edit=edit)
     if not pessoa:
         return
+    dia = today()
     conn = db()
     try:
-        totais = consumption_totals(conn, pessoa.telegram_id, today())
-        historico = consumption_history(conn, pessoa.telegram_id, 20)
+        dias = history_by_day(conn, pessoa.telegram_id, days=14)
     finally:
         conn.close()
 
     alvo = target_for(pessoa)
-    linhas = ["\U0001f4ca <b>Meu dia</b>\n"]
-    if totais.get("itens"):
-        leitura = plate_reading(totais["kcal"], totais["ptn_g"], alvo["kcal"], alvo["ptn"], True)
-        linhas.append(escape(leitura[0]))
-        linhas.append(escape(leitura[1]))
-        linhas.append(f"\n<i>{totais['kcal']:.0f} kcal · {totais['ptn_g']:.0f} g de proteina</i>")
-    else:
-        linhas.append("Voce ainda nao registrou o almoco de hoje.")
+    hoje = next((d for d in dias if d.service_date == dia), None)
 
-    if historico:
-        linhas.append("\n<b>Antes disso:</b>")
-        dia_atual = ""
-        for linha in historico:
-            if linha["service_date"] == today():
-                continue
-            if linha["service_date"] != dia_atual:
-                dia_atual = linha["service_date"]
-                linhas.append(f"\n<i>{escape(friendly_date(dia_atual))}</i>")
-            linhas.append(f"• {escape(linha['name'])}")
-    await reply(update, "\n".join(linhas), main_menu(), edit=edit)
+    linhas = ["\U0001f4ca <b>Meu dia</b>\n"]
+    if hoje:
+        categorias = {(linha["category"] or "").upper() for linha in hoje.items}
+        leitura = plate_reading(
+            hoje.kcal, hoje.ptn_g, alvo["kcal"], alvo["ptn"], bool(categorias & FRESH_CATEGORIES)
+        )
+        linhas.extend(escape(frase) for frase in leitura)
+        linhas.append("")
+        linhas.extend(f"• {escape(history_line(linha))}" for linha in hoje.items)
+        linhas.append(f"\n<i>{hoje.kcal:.0f} kcal · {hoje.ptn_g:.0f} g de proteina</i>")
+        if hoje.incomplete:
+            linhas.append("⚠️ Algum item estava sem informacao nutricional — o total esta incompleto.")
+    else:
+        linhas.append(
+            "Voce ainda nao registrou o almoco de hoje.\n\n"
+            "Toque em <b>Quanto pegar hoje</b> e depois em <b>Vou pegar isso</b> — "
+            "assim fica guardado no seu historico."
+        )
+
+    anteriores = [d for d in dias if d.service_date != dia]
+    if anteriores:
+        linhas.append("\n\U0001f4c6 <b>Seu historico</b>")
+        for registro in anteriores[:7]:
+            linhas.append(
+                f"\n<i>{escape(friendly_date(registro.service_date))}</i> — "
+                f"{registro.kcal:.0f} kcal · {registro.ptn_g:.0f} g ptn"
+            )
+            linhas.extend(f"• {escape(history_line(linha))}" for linha in registro.items)
+        if len(anteriores) > 7:
+            linhas.append(f"\n<i>… e mais {len(anteriores) - 7} dia(s) registrados.</i>")
+
+    botoes = [
+        [("\U0001f37d️ Quanto pegar hoje", "quanto")] if not hoje else [("✏️ Corrigir o de hoje", "montar")],
+        [("\U0001f519 Voltar", "menu")],
+    ]
+    await reply(update, "\n".join(linhas), botoes, edit=edit)
 
 
 async def show_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
@@ -887,11 +989,13 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bo
         update,
         "❓ <b>Como usar</b>\n\n"
         "<b>Quanto pegar hoje</b> — eu digo quantas conchas e colheres pegar de cada coisa "
-        "para chegar no seu objetivo, com o cardapio de hoje.\n\n"
+        "para chegar no seu objetivo, com o cardapio de hoje. Se voce pegar o que eu sugeri, "
+        "toque em <b>Vou pegar isso</b> e ja fica guardado.\n\n"
         "<b>Montar meu prato</b> — eu te levo pela fila, uma categoria por vez. "
         "Voce toca no que pegou e eu mostro como ficou o prato.\n\n"
         "<b>Cardapio de hoje</b> — o que tem hoje, com aviso do que voce nao pode comer.\n\n"
-        "<b>Meu dia</b> — o que voce ja registrou hoje e nos dias anteriores.\n\n"
+        "<b>Meu dia</b> — o que voce registrou hoje e nos dias anteriores, com quanto pegou "
+        "de cada coisa. Registrar de novo no mesmo dia substitui o registro anterior.\n\n"
         "<b>Favoritos</b> — pratos que voce gostou. Aviso quando voltarem.\n\n"
         "<b>Meu progresso</b> — sua sequencia e suas conquistas. So suas.\n\n"
         "<b>Sobre os simbolos</b>\n"
@@ -1279,6 +1383,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
     if data == "registrar":
         await register_meal(update, context)
+        return
+    if data == "registrar_sugestao":
+        await register_suggestion(update, context)
         return
     if data == "fav_lista":
         await show_favorite_picker(update, context)

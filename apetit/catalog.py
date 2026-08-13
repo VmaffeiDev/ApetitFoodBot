@@ -95,12 +95,26 @@ CREATE TABLE IF NOT EXISTS employee_free_restriction (
     PRIMARY KEY (telegram_id, term)
 );
 
+-- Historico do funcionario. Guarda **fotografia**, nao ponteiro: nome,
+-- categoria, quantidade e macros ficam congelados no momento do registro.
+-- Se a operacao reimportar o cardapio e corrigir a ficha tecnica de um prato,
+-- o que a pessoa comeu em setembro continua sendo o que ela comeu em setembro.
+-- item_code fica so como referencia (para favoritos e variedade), sem FK,
+-- porque um item pode sair do cardapio sem apagar a historia de quem comeu.
 CREATE TABLE IF NOT EXISTS consumption (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     telegram_id INTEGER NOT NULL,
     service_date TEXT NOT NULL,
     meal TEXT NOT NULL DEFAULT 'almoco',
-    item_code TEXT NOT NULL REFERENCES menu_item(code),
+    item_code TEXT NOT NULL,
+    item_name TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
+    quantity INTEGER NOT NULL DEFAULT 1,
+    kcal REAL,
+    cho_g REAL,
+    lip_g REAL,
+    ptn_g REAL,
+    source TEXT NOT NULL DEFAULT 'montado',
     logged_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_consumption_pessoa ON consumption (telegram_id, service_date);
@@ -138,7 +152,56 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     return conn
 
 
+# Colunas de fotografia do consumo, na ordem em que devem ser criadas num banco
+# antigo. O tipo vai junto porque ALTER TABLE precisa dele.
+CONSUMPTION_SNAPSHOT_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("item_name", "TEXT NOT NULL DEFAULT ''"),
+    ("category", "TEXT NOT NULL DEFAULT ''"),
+    ("quantity", "INTEGER NOT NULL DEFAULT 1"),
+    ("kcal", "REAL"),
+    ("cho_g", "REAL"),
+    ("lip_g", "REAL"),
+    ("ptn_g", "REAL"),
+    ("source", "TEXT NOT NULL DEFAULT 'montado'"),
+)
+
+
+def _migrate_consumption_snapshot(conn: sqlite3.Connection) -> None:
+    """Da fotografia ao historico ja gravado em bancos antigos.
+
+    O backfill copia o que a ficha tecnica diz **hoje**, que e a melhor
+    aproximacao disponivel para um registro feito antes de existir fotografia.
+    A partir daqui o valor para de mudar sozinho.
+    """
+    existentes = {linha["name"] for linha in conn.execute("PRAGMA table_info(consumption)")}
+    if not existentes:  # tabela ainda nem existe; o SCHEMA ja cria completa
+        return
+    faltando = [(nome, tipo) for nome, tipo in CONSUMPTION_SNAPSHOT_COLUMNS if nome not in existentes]
+    if not faltando:
+        return
+    for nome, tipo in faltando:
+        conn.execute(f"ALTER TABLE consumption ADD COLUMN {nome} {tipo}")
+    conn.execute(
+        """
+        UPDATE consumption SET
+            item_name = COALESCE((SELECT i.name FROM menu_item i WHERE i.code = consumption.item_code), item_code),
+            kcal = (SELECT i.kcal FROM menu_item i WHERE i.code = consumption.item_code),
+            cho_g = (SELECT i.cho_g FROM menu_item i WHERE i.code = consumption.item_code),
+            lip_g = (SELECT i.lip_g FROM menu_item i WHERE i.code = consumption.item_code),
+            ptn_g = (SELECT i.ptn_g FROM menu_item i WHERE i.code = consumption.item_code),
+            category = COALESCE((
+                SELECT e.category FROM menu_entry e
+                WHERE e.item_code = consumption.item_code
+                  AND e.service_date = consumption.service_date
+                LIMIT 1
+            ), '')
+        """
+    )
+    conn.commit()
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
+    _migrate_consumption_snapshot(conn)
     conn.executescript(SCHEMA)
     conn.commit()
 
