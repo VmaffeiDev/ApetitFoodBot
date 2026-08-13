@@ -180,6 +180,23 @@ class CadastroTest(BotBase):
         self.assertNotIn("✅", update.last)
         self.assertIn("⚠️", update.last)
 
+    async def test_stale_consent_button_never_wipes_an_existing_profile(self):
+        # Botao de mensagem antiga continua clicavel. Tocar nele depois nao
+        # pode zerar o cadastro de quem ja se cadastrou.
+        context = FakeContext()
+        await self.registrar(context)
+
+        outro = FakeContext()  # sessao nova, rascunho vazio
+        await bot.handle_callback(FakeUpdate(callback="consent_sim"), outro)
+
+        conn = bot.db()
+        try:
+            pessoa = load_employee(conn, self.user)
+        finally:
+            conn.close()
+        self.assertEqual(pessoa.name, "Mariana")
+        self.assertTrue(pessoa.registered)
+
     async def test_restriction_toggles_off_when_tapped_twice(self):
         context = FakeContext()
         await bot.handle_callback(FakeUpdate(callback="restr:leite"), context)

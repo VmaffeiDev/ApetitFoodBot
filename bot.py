@@ -36,6 +36,7 @@ from telegram.ext import (
 from apetit.allergens import ALLERGENS, Restriction, RestrictionKind, Verdict
 from apetit.allergen_sheet import coverage_summary
 from apetit.allergy_text import describe, recognize
+from apetit.portions import suggest_plate
 from apetit.catalog import (
     allergen_coverage,
     check_menu_for_employee,
@@ -121,6 +122,7 @@ VERDICT_MARK = {
 
 COMMANDS = [
     BotCommand("cardapio", "Ver o cardapio de hoje"),
+    BotCommand("quanto_pegar", "Quanto pegar de cada coisa hoje"),
     BotCommand("montar", "Montar meu prato passo a passo"),
     BotCommand("meu_dia", "O que eu comi hoje e nos ultimos dias"),
     BotCommand("favoritos", "Pratos que eu guardei"),
@@ -175,8 +177,9 @@ async def reply(update: Update, text: str, buttons=None, edit: bool = False) -> 
 
 def main_menu() -> list[list[tuple[str, str]]]:
     return [
-        [("\U0001f37d️ Montar meu prato", "montar")],
-        [("\U0001f4c5 Cardapio de hoje", "cardapio"), ("\U0001f4c8 Meu progresso", "progresso")],
+        [("\U0001f957 Quanto pegar hoje", "quanto")],
+        [("\U0001f37d️ Montar meu prato", "montar"), ("\U0001f4c5 Cardapio", "cardapio")],
+        [("\U0001f4c8 Meu progresso", "progresso")],
         [("\U0001f4ca Meu dia", "meu_dia"), ("⭐ Favoritos", "favoritos")],
         [("\U0001f464 Meu cadastro", "perfil"), ("❓ Ajuda", "ajuda")],
     ]
@@ -382,6 +385,18 @@ async def ask_consent(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: 
 
 async def finish_registration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     dados = draft(context)
+
+    # Botao de mensagem antiga continua clicavel no Telegram para sempre. Sem
+    # esta guarda, tocar num "Pode guardar" de dias atras salvaria um cadastro
+    # vazio por cima do que a pessoa ja tinha.
+    if not all(dados.get(campo) for campo in ("nome", "unidade", "empresa", "setor")):
+        ja_cadastrado = current_employee(update)
+        if ja_cadastrado and ja_cadastrado.registered:
+            await reply(update, "Seu cadastro ja esta completo \U0001f60a", main_menu(), edit=True)
+        else:
+            await ask_name(update, context, edit=True)
+        return
+
     pessoa = Employee(
         telegram_id=tg_id(update),
         name=dados.get("nome", ""),
@@ -516,6 +531,59 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bo
         update,
         "\n".join(linhas),
         [[("\U0001f37d️ Montar meu prato", "montar")], [("\U0001f519 Voltar", "menu")]],
+        edit=edit,
+    )
+
+
+async def show_portions(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+    """Quanto pegar de cada coisa, em concha e colher."""
+    pessoa = await require_registration(update, context, edit=edit)
+    if not pessoa:
+        return
+    dia = today()
+    alvo = target_for(pessoa)
+
+    # So entra na sugestao o que a pessoa pode comer: sugerir quantidade de um
+    # prato bloqueado seria pior que nao sugerir nada.
+    liberados = [
+        {"category": i["category"], "name": i["name"], "kcal": i["kcal"], "ptn_g": i["ptn_g"]}
+        for i in load_menu(pessoa, dia)
+        if i["check"].verdict is not Verdict.BLOQUEIO
+    ]
+    if not liberados:
+        await show_menu(update, context, edit=edit)
+        return
+
+    sugestao = suggest_plate(liberados, alvo["kcal"], alvo["ptn"])
+    if not sugestao.portions:
+        await reply(
+            update,
+            "Ainda nao consigo sugerir quantidades: o cardapio de hoje esta sem informacao nutricional.",
+            [[("\U0001f4c5 Ver cardapio", "cardapio")], [("\U0001f519 Voltar", "menu")]],
+            edit=edit,
+        )
+        return
+
+    linhas = [
+        f"\U0001f37d️ <b>Quanto pegar hoje</b>",
+        f"<i>{escape(friendly_date(dia))} · objetivo: {escape(pessoa.goal)}</i>\n",
+    ]
+    linhas.extend(f"• {escape(linha)}" for linha in sugestao.lines())
+    linhas.append(f"\n{escape(sugestao.summary())}")
+    for nota in sugestao.notes:
+        linhas.append(f"\n⚠️ {escape(nota)}")
+    linhas.append(
+        "\n<i>E uma sugestao com base no que tem hoje e no objetivo que voce escolheu. "
+        "Quem define quantidade individual e o nutricionista.</i>"
+    )
+
+    await reply(
+        update,
+        "\n".join(linhas),
+        [
+            [("\U0001f37d️ Montar meu prato", "montar")],
+            [("\U0001f4c5 Ver cardapio", "cardapio"), ("\U0001f519 Voltar", "menu")],
+        ],
         edit=edit,
     )
 
@@ -818,6 +886,8 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bo
     await reply(
         update,
         "❓ <b>Como usar</b>\n\n"
+        "<b>Quanto pegar hoje</b> — eu digo quantas conchas e colheres pegar de cada coisa "
+        "para chegar no seu objetivo, com o cardapio de hoje.\n\n"
         "<b>Montar meu prato</b> — eu te levo pela fila, uma categoria por vez. "
         "Voce toca no que pegou e eu mostro como ficou o prato.\n\n"
         "<b>Cardapio de hoje</b> — o que tem hoje, com aviso do que voce nao pode comer.\n\n"
@@ -1181,6 +1251,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if data == "cardapio":
         await show_menu(update, context, edit=True)
         return
+    if data == "quanto":
+        await show_portions(update, context, edit=True)
+        return
     if data == "montar":
         await start_flow(update, context, edit=True)
         return
@@ -1288,6 +1361,7 @@ def main() -> None:
     app.add_handler(CommandHandler("recadastrar", restart_registration))
     app.add_handler(CommandHandler("cardapio", show_menu))
     app.add_handler(CommandHandler("montar", start_flow))
+    app.add_handler(CommandHandler("quanto_pegar", show_portions))
     app.add_handler(CommandHandler("meu_dia", show_day))
     app.add_handler(CommandHandler("favoritos", show_favorites))
     app.add_handler(CommandHandler("progresso", show_progress))

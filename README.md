@@ -20,6 +20,7 @@ publicado, e o funcionario monta o prato e registra o consumo.
 | Comando | O que faz |
 |---|---|
 | `/start` | Cadastro ou menu principal |
+| `/quanto_pegar` | Quantas conchas e colheres pegar para bater a meta |
 | `/montar` | Monta o prato passo a passo, na ordem da fila |
 | `/cardapio` | Cardapio de hoje com alerta de alergenico |
 | `/meu_dia` | O que comeu hoje e nos dias anteriores |
@@ -74,6 +75,43 @@ menos, porque quem prescreve e o nutricionista.
 **O cadastro oferece, nao pergunta codigo.** Refeitorio, empresa e setor viram
 botoes com o que ja existe no banco, com saida para digitar quando for novo. O
 funcionario nao sabe que a unidade dele se chama `SM` no sistema da operacao.
+
+## Quanto pegar, em concha e colher
+
+O funcionario nao serve gramas: ele serve concha, colher e pegador. Entao a
+sugestao sai na medida do refeitorio.
+
+```
+Quanto pegar hoje
+segunda-feira, 1 de setembro · objetivo: Manter o equilibrio
+
+• 2 porcoes de File de frango grelhado
+• 1 colher de Macarrao alho e oleo
+• 2 colheres de Arroz parboilizado
+• 1 concha de Feijao preto
+• Mix de alface a vontade
+
+Isso fecha 703 kcal e 33 g de proteina — sua meta do dia.
+```
+
+O que torna a conta simples: no cardapio da operacao **cada linha ja e uma porcao
+padrao**. ARROZ PARBOILIZADO com 138 kcal e uma colher de servir; FEIJAO PRETO
+com 29 kcal e uma concha. Entao a sugestao multiplica, nao converte.
+
+Quatro regras seguram o resultado:
+
+- **prato bloqueado nao entra** — sugerir quantidade de algo que a pessoa nao
+  pode comer seria pior que nao sugerir nada
+- **teto por categoria** — no maximo 3 colheres de arroz, 2 conchas de feijao;
+  sem isso a conta viraria recomendacao absurda
+- **sobremesa e bebida ficam de fora** — nao e papel do app empurrar pudim para
+  fechar caloria
+- **quando o cardapio nao alcanca o alvo, ele diz** em vez de inventar porcao
+
+Salada entra como "a vontade": quase nao move o total e faz bem.
+
+E sugestao, nao prescricao. Quem define quantidade individual e o nutricionista
+responsavel.
 
 ## Importacao do cardapio
 

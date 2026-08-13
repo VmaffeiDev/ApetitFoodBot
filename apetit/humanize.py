@@ -72,6 +72,25 @@ def order_categories(codes) -> list[str]:
     return conhecidas + resto
 
 
+# Abreviacoes da operacao que nao fazem sentido para quem le o cardapio.
+PREFIXOS_OPERACAO = ("sal.", "sal ", "sob.", "gua.")
+
+
+def clean_dish_name(name: str) -> str:
+    """"SAL. MIX DE ALFACE" -> "Mix de alface".
+
+    O cardapio da cozinha usa abreviacao de categoria no nome. Isso ajuda quem
+    monta a planilha e atrapalha quem le no celular.
+    """
+    limpo = (name or "").strip()
+    minusculo = limpo.lower()
+    for prefixo in PREFIXOS_OPERACAO:
+        if minusculo.startswith(prefixo):
+            limpo = limpo[len(prefixo):].strip(" .")
+            break
+    return limpo[:1].upper() + limpo[1:].lower() if limpo else limpo
+
+
 def dish_weight(kcal: float | None) -> str:
     """Uma palavra sobre o quanto o prato pesa no dia."""
     if kcal is None:
