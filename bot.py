@@ -15,6 +15,7 @@ Toda a regra de dominio vive em apetit/, para servir depois a um painel do
 nutricionista sem reescrita.
 """
 
+import io
 import logging
 import os
 from datetime import UTC, date, datetime, timedelta
@@ -41,6 +42,7 @@ from apetit.catalog import (
     allergen_coverage,
     check_menu_for_employee,
     connect,
+    import_menu_rows,
     init_schema,
     item_allergens,
     known_units,
@@ -48,6 +50,9 @@ from apetit.catalog import (
     pending_issues,
     set_item_allergens,
 )
+from apetit.csv_import import parse_menu_rows, read_rows
+from apetit.intake import build_preview, infer_period
+from apetit.spreadsheet import is_spreadsheet, read_spreadsheet_rows
 from apetit.feedback import (
     MISSING_TAGS,
     SCALE,
@@ -62,6 +67,7 @@ from apetit.feedback import (
 )
 from apetit.humanize import (
     FRESH_CATEGORIES,
+    MESES as MESES_PT,
     category_label,
     clean_dish_name,
     dish_hint,
@@ -1359,6 +1365,214 @@ async def show_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.effective_message.reply_text("\n".join(linhas), parse_mode=ParseMode.HTML)
 
 
+# --------------------------------------------------------------------------
+# Cardapio da semana chegando pelo Telegram
+# --------------------------------------------------------------------------
+#
+# Toda semana alguem precisa publicar o cardapio novo. Pelo terminal isso exige
+# repositorio, Python e lembrar `--unidade SM --mes 8 --ano 2025`. Quem tem o
+# arquivo e a nutricionista, e ela ja tem o arquivo e ja tem o Telegram: mandar
+# como anexo tira o terminal do caminho inteiro.
+#
+# O que nao muda: nada e publicado sem uma pessoa confirmar o periodo, com as
+# datas ja montadas na tela. Publicar a semana errada e visivel para o
+# refeitorio inteiro.
+
+IMPORTACAO = "importacao"
+MAX_ARQUIVO_BYTES = 5 * 1024 * 1024
+
+
+async def receive_menu_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Recebe o CSV ou .xlsx do cardapio e mostra o que sera publicado."""
+    if not is_admin(tg_id(update)):
+        await deny_admin(update, "enviar cardapio")
+        return
+
+    documento = update.effective_message.document
+    nome = documento.file_name or "cardapio"
+    if not (is_spreadsheet(nome) or nome.lower().endswith((".csv", ".txt"))):
+        await reply(
+            update,
+            f"Nao sei ler <b>{escape(nome)}</b>.\n\n"
+            "Mande o cardapio em <b>.csv</b> ou <b>.xlsx</b> — e o que a operacao exporta.",
+        )
+        return
+    if (documento.file_size or 0) > MAX_ARQUIVO_BYTES:
+        await reply(update, "Arquivo grande demais. O cardapio costuma ter poucos KB.")
+        return
+
+    arquivo = await context.bot.get_file(documento.file_id)
+    conteudo = bytes(await arquivo.download_as_bytearray())
+
+    try:
+        if is_spreadsheet(nome):
+            linhas = read_spreadsheet_rows(io.BytesIO(conteudo))
+        else:
+            try:
+                texto = conteudo.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                texto = conteudo.decode("latin-1")
+            linhas = read_rows(texto)
+    except Exception as erro:  # arquivo corrompido ou formato inesperado
+        logger.warning("Falha lendo %s: %s", nome, erro)
+        await reply(update, f"Nao consegui abrir <b>{escape(nome)}</b>. O arquivo pode estar corrompido.")
+        return
+
+    periodo = infer_period(nome, date.fromisoformat(today()))
+    context.user_data[IMPORTACAO] = {
+        "linhas": linhas,
+        "nome": nome,
+        "mes": periodo.month,
+        "ano": periodo.year,
+        "origem": periodo.source,
+        "unidade": context.user_data.get("ultima_unidade", ""),
+    }
+    await show_import_preview(update, context)
+
+
+async def show_import_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+    dados = context.user_data.get(IMPORTACAO)
+    if not dados:
+        await reply(update, "Nao tenho nenhum cardapio esperando. Mande o arquivo de novo.", edit=edit)
+        return
+
+    conn = db()
+    try:
+        unidades = known_units(conn)
+    finally:
+        conn.close()
+    unidade = dados.get("unidade") or (unidades[0] if unidades else "")
+    dados["unidade"] = unidade
+
+    entries, issues = parse_menu_rows(
+        dados["linhas"], unit=unidade, month=dados["mes"], year=dados["ano"]
+    )
+    previa = build_preview(entries, issues, unidade)
+
+    linhas = [f"\U0001f4c4 <b>{escape(dados['nome'])}</b>\n"]
+    if not previa.entries:
+        linhas.append("Nao encontrei nenhum item de cardapio neste arquivo.")
+        for detalhe in previa.blocking[:3]:
+            linhas.append(f"⛔ {escape(detalhe)}")
+        await reply(update, "\n".join(linhas), [[("\U0001f519 Voltar", "menu")]], edit=edit)
+        return
+
+    linhas.append(f"<b>Refeitorio:</b> {escape(unidade or 'nao definido')}")
+    linhas.append(f"<b>Periodo:</b> {escape(friendly_date(previa.dates[0]))}")
+    if len(previa.dates) > 1:
+        linhas.append(f"           ate {escape(friendly_date(previa.dates[-1]))}")
+    linhas.append(f"<i>mes e ano vieram de {escape(dados['origem'])}</i>")
+    linhas.append(f"\n<b>{previa.entries} itens</b> em {len(previa.dates)} dia(s) · {previa.dishes} pratos diferentes")
+    if previa.without_macros:
+        linhas.append(f"⚠️ {previa.without_macros} sem informacao nutricional")
+    for detalhe in previa.warnings[:3]:
+        linhas.append(f"⚠️ {escape(detalhe)}")
+    if previa.blocking:
+        linhas.append("\n⛔ <b>Nao da para publicar:</b>")
+        linhas.extend(f"• {escape(d)}" for d in previa.blocking[:3])
+
+    if not unidade:
+        linhas.append("\n⛔ <b>Escolha o refeitorio.</b> Sem ele o cardapio nao chega a ninguem.")
+    else:
+        linhas.append("\n<b>Confira o periodo antes de publicar.</b>")
+
+    botoes = []
+    if previa.ok:
+        botoes.append([("✅ Publicar este cardapio", "imp_publicar")])
+    botoes.append([("\U0001f4c5 Trocar o mes", "imp_mes")])
+    if len(unidades) > 1 or not unidade:
+        botoes.append([("\U0001f3e2 Trocar o refeitorio", "imp_unidade")])
+    botoes.append([("❌ Cancelar", "imp_cancelar")])
+    await reply(update, "\n".join(linhas), botoes, edit=edit)
+
+
+async def ask_import_unit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    conn = db()
+    try:
+        unidades = known_units(conn)
+    finally:
+        conn.close()
+    botoes = [[(u[:40], f"imp_un:{i}")] for i, u in enumerate(unidades[:8])]
+    botoes.append([("Digitar outro", "imp_un:outro")])
+    await reply(update, "\U0001f3e2 <b>Para qual refeitorio e este cardapio?</b>", botoes, edit=True)
+
+
+async def ask_import_month(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    dados = context.user_data.get(IMPORTACAO) or {}
+    base = date(dados.get("ano") or date.fromisoformat(today()).year, dados.get("mes") or 1, 1)
+    opcoes = []
+    for salto in (-1, 0, 1):
+        mes = base.month + salto
+        ano = base.year + (mes - 1) // 12
+        mes = (mes - 1) % 12 + 1
+        opcoes.append((f"{MESES_PT[mes - 1]} de {ano}", f"imp_mes:{ano}-{mes:02d}"))
+    await reply(
+        update,
+        "\U0001f4c5 <b>De que mes e este cardapio?</b>",
+        [[opcao] for opcao in opcoes] + [[("← Voltar", "imp_previa")]],
+        edit=True,
+    )
+
+
+async def publish_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    dados = context.user_data.get(IMPORTACAO)
+    if not dados:
+        await reply(update, "Nao tenho nenhum cardapio esperando.", main_menu(), edit=True)
+        return
+
+    conn = db()
+    try:
+        resultado = import_menu_rows(
+            conn,
+            dados["linhas"],
+            unit=dados["unidade"],
+            month=dados["mes"],
+            year=dados["ano"],
+            batch=dados["nome"],
+        )
+    finally:
+        conn.close()
+
+    context.user_data["ultima_unidade"] = dados["unidade"]
+    context.user_data.pop(IMPORTACAO, None)
+
+    datas = sorted({e.service_date for e in resultado.published})
+    linhas = ["✅ <b>Cardapio publicado</b>\n"]
+    linhas.append(f"<b>{len(resultado.published)} itens</b> em {escape(dados['unidade'])}")
+    if datas:
+        linhas.append(f"{escape(friendly_date(datas[0]))} a {escape(friendly_date(datas[-1]))}")
+    if resultado.blocked:
+        linhas.append(
+            f"\n⛔ {len(resultado.blocked)} item(ns) ficaram de fora e estao em /pendencias."
+        )
+    linhas.append("\nJa esta no ar para quem abrir o app.")
+    linhas.append("<i>Mandar o mesmo periodo de novo substitui o que esta publicado.</i>")
+
+    await reply(
+        update,
+        "\n".join(linhas),
+        [[("\U0001f4e2 Avisar quem favoritou", "imp_avisar")], [("\U0001f519 Voltar", "menu")]],
+        edit=True,
+    )
+
+
+async def show_import_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_admin(tg_id(update)):
+        await deny_admin(update, "importar cardapio")
+        return
+    await reply(
+        update,
+        "\U0001f4c4 <b>Publicar o cardapio da semana</b>\n\n"
+        "<b>E so me mandar o arquivo aqui.</b> Anexe o .csv ou .xlsx que a operacao "
+        "exporta, do jeito que ele vem.\n\n"
+        "Eu leio, descubro o periodo pelo nome do arquivo e mostro o que vou publicar. "
+        "Voce confere o refeitorio e as datas e toca em publicar.\n\n"
+        "<b>Nada e publicado sem a sua confirmacao.</b>\n\n"
+        "Mandar o mesmo periodo de novo substitui o que ja esta publicado — da para "
+        "corrigir uma semana reenviando o arquivo corrigido.",
+    )
+
+
 def _linha_relatorio(relatorio) -> str:
     if relatorio.suppressed:
         return f"- <b>{escape(relatorio.apetit_unit)}</b>: suprimido ({escape(relatorio.reason)})"
@@ -1512,6 +1726,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await reply(update, "Toque numa opcao \U0001f447", main_menu())
         else:
             await ask_name(update, context)
+        return
+
+    if step == "importacao_unidade":
+        context.user_data.pop(STEP, None)
+        if context.user_data.get(IMPORTACAO):
+            context.user_data[IMPORTACAO]["unidade"] = texto
+        await show_import_preview(update, context)
         return
 
     if step == "avaliacao_comentario":
@@ -1703,6 +1924,55 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 conn.close()
             await show_favorites(update, context, edit=True)
         return
+    if data.startswith("imp_"):
+        if not is_admin(tg_id(update)):
+            await deny_admin(update, "publicar cardapio")
+            return
+        dados = context.user_data.get(IMPORTACAO)
+        if data == "imp_cancelar":
+            context.user_data.pop(IMPORTACAO, None)
+            await reply(update, "Cancelado. Nada foi publicado.", main_menu(), edit=True)
+            return
+        if data == "imp_previa":
+            await show_import_preview(update, context, edit=True)
+            return
+        if data == "imp_publicar":
+            await publish_menu(update, context)
+            return
+        if data == "imp_avisar":
+            await notify_favorites(update, context)
+            return
+        if data == "imp_mes":
+            await ask_import_month(update, context)
+            return
+        if data.startswith("imp_mes:") and dados:
+            ano, mes = data.split(":", 1)[1].split("-")
+            dados["ano"], dados["mes"] = int(ano), int(mes)
+            dados["origem"] = "sua escolha"
+            await show_import_preview(update, context, edit=True)
+            return
+        if data == "imp_unidade":
+            await ask_import_unit(update, context)
+            return
+        if data.startswith("imp_un:") and dados:
+            escolha = data.split(":", 1)[1]
+            if escolha == "outro":
+                context.user_data[STEP] = "importacao_unidade"
+                await reply(update, "Digite o nome do refeitorio:", edit=True)
+                return
+            conn = db()
+            try:
+                unidades = known_units(conn)
+            finally:
+                conn.close()
+            indice = int(escolha)
+            if indice < len(unidades):
+                dados["unidade"] = unidades[indice]
+            await show_import_preview(update, context, edit=True)
+            return
+        await show_import_preview(update, context, edit=True)
+        return
+
     if data == "avaliar":
         await ask_food(update, context, edit=True)
         return
@@ -1804,6 +2074,10 @@ def main() -> None:
     app.add_handler(CommandHandler("cobertura", show_coverage))
     app.add_handler(CommandHandler("relatorio", show_report))
     app.add_handler(CommandHandler("atendimento", show_service_report))
+    app.add_handler(CommandHandler("importar", show_import_help))
+    # Anexo do cardapio: e o caminho de publicacao da semana, entao vem antes
+    # do handler de texto solto.
+    app.add_handler(MessageHandler(filters.Document.ALL, receive_menu_file))
     app.add_handler(CommandHandler("avisar_favoritos", notify_favorites))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

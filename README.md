@@ -40,6 +40,8 @@ Administracao e nutricionista:
 
 | Comando | O que faz |
 |---|---|
+| **anexar .csv/.xlsx** | **Publica o cardapio da semana** — e so mandar o arquivo |
+| `/importar` | Explica como publicar o cardapio |
 | `/pendencias` | Fila de revisao da importacao |
 | `/alergenico <prato> <alergenico> <estado>` | Declara alergenico de um prato |
 | `/relatorio` | Adesao **agregada** por setor |
@@ -176,10 +178,58 @@ sao criadas e preenchidas com o que a ficha tecnica diz no momento da migracao �
 melhor aproximacao disponivel para um registro feito antes de existir fotografia.
 A partir dali o valor para de mudar sozinho.
 
-## Importacao do cardapio
+## Publicar o cardapio da semana
 
-O cardapio chega em CSV ou `.xlsx`. O importador aceita os tres layouts
-observados, com separador `;` ou `,` e decimal com virgula:
+**Mande o arquivo para o bot.** Toda semana, quem tem o cardapio anexa o `.csv`
+ou `.xlsx` na conversa do Telegram, do jeito que a operacao exporta. Sem
+terminal, sem repositorio, sem Python, sem lembrar flag nenhuma.
+
+```
+📄 Cardapio_17_a_2108.xlsx
+
+Refeitorio: Refeitorio Central
+Periodo: segunda-feira, 17 de agosto
+         ate sexta-feira, 21 de agosto
+mes e ano vieram de o nome do arquivo (17_a_2108)
+
+80 itens em 5 dia(s) · 58 pratos diferentes
+⚠️ 80 sem informacao nutricional
+
+Confira o periodo antes de publicar.
+
+[ ✅ Publicar este cardapio ]
+[ 📅 Trocar o mes ]  [ 🏢 Trocar o refeitorio ]  [ ❌ Cancelar ]
+```
+
+A planilha traz so o numero do dia, sem mes nem ano. Pelo terminal isso virava
+`--mes 8 --ano 2025` digitado a mao toda semana — campo que alguem erra em
+novembro e publica a semana no dia errado. Agora o mes sai do nome do arquivo
+(`Cardapio_17_a_2108` diz 21/08) e a pessoa so **confirma**.
+
+O palpite nunca publica sozinho. A tela mostra as **datas ja montadas**, nao
+"mes 8": data por extenso e o que alguem consegue conferir de relance. Sem
+confirmacao, nada vai para o ar.
+
+Tres protecoes que sobreviveram a mudanca:
+
+- **Sem refeitorio nao publica.** O funcionario ve o cardapio filtrado pela
+  unidade dele; publicar sem unidade e publicar para ninguem, e some sem erro
+  nenhum — a pior forma de falhar.
+- **Fim de semana vira aviso.** Se as datas montadas caem no sabado ou domingo,
+  o mes ou o ano do palpite quase certamente esta errado: os dias vem da
+  planilha, entao o que nao bate e o mes/ano. O proprio calendario denuncia o
+  palpite, sem precisar de outro palpite. Fica como aviso, porque existe
+  refeitorio que serve no fim de semana.
+- **Reenviar o mesmo periodo substitui.** E como a operacao corrige uma semana
+  ja publicada: manda o arquivo corrigido de novo.
+
+`/importar` explica isso dentro do bot. O caminho por terminal continua valendo
+para carga em lote:
+
+## Importacao pelo terminal
+
+O importador aceita os tres layouts observados, com separador `;` ou `,` e
+decimal com virgula:
 
 | Layout | Como e | Traz macro? |
 |---|---|---|
@@ -568,6 +618,7 @@ apetit/
   humanize.py    o texto que o funcionario le
   tracking.py    historico congelado, favoritos e pontos
   feedback.py    avaliacao do refeitorio, agregada e sem autor
+  intake.py      de que semana e o arquivo que chegou
 bot.py           camada do Telegram
 ```
 

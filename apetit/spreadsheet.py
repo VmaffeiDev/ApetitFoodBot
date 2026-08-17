@@ -26,8 +26,11 @@ def _cell_text(value) -> str:
     return str(value).strip()
 
 
-def read_spreadsheet_rows(path: str | Path, sheet: str = "") -> list[list[str]]:
+def read_spreadsheet_rows(path, sheet: str = "") -> list[list[str]]:
     """Devolve as linhas da planilha como texto, no formato do `csv_import`.
+
+    Aceita caminho no disco ou objeto de arquivo ja aberto em memoria — o
+    arquivo que chega pelo Telegram nunca toca o disco.
 
     Sem `sheet`, le a primeira aba — que e onde os exports observados poem o
     cardapio.

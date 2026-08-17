@@ -8,7 +8,7 @@ os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-token")
 
 import bot
 from apetit.allergens import ALLERGENS
-from apetit.catalog import import_menu_csv, init_schema, set_item_allergens
+from apetit.catalog import import_menu_csv, init_schema, menu_for_date, set_item_allergens
 from apetit.profile import load_employee
 from apetit.feedback import MIN_RATINGS, Rating, rating_for, save_rating
 from apetit.tracking import consumption_history, favorites, history_by_day, total_points
@@ -42,8 +42,9 @@ class FakeQuery:
 
 
 class FakeUpdate:
-    def __init__(self, text="", user_id=777, callback=None):
+    def __init__(self, text="", user_id=777, callback=None, document=None):
         self.message = FakeMessage(text)
+        self.message.document = document
         self.effective_message = self.message
         self.effective_user = SimpleNamespace(id=user_id)
         self.effective_chat = SimpleNamespace(id=user_id)
@@ -62,11 +63,30 @@ class FakeUpdate:
         return [(botao.text, botao.callback_data) for linha in markup.inline_keyboard for botao in linha]
 
 
+class FakeDocument:
+    def __init__(self, file_name, content: bytes):
+        self.file_name = file_name
+        self.file_id = "fid"
+        self.file_size = len(content)
+
+
+class FakeFile:
+    def __init__(self, content: bytes):
+        self._content = content
+
+    async def download_as_bytearray(self):
+        return bytearray(self._content)
+
+
 class FakeContext:
-    def __init__(self):
+    def __init__(self, arquivo: bytes = b""):
         self.user_data = {}
         self.args = []
         self.bot = self
+        self._arquivo = arquivo
+
+    async def get_file(self, file_id):
+        return FakeFile(self._arquivo)
 
 
 class BotBase(unittest.IsolatedAsyncioTestCase):
@@ -605,6 +625,136 @@ class RelatorioAtendimentoTest(BotBase):
         self.assertIn("SM", update.last)
         self.assertIn("comida boa 0%", update.last)
         self.assertIn("atendimento bom 100%", update.last)
+
+
+CARDAPIO_SEMANA = (
+    "Dia;PRATO PRINCIPAL;ARROZ;FEIJAO\n"
+    "17;BIFE ACEBOLADO (80g) - C51 - 3.11;ARROZ PARBOILIZADO - C51 - 0.24;FEIJAO CARIOCA - C51 - 0.29\n"
+    "18;CARNE MOIDA A MEXICANA (80g) - C51 - 2.67;ARROZ PARBOILIZADO - C51 - 0.24;FEIJAO CARIOCA - C51 - 0.29\n"
+).encode("utf-8")
+
+
+class EnvioDoCardapioTest(BotBase):
+    """Publicar a semana mandando o arquivo, sem terminal."""
+
+    def setUp(self):
+        super().setUp()
+        bot.ADMIN_IDS = {self.user}
+        bot.today = lambda: "2025-08-15"
+
+    async def mandar(self, nome="Cardapio_17_a_2108.csv", conteudo=CARDAPIO_SEMANA, context=None):
+        context = context or FakeContext(arquivo=conteudo)
+        update = FakeUpdate(user_id=self.user, document=FakeDocument(nome, conteudo))
+        await bot.receive_menu_file(update, context)
+        return update, context
+
+    async def test_non_admin_cannot_publish_a_menu(self):
+        bot.ADMIN_IDS = {999}
+        update, _ = await self.mandar()
+
+        self.assertIn("Apenas administradores", update.last)
+
+    async def test_the_preview_shows_the_period_before_publishing(self):
+        update, _ = await self.mandar()
+
+        # Data montada, nao "mes 8": e o que a pessoa consegue conferir.
+        self.assertIn("17 de agosto", update.last)
+        self.assertIn("18 de agosto", update.last)
+        self.assertIn("6 itens", update.last)
+
+    async def test_the_preview_says_where_the_month_came_from(self):
+        update, _ = await self.mandar()
+
+        self.assertIn("nome do arquivo", update.last)
+
+    async def test_nothing_is_published_before_confirming(self):
+        await self.mandar()
+
+        conn = bot.db()
+        try:
+            self.assertEqual(menu_for_date(conn, "2025-08-17", unit="SM"), [])
+        finally:
+            conn.close()
+
+    async def test_confirming_publishes_the_week(self):
+        _, context = await self.mandar()
+
+        update = FakeUpdate(user_id=self.user, callback="imp_publicar")
+        await bot.handle_callback(update, context)
+
+        conn = bot.db()
+        try:
+            cardapio = menu_for_date(conn, "2025-08-17", unit="SM")
+        finally:
+            conn.close()
+        self.assertIn("BIFE ACEBOLADO", {l["name"] for l in cardapio})
+        self.assertIn("publicado", update.last)
+
+    async def test_the_month_can_be_corrected_before_publishing(self):
+        _, context = await self.mandar()
+
+        await bot.handle_callback(FakeUpdate(user_id=self.user, callback="imp_mes:2025-09"), context)
+        update = FakeUpdate(user_id=self.user, callback="imp_publicar")
+        await bot.handle_callback(update, context)
+
+        conn = bot.db()
+        try:
+            self.assertTrue(menu_for_date(conn, "2025-09-17", unit="SM"))
+            self.assertEqual(menu_for_date(conn, "2025-08-17", unit="SM"), [])
+        finally:
+            conn.close()
+
+    async def test_cancelling_publishes_nothing(self):
+        _, context = await self.mandar()
+
+        update = FakeUpdate(user_id=self.user, callback="imp_cancelar")
+        await bot.handle_callback(update, context)
+
+        conn = bot.db()
+        try:
+            self.assertEqual(menu_for_date(conn, "2025-08-17", unit="SM"), [])
+        finally:
+            conn.close()
+        self.assertIn("Nada foi publicado", update.last)
+
+    async def test_sending_the_same_week_again_replaces_it(self):
+        # E como a operacao corrige uma semana ja publicada.
+        _, context = await self.mandar()
+        await bot.handle_callback(FakeUpdate(user_id=self.user, callback="imp_publicar"), context)
+
+        corrigido = CARDAPIO_SEMANA.replace(b"BIFE ACEBOLADO", b"BIFE GRELHADO")
+        _, context2 = await self.mandar(conteudo=corrigido)
+        await bot.handle_callback(FakeUpdate(user_id=self.user, callback="imp_publicar"), context2)
+
+        conn = bot.db()
+        try:
+            nomes = {l["name"] for l in menu_for_date(conn, "2025-08-17", unit="SM")}
+        finally:
+            conn.close()
+        self.assertIn("BIFE GRELHADO", nomes)
+        self.assertNotIn("BIFE ACEBOLADO", nomes)
+
+    async def test_a_file_type_it_cannot_read_is_refused_clearly(self):
+        update, _ = await self.mandar(nome="cardapio.pdf", conteudo=b"%PDF-1.4")
+
+        self.assertIn("Nao sei ler", update.last)
+        self.assertIn(".csv", update.last)
+
+    async def test_a_corrupt_spreadsheet_does_not_crash(self):
+        update, _ = await self.mandar(nome="cardapio.xlsx", conteudo=b"nao sou uma planilha")
+
+        self.assertIn("Nao consegui abrir", update.last)
+
+    async def test_a_file_with_no_menu_says_so(self):
+        update, _ = await self.mandar(nome="lista.csv", conteudo=b"a;b;c\n1;2;3\n")
+
+        self.assertIn("Nao encontrei nenhum item", update.last)
+
+    async def test_the_help_tells_the_person_to_just_send_the_file(self):
+        update = FakeUpdate(user_id=self.user)
+        await bot.show_import_help(update, FakeContext())
+
+        self.assertIn("me mandar o arquivo", update.last)
 
 
 class LgpdTest(BotBase):
