@@ -681,22 +681,34 @@ async def show_flow_step(update: Update, context: ContextTypes.DEFAULT_TYPE, edi
 
 
 def plate_totals(pessoa: Employee, codigos: list[str]) -> tuple[dict, list[str], set[str]]:
+    """Soma o prato e conta o que nao da para somar.
+
+    `sem_macro` e `com_macro` viajam junto do total de proposito: sem eles,
+    quem le o total nao tem como saber que ele e piso e nao total.
+    """
     conn = db()
     try:
         linhas = {l["item_code"]: l for l in menu_for_date(conn, today(), unit=pessoa.apetit_unit)}
     finally:
         conn.close()
-    totais = {"kcal": 0.0, "cho": 0.0, "lip": 0.0, "ptn": 0.0}
+    totais = {"kcal": 0.0, "cho": 0.0, "lip": 0.0, "ptn": 0.0, "sem_macro": 0, "com_macro": 0}
     nomes: list[str] = []
     categorias: set[str] = set()
     for code in codigos:
         linha = linhas.get(code)
         if not linha:
             continue
-        totais["kcal"] += linha["kcal"] or 0
-        totais["cho"] += linha["cho_g"] or 0
-        totais["lip"] += linha["lip_g"] or 0
-        totais["ptn"] += linha["ptn_g"] or 0
+        # kcal e proteina sao o par que o app usa para dizer qualquer coisa.
+        # Faltando um dos dois, o item nao entra na conta — somar so a metade
+        # daria um numero que parece total e nao e.
+        if linha["kcal"] is None or linha["ptn_g"] is None:
+            totais["sem_macro"] += 1
+        else:
+            totais["com_macro"] += 1
+            totais["kcal"] += linha["kcal"]
+            totais["cho"] += linha["cho_g"] or 0
+            totais["lip"] += linha["lip_g"] or 0
+            totais["ptn"] += linha["ptn_g"]
         nomes.append(linha["name"])
         categorias.add(linha["category"])
     return totais, nomes, categorias
@@ -719,17 +731,25 @@ async def show_plate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE,
     alvo = target_for(pessoa)
     totais, nomes, categorias = plate_totals(pessoa, codigos)
     leitura = plate_reading(
-        totais["kcal"], totais["ptn"], alvo["kcal"], alvo["ptn"], bool(categorias & FRESH_CATEGORIES)
+        totais["kcal"],
+        totais["ptn"],
+        alvo["kcal"],
+        alvo["ptn"],
+        bool(categorias & FRESH_CATEGORIES),
+        unknown_items=totais["sem_macro"],
+        known_items=totais["com_macro"],
     )
 
     linhas = ["\U0001f37d️ <b>Seu prato</b>\n"]
     linhas.extend(f"• {escape(nome)}" for nome in nomes)
     linhas.append("")
     linhas.extend(escape(frase) for frase in leitura)
-    linhas.append(
-        f"\n<i>{totais['kcal']:.0f} kcal · {totais['cho']:.0f} g carboidrato · "
-        f"{totais['lip']:.0f} g gordura · {totais['ptn']:.0f} g proteina</i>"
-    )
+    if totais["com_macro"]:
+        prefixo = "no minimo " if totais["sem_macro"] else ""
+        linhas.append(
+            f"\n<i>{prefixo}{totais['kcal']:.0f} kcal · {totais['cho']:.0f} g carboidrato · "
+            f"{totais['lip']:.0f} g gordura · {totais['ptn']:.0f} g proteina</i>"
+        )
 
     botoes = [
         [("✅ Registrar este prato", "registrar")],
@@ -772,12 +792,16 @@ async def save_meal(
 
     linhas = [f"✅ <b>Refeicao de {escape(friendly_date(dia))} registrada</b>\n"]
     linhas.extend(f"• {escape(item)}" for item in resumo)
-    linhas.append(
-        f"\n<i>{totais['kcal']:.0f} kcal · {totais['ptn_g']:.0f} g de proteina</i>"
-    )
-    if totais.get("sem_macro"):
+    sem_macro = totais.get("sem_macro") or 0
+    if totais.get("com_macro"):
+        prefixo = "no minimo " if sem_macro else ""
         linhas.append(
-            f"⚠️ {totais['sem_macro']} item(ns) sem informacao nutricional — o total esta incompleto."
+            f"\n<i>{prefixo}{totais['kcal']:.0f} kcal · {totais['ptn_g']:.0f} g de proteina</i>"
+        )
+    if sem_macro:
+        linhas.append(
+            f"⚠️ {sem_macro} item(ns) sem informacao nutricional — "
+            "ainda nao da para fechar o total do dia."
         )
     linhas.append(f"\n{escape(week_summary(dias_semana))}")
     if ganhas:
@@ -858,14 +882,20 @@ async def show_day(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: boo
     if hoje:
         categorias = {(linha["category"] or "").upper() for linha in hoje.items}
         leitura = plate_reading(
-            hoje.kcal, hoje.ptn_g, alvo["kcal"], alvo["ptn"], bool(categorias & FRESH_CATEGORIES)
+            hoje.kcal,
+            hoje.ptn_g,
+            alvo["kcal"],
+            alvo["ptn"],
+            bool(categorias & FRESH_CATEGORIES),
+            unknown_items=hoje.unknown_items,
+            known_items=hoje.known_items,
         )
         linhas.extend(escape(frase) for frase in leitura)
         linhas.append("")
         linhas.extend(f"• {escape(history_line(linha))}" for linha in hoje.items)
-        linhas.append(f"\n<i>{hoje.kcal:.0f} kcal · {hoje.ptn_g:.0f} g de proteina</i>")
-        if hoje.incomplete:
-            linhas.append("⚠️ Algum item estava sem informacao nutricional — o total esta incompleto.")
+        if hoje.known_items:
+            prefixo = "no minimo " if hoje.incomplete else ""
+            linhas.append(f"\n<i>{prefixo}{hoje.kcal:.0f} kcal · {hoje.ptn_g:.0f} g de proteina</i>")
     else:
         linhas.append(
             "Voce ainda nao registrou o almoco de hoje.\n\n"
@@ -877,10 +907,12 @@ async def show_day(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: boo
     if anteriores:
         linhas.append("\n\U0001f4c6 <b>Seu historico</b>")
         for registro in anteriores[:7]:
-            linhas.append(
-                f"\n<i>{escape(friendly_date(registro.service_date))}</i> — "
-                f"{registro.kcal:.0f} kcal · {registro.ptn_g:.0f} g ptn"
-            )
+            if registro.known_items:
+                prefixo = "min. " if registro.incomplete else ""
+                resumo = f" — {prefixo}{registro.kcal:.0f} kcal · {registro.ptn_g:.0f} g ptn"
+            else:
+                resumo = " — sem informacao nutricional"
+            linhas.append(f"\n<i>{escape(friendly_date(registro.service_date))}</i>{resumo}")
             linhas.extend(f"• {escape(history_line(linha))}" for linha in registro.items)
         if len(anteriores) > 7:
             linhas.append(f"\n<i>… e mais {len(anteriores) - 7} dia(s) registrados.</i>")

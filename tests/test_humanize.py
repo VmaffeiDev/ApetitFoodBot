@@ -85,6 +85,50 @@ class LeituraDoPratoTest(unittest.TestCase):
         self.assertIn("vale somar uma", linhas[-1])
 
 
+class LeituraSemMacroTest(unittest.TestCase):
+    """Sem informacao nutricional o app descreve a falta; nunca a chama de zero."""
+
+    def test_plate_with_no_nutrition_is_not_classified(self):
+        # Com o cardapio de planejamento, todo item chega sem macro. Somar zero
+        # e chamar de "prato leve" seria o app afirmar o que nao sabe.
+        linhas = plate_reading(
+            kcal=0, ptn_g=0, target_kcal=700, target_ptn=30, has_fresh=True,
+            unknown_items=4, known_items=0,
+        )
+
+        texto = " ".join(linhas)
+        self.assertIn("nao consigo ler", texto)
+        for proibido in ("leve", "alinhado", "Faltam", "0 kcal"):
+            self.assertNotIn(proibido, texto)
+
+    def test_partial_plate_reports_a_floor_not_a_total(self):
+        linhas = plate_reading(
+            kcal=280, ptn_g=14, target_kcal=700, target_ptn=30, has_fresh=True,
+            unknown_items=2, known_items=2,
+        )
+
+        texto = " ".join(linhas)
+        self.assertIn("Leitura incompleta", texto)
+        self.assertIn("no minimo 280 kcal", texto)
+        # Nao classifica o prato a partir de uma soma que sabe estar incompleta.
+        self.assertNotIn("Prato leve", texto)
+
+    def test_missing_salad_is_still_flagged_without_nutrition(self):
+        # A composicao do prato nao depende de macro para ser lida.
+        linhas = plate_reading(
+            kcal=0, ptn_g=0, target_kcal=700, target_ptn=30, has_fresh=False,
+            unknown_items=3, known_items=0,
+        )
+
+        self.assertIn("vale somar uma", linhas[-1])
+
+    def test_complete_plate_reads_exactly_as_before(self):
+        linhas = plate_reading(kcal=690, ptn_g=31, target_kcal=700, target_ptn=30, has_fresh=True)
+
+        self.assertIn("alinhado", linhas[0])
+        self.assertIn("atingida", linhas[1])
+
+
 class ProgressoTest(unittest.TestCase):
     def test_week_summary_is_personal_and_never_comparative(self):
         self.assertIn("ainda nao registrou", week_summary(0))

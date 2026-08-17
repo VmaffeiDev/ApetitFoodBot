@@ -315,6 +315,19 @@ class HistoricoEFotografiaTest(BancoBase):
         self.assertAlmostEqual(dias[1].kcal, 134 + 138, places=0)
         self.assertFalse(dias[1].incomplete)
 
+    def test_an_item_with_calories_but_no_protein_still_counts_as_unknown(self):
+        # kcal sem proteina nao da para ler: somar so a metade produz um numero
+        # que parece total e nao e.
+        self.conn.execute("UPDATE menu_item SET ptn_g = NULL WHERE code = ?", ("arroz_parboilizado",))
+        self.conn.commit()
+
+        log_consumption(self.conn, self.user, "2025-09-01", ["arroz_parboilizado"])
+
+        totais = consumption_totals(self.conn, self.user, "2025-09-01")
+        self.assertEqual(totais["sem_macro"], 1)
+        self.assertEqual(totais["com_macro"], 0)
+        self.assertTrue(history_by_day(self.conn, self.user)[0].incomplete)
+
     def test_a_day_with_an_unknown_item_is_flagged_as_incomplete(self):
         log_consumption(self.conn, self.user, "2025-09-01", ["carne_assada_ao_molho", "prato_que_sumiu"])
 

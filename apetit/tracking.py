@@ -118,13 +118,18 @@ def consumption_totals(conn: sqlite3.Connection, telegram_id: int, service_date:
     """Totais do dia, lidos da fotografia — nao da ficha tecnica de hoje."""
     row = conn.execute(
         """
+        -- sem_macro e com_macro contam porcoes, na mesma unidade de `itens`,
+        -- para quem le nao precisar converter linha em quantidade. Item so
+        -- conta como conhecido tendo kcal E proteina: e o par que o app usa
+        -- para dizer qualquer coisa sobre o prato.
         SELECT
             COALESCE(SUM(quantity), 0) AS itens,
             COALESCE(SUM(kcal * quantity), 0) AS kcal,
             COALESCE(SUM(cho_g * quantity), 0) AS cho_g,
             COALESCE(SUM(lip_g * quantity), 0) AS lip_g,
             COALESCE(SUM(ptn_g * quantity), 0) AS ptn_g,
-            SUM(CASE WHEN kcal IS NULL THEN 1 ELSE 0 END) AS sem_macro
+            COALESCE(SUM(CASE WHEN kcal IS NULL OR ptn_g IS NULL THEN quantity ELSE 0 END), 0) AS sem_macro,
+            COALESCE(SUM(CASE WHEN kcal IS NOT NULL AND ptn_g IS NOT NULL THEN quantity ELSE 0 END), 0) AS com_macro
         FROM consumption
         WHERE telegram_id = ? AND service_date = ?
         """,
@@ -163,10 +168,24 @@ class DayRecord:
     def ptn_g(self) -> float:
         return sum((linha["ptn_g"] or 0) * linha["quantity"] for linha in self.items)
 
+    @staticmethod
+    def _conhecido(linha) -> bool:
+        """Item so e legivel com kcal E proteina: e o par que o app usa."""
+        return linha["kcal"] is not None and linha["ptn_g"] is not None
+
+    @property
+    def unknown_items(self) -> int:
+        """Itens registrados sem macro. O total do dia e piso, nao total."""
+        return sum(1 for linha in self.items if not self._conhecido(linha))
+
+    @property
+    def known_items(self) -> int:
+        return sum(1 for linha in self.items if self._conhecido(linha))
+
     @property
     def incomplete(self) -> bool:
         """Algum item registrado nao tinha macro. O total do dia e parcial."""
-        return any(linha["kcal"] is None for linha in self.items)
+        return self.unknown_items > 0
 
 
 def history_by_day(conn: sqlite3.Connection, telegram_id: int, days: int = 14) -> list[DayRecord]:

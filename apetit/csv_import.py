@@ -223,6 +223,8 @@ NON_FOOD_CATEGORIES = ("KIT",)
 # "06.03.01.258", "09.03.01.077-1".
 FICHA_CODE = re.compile(r"^[A-Za-z]{0,2}\d[\d.\-]*$")
 PERCENT = re.compile(r"^\d+\s*%$")
+# Custo per capita: numero decimal solto no fim da celula.
+COST = re.compile(r"^\d+[.,]\d+$")
 PORTION_IN_NAME = re.compile(r"\((\d+(?:[.,]\d+)?)\s*g\)", re.IGNORECASE)
 
 
@@ -248,10 +250,10 @@ def parse_planning_cell(raw: str) -> tuple[str, float | None, str]:
 
     if len(partes) > 1 and PERCENT.match(partes[0]):
         partes.pop(0)
-    # O ultimo pedaco numerico e o custo per capita.
-    if len(partes) > 1 and parse_number(partes[-1]) is not None and not FICHA_CODE.match(partes[-1] or ""):
-        partes.pop()
-    elif len(partes) > 1 and parse_number(partes[-1]) is not None and "." in partes[-1]:
+    # Custo per capita: sempre o ultimo pedaco, e sempre decimal ("3.11",
+    # "0.62"). Exigir o decimal separa custo de codigo de ficha, que pode ser
+    # um inteiro solto — em "OVO FRITO - 1 - 0.62" o "1" e ficha, nao custo.
+    if len(partes) > 1 and COST.match(partes[-1]):
         partes.pop()
 
     ficha = ""
@@ -267,6 +269,9 @@ def parse_planning_cell(raw: str) -> tuple[str, float | None, str]:
         portion = parse_number(achado.group(1))
         nome = PORTION_IN_NAME.sub("", nome).strip()
     nome = re.sub(r"\s{2,}", " ", nome).strip(" -")
+    # Celula que sobrou so com numero nao e prato: virou lixo de planilha.
+    if parse_number(nome) is not None:
+        return "", portion, ficha
     return nome, portion, ficha
 
 

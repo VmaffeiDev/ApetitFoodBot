@@ -110,28 +110,55 @@ def dish_hint(kcal: float | None, ptn_g: float | None) -> str:
     return " · ".join(partes)
 
 
-def plate_reading(kcal: float, ptn_g: float, target_kcal: int, target_ptn: int, has_fresh: bool) -> list[str]:
+def plate_reading(
+    kcal: float,
+    ptn_g: float,
+    target_kcal: int,
+    target_ptn: int,
+    has_fresh: bool,
+    unknown_items: int = 0,
+    known_items: int = 1,
+) -> list[str]:
     """Leitura do prato montado, em frases.
 
     Nunca repreende nem manda comer menos: descreve onde o prato esta em relacao
     ao que a propria pessoa escolheu como objetivo, e sugere o que ainda da para
     somar. Quem prescreve e o nutricionista.
+
+    `unknown_items` sao os itens do prato sem valor nutricional. Enquanto houver
+    um, o prato nao e classificado: somar so o que tem macro da um numero menor
+    que o real, e chamar isso de "prato leve" seria o app afirmar o que nao sabe.
+    Prato sem nenhum item conhecido nao recebe leitura nenhuma — a mesma regra
+    que vale para alergenico vale aqui: ausencia de informacao nunca vira
+    afirmacao.
     """
     linhas: list[str] = []
 
-    proporcao = kcal / target_kcal if target_kcal else 0
-    if proporcao < 0.7:
-        linhas.append("Prato leve para o seu objetivo de hoje.")
-    elif proporcao <= 1.1:
-        linhas.append("Prato alinhado com o seu objetivo de hoje.")
+    if unknown_items and not known_items:
+        linhas.append(
+            "Ainda nao consigo ler este prato: os itens de hoje estao sem informacao nutricional."
+        )
+    elif unknown_items:
+        linhas.append(
+            f"Leitura incompleta: {unknown_items} item(ns) do prato estao sem informacao nutricional."
+        )
+        linhas.append(
+            f"Do que da para somar, o prato tem no minimo {kcal:.0f} kcal e {ptn_g:.0f} g de proteina."
+        )
     else:
-        linhas.append("Prato acima do que voce marcou como alvo para hoje.")
+        proporcao = kcal / target_kcal if target_kcal else 0
+        if proporcao < 0.7:
+            linhas.append("Prato leve para o seu objetivo de hoje.")
+        elif proporcao <= 1.1:
+            linhas.append("Prato alinhado com o seu objetivo de hoje.")
+        else:
+            linhas.append("Prato acima do que voce marcou como alvo para hoje.")
 
-    if ptn_g >= target_ptn:
-        linhas.append(f"Proteina do dia atingida: {ptn_g:.0f} g.")
-    else:
-        falta = target_ptn - ptn_g
-        linhas.append(f"Faltam {falta:.0f} g de proteina para o seu alvo.")
+        if ptn_g >= target_ptn:
+            linhas.append(f"Proteina do dia atingida: {ptn_g:.0f} g.")
+        else:
+            falta = target_ptn - ptn_g
+            linhas.append(f"Faltam {falta:.0f} g de proteina para o seu alvo.")
 
     if not has_fresh:
         linhas.append("Sem salada nem fruta no prato — vale somar uma.")

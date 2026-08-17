@@ -41,6 +41,10 @@ BASE_CATEGORIES = ("PRATO PRINCIPAL", "GUARNICAO", "ARROZ", "FEIJAO", "SALADA")
 # Salada quase nao move o total e faz bem: entra como "a vontade".
 FREE_CATEGORIES = {"SALADA"}
 
+# Categorias que existem no prato para entregar proteina. So se repetem
+# enquanto a meta de proteina nao fechou.
+PROTEIN_CATEGORIES = {"PRATO PRINCIPAL", "OPCAO AO PP"}
+
 # Quanto vale fechar 1 g de proteina, em "kcal equivalente" de prioridade.
 # Alto de proposito: a proteina e a parte que a pessoa costuma nao alcancar.
 PESO_PROTEINA = 15.0
@@ -108,17 +112,30 @@ class PlateSuggestion:
         return [p.code for p in self.portions for _ in range(p.quantity) if p.code]
 
     def summary(self) -> str:
+        """Fecha a sugestao dizendo onde ela chegou — e onde nao chegou.
+
+        Proteina e energia sao ditas separadamente: bater a proteina e ficar
+        200 kcal abaixo do alvo nao e "a meta do dia", e anunciar assim faria o
+        app declarar cumprido o que nao cumpriu.
+        """
         if not self.portions:
             return "Nao consigo sugerir quantidades para o cardapio de hoje."
-        falta = self.target_ptn - self.ptn_g
-        if falta <= 0:
-            fecho = f"Isso fecha {self.kcal:.0f} kcal e {self.ptn_g:.0f} g de proteina — sua meta do dia."
-        else:
-            fecho = (
-                f"Isso da {self.kcal:.0f} kcal e {self.ptn_g:.0f} g de proteina. "
-                f"Ainda ficam {falta:.0f} g de proteina abaixo do seu alvo com o que tem hoje."
-            )
-        return fecho
+
+        numeros = f"Isso da {self.kcal:.0f} kcal e {self.ptn_g:.0f} g de proteina."
+        falta_ptn = self.target_ptn - self.ptn_g
+        # Abaixo de 85% do alvo de energia a diferenca ja e uma refeicao menor,
+        # nao arredondamento.
+        falta_kcal = self.target_kcal * 0.85 - self.kcal
+
+        pendencias = []
+        if falta_ptn > 0:
+            pendencias.append(f"{falta_ptn:.0f} g de proteina")
+        if falta_kcal > 0:
+            pendencias.append(f"{self.target_kcal - self.kcal:.0f} kcal")
+
+        if not pendencias:
+            return f"{numeros} E a sua meta do dia."
+        return f"{numeros} Com o que tem hoje, ainda fica abaixo do seu alvo em {' e '.join(pendencias)}."
 
 
 def _best_in_category(category: str, items: list[dict]) -> dict | None:
@@ -188,6 +205,14 @@ def suggest_plate(menu_items: list[dict], target_kcal: int, target_ptn: int) -> 
 
         for categoria, item in escolhidos.items():
             if categoria in FREE_CATEGORIES:
+                continue
+            # Repetir o prato principal so se faltar proteina. Depois que a meta
+            # de proteina fecha, o principal e apenas a opcao mais calorica da
+            # bandeja, e o algoritmo passaria a mandar "pegue duas porcoes de
+            # carne" so para fechar energia — caro no refeitorio e nao e o que
+            # um nutricionista sugeriria. Energia que falta se fecha com arroz e
+            # guarnicao.
+            if categoria in PROTEIN_CATEGORIES and quantidades[categoria] >= 1 and falta_ptn <= 0:
                 continue
             _, _, maximo = MEASURES.get(categoria, MEDIDA_PADRAO)
             if quantidades[categoria] >= maximo:

@@ -110,6 +110,46 @@ class SugestaoTest(unittest.TestCase):
 
         self.assertNotIn("SOBREMESA", {p.category for p in sugestao.portions})
 
+    def test_main_dish_is_not_repeated_once_protein_is_met(self):
+        # Com a meta de proteina fechada, o principal so seria repetido para
+        # fechar caloria. "Pegue duas porcoes de carne" e caro no refeitorio e
+        # nao e o que um nutricionista sugeriria.
+        sugestao = suggest_plate(CARDAPIO, target_kcal=700, target_ptn=30)
+
+        principal = next(p for p in sugestao.portions if p.category == "PRATO PRINCIPAL")
+        self.assertEqual(principal.quantity, 1)
+
+    def test_main_dish_still_repeats_when_protein_is_short(self):
+        # Alvo de proteina alto: ai repetir o principal e exatamente o certo.
+        sugestao = suggest_plate(CARDAPIO, target_kcal=850, target_ptn=45)
+
+        principal = next(p for p in sugestao.portions if p.category == "PRATO PRINCIPAL")
+        self.assertEqual(principal.quantity, 2)
+
+    def test_energy_gap_is_closed_with_sides(self):
+        sugestao = suggest_plate(CARDAPIO, target_kcal=700, target_ptn=30)
+
+        acompanhamentos = {p.category: p.quantity for p in sugestao.portions}
+        self.assertGreater(acompanhamentos["ARROZ"] + acompanhamentos["GUARNICAO"], 2)
+        self.assertGreaterEqual(sugestao.kcal, 700 * 0.85)
+
+    def test_summary_does_not_claim_the_goal_when_energy_is_far_below(self):
+        # Bater proteina e ficar 300 kcal abaixo nao e "a meta do dia".
+        magro = [
+            {"category": "PRATO PRINCIPAL", "name": "FRANGO", "kcal": 150, "ptn_g": 32},
+            {"category": "SALADA", "name": "ALFACE", "kcal": 4, "ptn_g": 0.5},
+        ]
+
+        sugestao = suggest_plate(magro, target_kcal=700, target_ptn=30)
+
+        self.assertIn("abaixo do seu alvo", sugestao.summary())
+        self.assertNotIn("E a sua meta do dia", sugestao.summary())
+
+    def test_summary_claims_the_goal_only_when_both_are_met(self):
+        sugestao = suggest_plate(CARDAPIO, target_kcal=700, target_ptn=30)
+
+        self.assertIn("E a sua meta do dia", sugestao.summary())
+
     def test_suggestion_follows_the_serving_line_order(self):
         sugestao = suggest_plate(CARDAPIO, target_kcal=700, target_ptn=30)
 
