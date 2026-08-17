@@ -98,15 +98,23 @@ O que torna a conta simples: no cardapio da operacao **cada linha ja e uma porca
 padrao**. ARROZ PARBOILIZADO com 138 kcal e uma colher de servir; FEIJAO PRETO
 com 29 kcal e uma concha. Entao a sugestao multiplica, nao converte.
 
-Quatro regras seguram o resultado:
+Cinco regras seguram o resultado:
 
 - **prato bloqueado nao entra** — sugerir quantidade de algo que a pessoa nao
   pode comer seria pior que nao sugerir nada
 - **teto por categoria** — no maximo 3 colheres de arroz, 2 conchas de feijao;
   sem isso a conta viraria recomendacao absurda
+- **o prato principal so se repete enquanto falta proteina** — depois da meta
+  fechada ele e apenas a opcao mais calorica da bandeja, e repetir viraria
+  "pegue duas porcoes de carne" so para fechar energia. Energia que falta se
+  fecha com arroz e guarnicao
 - **sobremesa e bebida ficam de fora** — nao e papel do app empurrar pudim para
   fechar caloria
 - **quando o cardapio nao alcanca o alvo, ele diz** em vez de inventar porcao
+
+O fecho cobra proteina e energia separadamente: bater a proteina e ficar 200
+kcal abaixo do alvo nao e "a meta do dia", e anunciar assim faria o app declarar
+cumprido o que nao cumpriu.
 
 Salada entra como "a vontade": quase nao move o total e faz bem.
 
@@ -212,6 +220,35 @@ Tres detalhes que o formato exige:
 Importar planejamento por cima de uma ficha tecnica ja carregada **nao apaga os
 macros** — todo campo nutricional entra por `COALESCE`, entao valor novo
 nao-nulo vence e ausencia preserva o que estava la.
+
+### Ausencia de macro nunca vira zero
+
+A mesma invariante que vale para alergenico vale para valor nutricional: o que
+o app nao sabe, ele nao afirma.
+
+Somar item sem macro como zero produzia isto, para quem pegou carne, arroz,
+feijao e salada de um cardapio sem ficha tecnica:
+
+```
+Prato leve para o seu objetivo de hoje.
+Faltam 30 g de proteina para o seu alvo.
+0 kcal · 0 g proteina
+```
+
+Nada ali era verdade. Hoje a leitura do prato recebe quantos itens sao
+legiveis, e:
+
+- **nenhum legivel** — o app nao classifica o prato: "ainda nao consigo ler
+  este prato"
+- **parte legivel** — o total vira piso explicito ("no minimo 280 kcal") e o
+  prato tambem nao e classificado, porque classificar soma incompleta e
+  afirmar o que nao se sabe
+- **tudo legivel** — leitura normal
+
+Item so conta como legivel tendo **kcal e proteina**: e o par que o app usa para
+dizer qualquer coisa, e so kcal deixava a proteina entrar como zero silencioso.
+A composicao do prato ("sem salada nem fruta") continua sendo lida sem macro
+nenhum, porque para isso a categoria basta.
 
 ### O que essa planilha sozinha nao resolve
 
