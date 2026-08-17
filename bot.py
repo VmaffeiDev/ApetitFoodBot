@@ -48,6 +48,18 @@ from apetit.catalog import (
     pending_issues,
     set_item_allergens,
 )
+from apetit.feedback import (
+    MISSING_TAGS,
+    SCALE,
+    Rating,
+    all_unit_reports,
+    my_ratings,
+    rating_for,
+    save_rating,
+    unit_comments,
+    unit_report,
+    unit_trend,
+)
 from apetit.humanize import (
     FRESH_CATEGORIES,
     category_label,
@@ -126,6 +138,7 @@ COMMANDS = [
     BotCommand("cardapio", "Ver o cardapio de hoje"),
     BotCommand("quanto_pegar", "Quanto pegar de cada coisa hoje"),
     BotCommand("montar", "Montar meu prato passo a passo"),
+    BotCommand("avaliar", "Avaliar o refeitorio de hoje"),
     BotCommand("meu_dia", "O que eu comi hoje e nos ultimos dias"),
     BotCommand("favoritos", "Pratos que eu guardei"),
     BotCommand("progresso", "Minha sequencia e conquistas"),
@@ -181,6 +194,7 @@ def main_menu() -> list[list[tuple[str, str]]]:
     return [
         [("\U0001f957 Quanto pegar hoje", "quanto")],
         [("\U0001f37d️ Montar meu prato", "montar"), ("\U0001f4c5 Cardapio", "cardapio")],
+        [("⭐ Avaliar o refeitorio", "avaliar")],
         [("\U0001f4c8 Meu progresso", "progresso")],
         [("\U0001f4ca Meu dia", "meu_dia"), ("⭐ Favoritos", "favoritos")],
         [("\U0001f464 Meu cadastro", "perfil"), ("❓ Ajuda", "ajuda")],
@@ -809,12 +823,23 @@ async def save_meal(
         linhas.extend(f"• {escape(regra.label)}" for regra in ganhas)
     linhas.append("\nIsso fica no seu <b>Meu dia</b>. Registrar de novo hoje substitui este.")
 
-    await reply(
-        update,
-        "\n".join(linhas),
-        [[("\U0001f4ca Ver meu historico", "meu_dia")], [("\U0001f519 Voltar", "menu")]],
-        edit=True,
-    )
+    # Convite para avaliar so aparece se ela ainda nao avaliou hoje: pedir de
+    # novo o que a pessoa ja respondeu e o caminho mais rapido para ela parar
+    # de responder.
+    conn = db()
+    try:
+        ja_avaliou = rating_for(conn, pessoa.telegram_id, dia) is not None
+    finally:
+        conn.close()
+
+    botoes = []
+    if not ja_avaliou:
+        linhas.append("\nComo foi o refeitorio hoje? Leva tres toques.")
+        botoes.append([("⭐ Avaliar o refeitorio", "avaliar")])
+    botoes.append([("\U0001f4ca Ver meu historico", "meu_dia")])
+    botoes.append([("\U0001f519 Voltar", "menu")])
+
+    await reply(update, "\n".join(linhas), botoes, edit=True)
 
 
 async def register_meal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -845,6 +870,127 @@ async def register_suggestion(update: Update, context: ContextTypes.DEFAULT_TYPE
     await save_meal(
         update, context, pessoa, sugestao.item_codes(), sugestao.lines(), source="sugestao"
     )
+
+
+# --------------------------------------------------------------------------
+# Avaliacao do refeitorio
+# --------------------------------------------------------------------------
+#
+# Esta e a unica tela do app cujo dado a Apetit le. Por isso ela avisa, antes
+# de qualquer pergunta, que a resposta vai sem nome — quem nao sabe que esta
+# protegido responde como se nao estivesse.
+
+AVALIACAO = "avaliacao"
+
+NOTAS = ((3, "\U0001f60b Boa"), (2, "\U0001f610 Regular"), (1, "\U0001f61e Ruim"))
+
+
+def rascunho_avaliacao(context: ContextTypes.DEFAULT_TYPE) -> dict:
+    return context.user_data.setdefault(AVALIACAO, {})
+
+
+async def ask_food(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+    pessoa = await require_registration(update, context, edit=edit)
+    if not pessoa:
+        return
+    context.user_data[AVALIACAO] = {}
+    await reply(
+        update,
+        "⭐ <b>Como foi o almoco de hoje?</b>\n"
+        f"<i>{escape(pessoa.apetit_unit)} · {escape(friendly_date(today()))}</i>\n\n"
+        "<b>A comida estava boa?</b>\n\n"
+        "<i>Sua resposta vai sem o seu nome. A Apetit ve como o refeitorio esta indo, "
+        "nunca quem disse o que — nem a sua empresa, nem o seu setor.</i>",
+        [[(rotulo, f"aval_comida:{nota}")] for nota, rotulo in NOTAS] + [[("\U0001f519 Voltar", "menu")]],
+        edit=edit,
+    )
+
+
+async def ask_service(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await reply(
+        update,
+        "⭐ <b>E o atendimento?</b>\n\n"
+        "<i>Como voce foi tratado no balcao e na fila.</i>",
+        [[(rotulo, f"aval_atend:{nota}")] for nota, rotulo in NOTAS] + [[("← Voltar", "avaliar")]],
+        edit=True,
+    )
+
+
+async def ask_missing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await reply(
+        update,
+        "⭐ <b>Faltou alguma coisa?</b>",
+        [
+            [("\U0001f44d Nao, estava tudo la", "aval_faltou:nao")],
+            [("\U0001f44e Sim, faltou", "aval_faltou:sim")],
+        ],
+        edit=True,
+    )
+
+
+async def ask_missing_what(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    marcados = set(rascunho_avaliacao(context).get("tags", []))
+    botoes = [
+        [(("☑️ " if code in marcados else "⬜ ") + rotulo, f"aval_tag:{code}")]
+        for code, rotulo in MISSING_TAGS.items()
+    ]
+    botoes.append([("Continuar ➡️", "aval_comentario")])
+    await reply(update, "⭐ <b>O que faltou?</b>\n\nPode marcar mais de um.", botoes, edit=True)
+
+
+async def ask_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data[STEP] = "avaliacao_comentario"
+    await reply(
+        update,
+        "⭐ <b>Quer contar mais alguma coisa?</b>\n\n"
+        "Escreva o que quiser sobre o refeitorio de hoje, ou toque em pular.\n\n"
+        "<i>O texto chega a Apetit sem o seu nome. Ainda assim, evite escrever algo "
+        "que so voce diria — e evite citar colega pelo nome.</i>",
+        [[("Pular e enviar", "aval_enviar")]],
+        edit=True,
+    )
+
+
+async def submit_rating(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    pessoa = await require_registration(update, context, edit=True)
+    if not pessoa:
+        return
+    dados = rascunho_avaliacao(context)
+    avaliacao = Rating(
+        apetit_unit=pessoa.apetit_unit,
+        service_date=today(),
+        food=dados.get("comida"),
+        service=dados.get("atendimento"),
+        missing=bool(dados.get("faltou")),
+        tags=dados.get("tags", []),
+        comment=dados.get("comentario", ""),
+    )
+    context.user_data.pop(AVALIACAO, None)
+    context.user_data.pop(STEP, None)
+
+    if avaliacao.empty:
+        await reply(update, "Nao registrei nada — voce nao respondeu nenhuma pergunta.", main_menu(), edit=True)
+        return
+
+    conn = db()
+    try:
+        save_rating(conn, pessoa.telegram_id, avaliacao)
+    finally:
+        conn.close()
+
+    linhas = ["✅ <b>Obrigado!</b>\n", "Sua avaliacao de hoje foi registrada."]
+    if avaliacao.food is not None:
+        linhas.append(f"\n<b>Comida:</b> {escape(SCALE[avaliacao.food])}")
+    if avaliacao.service is not None:
+        linhas.append(f"<b>Atendimento:</b> {escape(SCALE[avaliacao.service])}")
+    if avaliacao.tags:
+        faltou = ", ".join(MISSING_TAGS[t] for t in avaliacao.tags)
+        linhas.append(f"<b>Faltou:</b> {escape(faltou)}")
+    linhas.append(
+        "\n<i>Isso entra na media do refeitorio, sem o seu nome. "
+        "Se quiser mudar, e so avaliar de novo hoje — a nova substitui esta.</i>"
+    )
+    await reply(update, "\n".join(linhas), main_menu(), edit=True)
 
 
 # --------------------------------------------------------------------------
@@ -1030,6 +1176,10 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bo
         "de cada coisa. Registrar de novo no mesmo dia substitui o registro anterior.\n\n"
         "<b>Favoritos</b> — pratos que voce gostou. Aviso quando voltarem.\n\n"
         "<b>Meu progresso</b> — sua sequencia e suas conquistas. So suas.\n\n"
+        "<b>Avaliar o refeitorio</b> — tres toques dizendo como foi a comida, o "
+        "atendimento e se faltou algo. <b>Vai sem o seu nome:</b> a Apetit ve como o "
+        "refeitorio esta indo, nunca quem disse o que — nem a sua empresa, nem o seu "
+        "setor. E a unica coisa do app que sai de voce.\n\n"
         "<b>Sobre os simbolos</b>\n"
         "⛔ contem algo que voce marcou como alergia\n"
         "⚠️ sem informacao de alergenico — pergunte no balcao\n"
@@ -1051,6 +1201,7 @@ async def show_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE, edit:
         historico = consumption_history(conn, pessoa.telegram_id, 200)
         guardados = favorites(conn, pessoa.telegram_id)
         pontos = total_points(conn, pessoa.telegram_id)
+        avaliacoes = my_ratings(conn, pessoa.telegram_id, 200)
     finally:
         conn.close()
     restricoes = describe_restrictions(pessoa)
@@ -1067,8 +1218,12 @@ async def show_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE, edit:
         f"<b>Aceite:</b> {escape(pessoa.consented_at or 'nao informado')}\n\n"
         f"<b>Dias com refeicao registrada:</b> {dias}\n"
         f"<b>Pratos guardados:</b> {len(guardados)}\n"
-        f"<b>Pontos:</b> {pontos}\n\n"
+        f"<b>Pontos:</b> {pontos}\n"
+        f"<b>Avaliacoes do refeitorio:</b> {len(avaliacoes)}\n\n"
         "<b>Sua empresa nao ve nada disso sobre voce.</b>\n"
+        "A unica coisa que sai daqui e a avaliacao do refeitorio — e ela vai "
+        "sem o seu nome, sem a sua empresa e sem o seu setor, junto com a de "
+        "todo mundo. A Apetit ve como o refeitorio esta indo, nunca quem disse o que.\n\n"
         "Para apagar tudo: /excluir_dados",
         [[("\U0001f519 Voltar", "menu")]],
         edit=edit,
@@ -1204,6 +1359,99 @@ async def show_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.effective_message.reply_text("\n".join(linhas), parse_mode=ParseMode.HTML)
 
 
+def _linha_relatorio(relatorio) -> str:
+    if relatorio.suppressed:
+        return f"- <b>{escape(relatorio.apetit_unit)}</b>: suprimido ({escape(relatorio.reason)})"
+    partes = [f"{relatorio.total} avaliacoes"]
+    if relatorio.food_good_pct is not None:
+        partes.append(f"comida boa {relatorio.food_good_pct:.0f}%")
+    if relatorio.service_good_pct is not None:
+        partes.append(f"atendimento bom {relatorio.service_good_pct:.0f}%")
+    if relatorio.missing_pct:
+        partes.append(f"faltou algo em {relatorio.missing_pct:.0f}%")
+    return f"- <b>{escape(relatorio.apetit_unit)}</b>: {escape(' · '.join(partes))}"
+
+
+async def show_service_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Como cada refeitorio esta sendo avaliado. Sempre agregado, nunca por pessoa.
+
+    Com `/atendimento <unidade>` abre o detalhe daquele refeitorio: o que mais
+    faltou, a serie semanal e os comentarios.
+    """
+    if not is_admin(tg_id(update)):
+        await deny_admin(update, "ver o relatorio de atendimento")
+        return
+
+    fim = today()
+    inicio = (date.fromisoformat(fim) - timedelta(days=29)).isoformat()
+    unidade = " ".join(context.args).strip() if context.args else ""
+
+    conn = db()
+    try:
+        if unidade:
+            relatorio = unit_report(conn, unidade, inicio, fim)
+            serie = unit_trend(conn, unidade, weeks=6, today=fim)
+            comentarios = unit_comments(conn, unidade, inicio, fim)
+        else:
+            relatorios = all_unit_reports(conn, inicio, fim)
+    finally:
+        conn.close()
+
+    periodo = f"{friendly_date(inicio)} a {friendly_date(fim)}"
+
+    if not unidade:
+        if not relatorios:
+            await update.effective_message.reply_text("Ainda nao ha avaliacoes de refeitorio no periodo.")
+            return
+        linhas = [f"\U0001f4ca <b>Atendimento por refeitorio</b>\n<i>{escape(periodo)}</i>\n"]
+        linhas.extend(_linha_relatorio(r) for r in relatorios)
+        linhas.append(
+            "\n<i>Ordenado por quem precisa de atencao primeiro. "
+            "Use /atendimento &lt;refeitorio&gt; para o detalhe.</i>"
+        )
+        linhas.append(
+            "<i>Avaliacao nao carrega nome, empresa nem setor de quem respondeu.</i>"
+        )
+        await update.effective_message.reply_text("\n".join(linhas), parse_mode=ParseMode.HTML)
+        return
+
+    linhas = [f"\U0001f4ca <b>{escape(unidade)}</b>\n<i>{escape(periodo)}</i>\n"]
+    if relatorio.suppressed:
+        linhas.append(f"Sem dado suficiente: {escape(relatorio.reason)}.")
+        linhas.append(
+            "\n<i>Abaixo do minimo a media nao sai: com poucas avaliacoes ela vira "
+            "a opiniao identificavel de uma pessoa.</i>"
+        )
+        await update.effective_message.reply_text("\n".join(linhas), parse_mode=ParseMode.HTML)
+        return
+
+    linhas.append(_linha_relatorio(relatorio).split(": ", 1)[1])
+    if relatorio.tags:
+        linhas.append("\n<b>O que mais faltou:</b>")
+        linhas.extend(f"• {escape(MISSING_TAGS.get(tag, tag))} — {total}x" for tag, total in relatorio.tags)
+
+    visiveis = [s for s in serie if not s.suppressed]
+    if visiveis:
+        linhas.append("\n<b>Semana a semana (comida boa):</b>")
+        for semana in serie:
+            if semana.suppressed:
+                linhas.append(f"• {escape(friendly_date(semana.period_start))}: sem dado suficiente")
+            else:
+                linhas.append(
+                    f"• {escape(friendly_date(semana.period_start))}: "
+                    f"{semana.food_good_pct:.0f}% ({semana.total} avaliacoes)"
+                )
+
+    if comentarios:
+        linhas.append("\n<b>O que escreveram:</b>")
+        linhas.extend(f"• <i>{escape(c)}</i>" for c in comentarios[:15])
+        if len(comentarios) > 15:
+            linhas.append(f"<i>… e mais {len(comentarios) - 15} comentario(s).</i>")
+
+    linhas.append("\n<i>Nenhuma linha aqui carrega quem respondeu.</i>")
+    await update.effective_message.reply_text("\n".join(linhas), parse_mode=ParseMode.HTML)
+
+
 async def notify_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_admin(tg_id(update)):
         await deny_admin(update, "disparar avisos de favorito")
@@ -1264,6 +1512,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await reply(update, "Toque numa opcao \U0001f447", main_menu())
         else:
             await ask_name(update, context)
+        return
+
+    if step == "avaliacao_comentario":
+        # Comentario e o unico texto livre que sai do app para a Apetit. Cortar
+        # no limite evita que um desabafo longo vire dado identificavel por
+        # volume de detalhe — e cabe na tela de quem vai ler.
+        rascunho_avaliacao(context)["comentario"] = texto[:500]
+        await submit_rating(update, context)
         return
 
     if len(texto) < 2:
@@ -1447,6 +1703,42 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 conn.close()
             await show_favorites(update, context, edit=True)
         return
+    if data == "avaliar":
+        await ask_food(update, context, edit=True)
+        return
+    if data.startswith("aval_comida:"):
+        rascunho_avaliacao(context)["comida"] = int(data.split(":", 1)[1])
+        await ask_service(update, context)
+        return
+    if data.startswith("aval_atend:"):
+        rascunho_avaliacao(context)["atendimento"] = int(data.split(":", 1)[1])
+        await ask_missing(update, context)
+        return
+    if data.startswith("aval_faltou:"):
+        faltou = data.split(":", 1)[1] == "sim"
+        rascunho_avaliacao(context)["faltou"] = faltou
+        if faltou:
+            await ask_missing_what(update, context)
+        else:
+            await ask_comment(update, context)
+        return
+    if data.startswith("aval_tag:"):
+        code = data.split(":", 1)[1]
+        if code in MISSING_TAGS:
+            tags = rascunho_avaliacao(context).setdefault("tags", [])
+            if code in tags:
+                tags.remove(code)
+            else:
+                tags.append(code)
+        await ask_missing_what(update, context)
+        return
+    if data == "aval_comentario":
+        await ask_comment(update, context)
+        return
+    if data == "aval_enviar":
+        await submit_rating(update, context)
+        return
+
     if data == "meu_dia":
         await show_day(update, context, edit=True)
         return
@@ -1501,6 +1793,7 @@ def main() -> None:
     app.add_handler(CommandHandler("cardapio", show_menu))
     app.add_handler(CommandHandler("montar", start_flow))
     app.add_handler(CommandHandler("quanto_pegar", show_portions))
+    app.add_handler(CommandHandler("avaliar", ask_food))
     app.add_handler(CommandHandler("meu_dia", show_day))
     app.add_handler(CommandHandler("favoritos", show_favorites))
     app.add_handler(CommandHandler("progresso", show_progress))
@@ -1510,6 +1803,7 @@ def main() -> None:
     app.add_handler(CommandHandler("alergenico", declare_allergen))
     app.add_handler(CommandHandler("cobertura", show_coverage))
     app.add_handler(CommandHandler("relatorio", show_report))
+    app.add_handler(CommandHandler("atendimento", show_service_report))
     app.add_handler(CommandHandler("avisar_favoritos", notify_favorites))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

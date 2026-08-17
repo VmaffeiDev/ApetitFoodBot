@@ -159,9 +159,19 @@ def load_employee(conn: sqlite3.Connection, telegram_id: int) -> Employee | None
 
 
 def delete_employee_data(conn: sqlite3.Connection, telegram_id: int) -> None:
-    """Exclusao completa pedida pelo titular, incluindo consumo e pontos."""
+    """Exclusao completa pedida pelo titular: consumo, pontos e avaliacoes.
+
+    As avaliacoes do refeitorio saem junto. Elas ja circulam so agregadas, mas
+    quem pede exclusao esta pedindo que nao reste linha ligada a ele — e a
+    linha existe, com telegram_id, mesmo que nenhum relatorio a leia assim.
+    """
+    conn.execute(
+        "DELETE FROM service_rating_tag WHERE rating_id IN "
+        "(SELECT id FROM service_rating WHERE telegram_id = ?)",
+        (telegram_id,),
+    )
     for tabela in (
-        "points_event", "favorite", "consumption",
+        "service_rating", "points_event", "favorite", "consumption",
         "employee_free_restriction", "employee_restriction", "employee",
     ):
         conn.execute(f"DELETE FROM {tabela} WHERE telegram_id = ?", (telegram_id,))

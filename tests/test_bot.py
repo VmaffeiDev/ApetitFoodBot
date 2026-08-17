@@ -10,6 +10,7 @@ import bot
 from apetit.allergens import ALLERGENS
 from apetit.catalog import import_menu_csv, init_schema, set_item_allergens
 from apetit.profile import load_employee
+from apetit.feedback import MIN_RATINGS, Rating, rating_for, save_rating
 from apetit.tracking import consumption_history, favorites, history_by_day, total_points
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -437,6 +438,173 @@ class MeuDiaTest(BotBase):
 
         self.assertIn("Seu historico", update.last)
         self.assertIn("g ptn", update.last)
+
+
+class AvaliacaoTest(BotBase):
+    async def asyncSetUp(self):
+        self.context = FakeContext()
+        await self.registrar(self.context, restricoes=())
+        bot.today = lambda: "2025-09-01"
+
+    async def avaliar(self, comida="aval_comida:3", atendimento="aval_atend:2", faltou="aval_faltou:nao"):
+        await bot.handle_callback(FakeUpdate(callback="avaliar"), self.context)
+        await bot.handle_callback(FakeUpdate(callback=comida), self.context)
+        await bot.handle_callback(FakeUpdate(callback=atendimento), self.context)
+        update = FakeUpdate(callback=faltou)
+        await bot.handle_callback(update, self.context)
+        return update
+
+    async def test_the_first_screen_says_the_answer_is_not_identified(self):
+        # Quem nao sabe que esta protegido responde como se nao estivesse.
+        update = FakeUpdate(callback="avaliar")
+        await bot.handle_callback(update, self.context)
+
+        self.assertIn("sem o seu nome", update.last)
+        self.assertIn("nunca quem disse o que", update.last)
+
+    async def test_three_taps_record_the_rating(self):
+        await self.avaliar()
+        update = FakeUpdate(callback="aval_enviar")
+        await bot.handle_callback(update, self.context)
+
+        conn = bot.db()
+        try:
+            guardada = rating_for(conn, self.user, "2025-09-01")
+        finally:
+            conn.close()
+        self.assertEqual(guardada.food, 3)
+        self.assertEqual(guardada.service, 2)
+        self.assertFalse(guardada.missing)
+        self.assertIn("Obrigado", update.last)
+
+    async def test_saying_something_was_missing_asks_what(self):
+        update = await self.avaliar(faltou="aval_faltou:sim")
+
+        self.assertIn("O que faltou", update.last)
+
+    async def test_missing_reasons_are_recorded(self):
+        await self.avaliar(faltou="aval_faltou:sim")
+        await bot.handle_callback(FakeUpdate(callback="aval_tag:acabou"), self.context)
+        await bot.handle_callback(FakeUpdate(callback="aval_tag:comida_fria"), self.context)
+        await bot.handle_callback(FakeUpdate(callback="aval_enviar"), self.context)
+
+        conn = bot.db()
+        try:
+            guardada = rating_for(conn, self.user, "2025-09-01")
+        finally:
+            conn.close()
+        self.assertEqual(sorted(guardada.tags), ["acabou", "comida_fria"])
+        self.assertTrue(guardada.missing)
+
+    async def test_tapping_a_reason_twice_unmarks_it(self):
+        await self.avaliar(faltou="aval_faltou:sim")
+        await bot.handle_callback(FakeUpdate(callback="aval_tag:acabou"), self.context)
+        await bot.handle_callback(FakeUpdate(callback="aval_tag:acabou"), self.context)
+        await bot.handle_callback(FakeUpdate(callback="aval_enviar"), self.context)
+
+        conn = bot.db()
+        try:
+            self.assertEqual(rating_for(conn, self.user, "2025-09-01").tags, [])
+        finally:
+            conn.close()
+
+    async def test_a_written_comment_is_saved(self):
+        await self.avaliar()
+        await bot.handle_callback(FakeUpdate(callback="aval_comentario"), self.context)
+        await bot.handle_message(FakeUpdate(text="O arroz estava salgado demais"), self.context)
+
+        conn = bot.db()
+        try:
+            self.assertEqual(
+                rating_for(conn, self.user, "2025-09-01").comment, "O arroz estava salgado demais"
+            )
+        finally:
+            conn.close()
+
+    async def test_after_registering_a_meal_it_offers_to_rate(self):
+        update = FakeUpdate(callback="registrar_sugestao")
+        await bot.handle_callback(update, self.context)
+
+        self.assertIn("avaliar", [data for _, data in update.buttons])
+
+    async def test_it_does_not_ask_again_once_already_rated(self):
+        # Pedir de novo o que a pessoa ja respondeu e o caminho mais rapido
+        # para ela parar de responder.
+        await self.avaliar()
+        await bot.handle_callback(FakeUpdate(callback="aval_enviar"), self.context)
+
+        update = FakeUpdate(callback="registrar_sugestao")
+        await bot.handle_callback(update, self.context)
+
+        self.assertNotIn("avaliar", [data for _, data in update.buttons])
+
+    async def test_my_data_shows_the_ratings_and_where_they_go(self):
+        await self.avaliar()
+        await bot.handle_callback(FakeUpdate(callback="aval_enviar"), self.context)
+
+        update = FakeUpdate()
+        await bot.show_my_data(update, self.context)
+
+        self.assertIn("Avaliacoes do refeitorio", update.last)
+        self.assertIn("sem o seu nome", update.last)
+
+    async def test_deleting_my_data_removes_the_ratings(self):
+        await self.avaliar()
+        await bot.handle_callback(FakeUpdate(callback="aval_enviar"), self.context)
+
+        await bot.handle_callback(FakeUpdate(callback="del_sim"), self.context)
+
+        conn = bot.db()
+        try:
+            self.assertIsNone(rating_for(conn, self.user, "2025-09-01"))
+        finally:
+            conn.close()
+
+
+class RelatorioAtendimentoTest(BotBase):
+    async def test_non_admin_cannot_see_the_service_report(self):
+        bot.ADMIN_IDS = {999}
+        update = FakeUpdate(user_id=self.user)
+
+        await bot.show_service_report(update, FakeContext())
+
+        self.assertIn("Apenas administradores", update.last)
+
+    async def test_report_suppresses_a_canteen_with_few_ratings(self):
+        bot.ADMIN_IDS = {self.user}
+        bot.today = lambda: "2025-09-10"
+        conn = bot.db()
+        try:
+            for i in range(2):
+                save_rating(conn, 500 + i, Rating(apetit_unit="SM", service_date="2025-09-01", food=1))
+        finally:
+            conn.close()
+
+        update = FakeUpdate(user_id=self.user)
+        await bot.show_service_report(update, FakeContext())
+
+        self.assertIn("suprimido", update.last)
+
+    async def test_report_shows_the_canteen_when_there_is_volume(self):
+        bot.ADMIN_IDS = {self.user}
+        bot.today = lambda: "2025-09-10"
+        conn = bot.db()
+        try:
+            for i in range(MIN_RATINGS):
+                save_rating(
+                    conn, 500 + i,
+                    Rating(apetit_unit="SM", service_date="2025-09-01", food=1, service=3, missing=True,
+                           tags=["acabou"]),
+                )
+        finally:
+            conn.close()
+
+        update = FakeUpdate(user_id=self.user)
+        await bot.show_service_report(update, FakeContext())
+
+        self.assertIn("SM", update.last)
+        self.assertIn("comida boa 0%", update.last)
+        self.assertIn("atendimento bom 100%", update.last)
 
 
 class LgpdTest(BotBase):

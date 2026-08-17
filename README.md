@@ -13,6 +13,8 @@ publicado, e o funcionario monta o prato e registra o consumo.
 - monta o prato e ve kcal e macros somarem contra o alvo do objetivo
 - registra o almoco e acumula pontos
 - guarda pratos favoritos e e avisado quando voltam ao cardapio
+- **avalia o refeitorio** — comida, atendimento e o que faltou — sem se
+  identificar para a empresa
 - consulta e apaga os proprios dados quando quiser
 
 ## Comandos
@@ -23,6 +25,7 @@ publicado, e o funcionario monta o prato e registra o consumo.
 | `/quanto_pegar` | Quantas conchas e colheres pegar para bater a meta |
 | `/montar` | Monta o prato passo a passo, na ordem da fila |
 | `/cardapio` | Cardapio de hoje com alerta de alergenico |
+| `/avaliar` | Avalia o refeitorio de hoje (comida, atendimento, falta) |
 | `/meu_dia` | O que comeu hoje e nos dias anteriores |
 | `/favoritos` | Pratos guardados |
 | `/progresso` | Sequencia e conquistas da pessoa |
@@ -40,6 +43,7 @@ Administracao e nutricionista:
 | `/pendencias` | Fila de revisao da importacao |
 | `/alergenico <prato> <alergenico> <estado>` | Declara alergenico de um prato |
 | `/relatorio` | Adesao **agregada** por setor |
+| `/atendimento [refeitorio]` | Como cada refeitorio esta sendo avaliado, **sempre agregado** |
 | `/avisar_favoritos` | Dispara aviso de prato favorito voltando |
 
 ## Rodar localmente
@@ -85,13 +89,13 @@ sugestao sai na medida do refeitorio.
 Quanto pegar hoje
 segunda-feira, 1 de setembro · objetivo: Manter o equilibrio
 
-• 2 porcoes de File de frango grelhado
-• 1 colher de Macarrao alho e oleo
+• 1 porcao de File de frango grelhado
+• 2 colheres de Macarrao alho e oleo
 • 2 colheres de Arroz parboilizado
 • 1 concha de Feijao preto
 • Mix de alface a vontade
 
-Isso fecha 703 kcal e 33 g de proteina — sua meta do dia.
+Isso da 711 kcal e 44 g de proteina. E a sua meta do dia.
 ```
 
 O que torna a conta simples: no cardapio da operacao **cada linha ja e uma porcao
@@ -411,6 +415,86 @@ teste garantindo que nenhuma se apoie em deficit ou peso.
 Os alvos de kcal e proteina por objetivo sao **ilustrativos**. Quem define faixa
 individual e o nutricionista responsavel: o app informa e acompanha, nao prescreve.
 
+## Avaliacao do refeitorio
+
+Depois de registrar a refeicao, o app pergunta como foi. Sao tres toques —
+quem avalia esta na fila, de bandeja na mao:
+
+```
+A comida estava boa?     😋 Boa  · 😐 Regular · 😞 Ruim
+E o atendimento?         😋 Bom  · 😐 Regular · 😞 Ruim
+Faltou alguma coisa?     👍 Nao  · 👎 Sim → o que faltou
+```
+
+Comentario escrito e opcional. O convite so aparece se a pessoa ainda nao
+avaliou naquele dia: pedir de novo o que ela ja respondeu e o caminho mais
+rapido para ela parar de responder.
+
+A escala e de tres niveis de proposito. Cinco estrelas viram indecisao na fila,
+e o que a operacao precisa saber e se da para servir na segunda-feira, nao a
+diferenca entre 3,4 e 3,6.
+
+### A parte delicada: isto e o unico dado que a empresa le
+
+Todo o resto do app e privado do funcionario — o que ele come, seu objetivo,
+suas restricoes, a empresa nunca ve. Aqui o fluxo se inverte, e isso cria um
+risco que precisa ser resolvido no desenho, nao na politica de uso:
+
+> quem reclama do refeitorio esta reclamando do servico contratado pela propria
+> empresa onde trabalha. Se a avaliacao chegasse identificada, o funcionario que
+> disse "faltou comida" ficaria exposto a retaliacao — e o proximo aprenderia a
+> mentir na avaliacao.
+
+Quatro decisoes saem dai, todas com teste:
+
+- **A linha de avaliacao nao tem coluna de empresa nem de setor.** Ela e sobre o
+  refeitorio. Guardar o setor criaria exatamente o cruzamento que reidentifica
+  ("a unica pessoa da manutencao que almocou terca"). Nao existe a coluna, entao
+  nao ha como consultar por ali depois.
+- **Nenhuma leitura para a gestao seleciona `telegram_id`.** Ele existe na tabela
+  so para tres coisas: uma avaliacao por dia, a pessoa poder rever e trocar a
+  propria, e a exclusao total quando ela pedir.
+- **Abaixo de 5 avaliacoes no periodo, o recorte e suprimido** — media de tres
+  pessoas nao e media, e opiniao identificavel.
+- **Comentario escrito so sai com volume**, e em ordem alfabetica, nunca
+  cronologica: a ordem de chegada cruzada com quem almocou no dia tambem aponta
+  para uma pessoa.
+
+A primeira tela diz isso ao funcionario antes da primeira pergunta. Quem nao
+sabe que esta protegido responde como se nao estivesse.
+
+Nao existe nota para funcionario do balcao por nome. Avaliacao individual de
+trabalhador por trabalhador nao e problema de app, e viraria outra fonte de
+retaliacao — do outro lado do balcao.
+
+### O historico de atendimento
+
+`/atendimento` lista os refeitorios do ultimo mes, **o pior primeiro**: o
+relatorio existe para achar o refeitorio com problema, nao para exibir o que vai
+bem.
+
+```
+Refeitorio Fabrica II: 24 avaliacoes · comida boa 62% · atendimento bom 46% · faltou algo em 42%
+Refeitorio Administrativo: 24 avaliacoes · comida boa 92% · atendimento bom 92%
+Refeitorio Central: 24 avaliacoes · comida boa 96% · atendimento bom 83%
+```
+
+`/atendimento <refeitorio>` abre o detalhe, com a serie semanal:
+
+```
+segunda-feira, 1 de setembro: 100% comida boa (12 avaliacoes)
+segunda-feira, 8 de setembro:  25% comida boa (12 avaliacoes)
+
+o que faltou: Acabou antes de eu chegar — 10x
+```
+
+A serie semanal existe porque a media do mes esconde a semana em que o
+refeitorio caiu — nos numeros acima, a media do periodo diz 62% e some com a
+queda de 100% para 25%.
+
+O percentual ignora quem pulou aquela pergunta: quem nao deu nota de atendimento
+nao conta como atendimento ruim.
+
 ## Privacidade
 
 O app guarda dado de saude de funcionario dentro de uma relacao de emprego, o que
@@ -418,6 +502,8 @@ exige cuidado alem do aviso de consentimento:
 
 - a empresa **nunca ve dado individual** — nem consumo, nem objetivo, nem restricao
 - `/relatorio` mostra so adesao agregada por setor
+- `/atendimento` mostra so media de refeitorio, suprimida abaixo de 5 avaliacoes,
+  e a avaliacao nao guarda empresa nem setor de quem respondeu
 - recorte com menos de **5 pessoas** e suprimido, porque setor pequeno mais dado
   alimentar reidentifica alguem sem precisar do nome
 - `/excluir_dados` apaga cadastro, restricoes, consumo, favoritos e pontos
@@ -434,7 +520,8 @@ arquivo atual limpo. Remover num commit posterior nao invalida a credencial.
 
 ## Comandos administrativos
 
-`/pendencias`, `/alergenico`, `/relatorio` e `/avisar_favoritos` sao restritos.
+`/pendencias`, `/alergenico`, `/relatorio`, `/atendimento` e `/avisar_favoritos`
+sao restritos.
 
 A lista de administradores e obrigatoria: enquanto `ADMIN_TELEGRAM_IDS` estiver
 vazio, **ninguem** usa esses comandos. Isso e proposital, porque `/avisar_favoritos`
@@ -480,6 +567,7 @@ apetit/
   portions.py    quanto pegar, em concha e colher
   humanize.py    o texto que o funcionario le
   tracking.py    historico congelado, favoritos e pontos
+  feedback.py    avaliacao do refeitorio, agregada e sem autor
 bot.py           camada do Telegram
 ```
 

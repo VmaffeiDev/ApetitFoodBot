@@ -119,6 +119,35 @@ CREATE TABLE IF NOT EXISTS consumption (
 );
 CREATE INDEX IF NOT EXISTS idx_consumption_pessoa ON consumption (telegram_id, service_date);
 
+-- Avaliacao do refeitorio. Unica parte do app cujo dado existe para a Apetit
+-- ler, e por isso a unica em que reidentificacao vira risco de retaliacao.
+--
+-- Nao ha empresa nem setor aqui de proposito: a avaliacao e sobre o refeitorio,
+-- e guardar o setor criaria o cruzamento que aponta para uma pessoa ("a unica
+-- da manutencao que almocou terca"). telegram_id existe so para uma avaliacao
+-- por dia, para a pessoa rever a propria e para a exclusao a pedido dela —
+-- nenhuma leitura para a gestao seleciona esse campo.
+CREATE TABLE IF NOT EXISTS service_rating (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    telegram_id INTEGER NOT NULL,
+    apetit_unit TEXT NOT NULL,
+    service_date TEXT NOT NULL,
+    meal TEXT NOT NULL DEFAULT 'almoco',
+    food INTEGER,
+    service INTEGER,
+    missing_something INTEGER NOT NULL DEFAULT 0,
+    comment TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    UNIQUE (telegram_id, service_date, meal)
+);
+CREATE INDEX IF NOT EXISTS idx_rating_unidade ON service_rating (apetit_unit, service_date);
+
+CREATE TABLE IF NOT EXISTS service_rating_tag (
+    rating_id INTEGER NOT NULL REFERENCES service_rating(id),
+    tag TEXT NOT NULL,
+    PRIMARY KEY (rating_id, tag)
+);
+
 CREATE TABLE IF NOT EXISTS favorite (
     telegram_id INTEGER NOT NULL,
     item_code TEXT NOT NULL REFERENCES menu_item(code),
