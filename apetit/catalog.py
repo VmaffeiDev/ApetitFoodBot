@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from .allergens import ALLERGENS, Declaration, Restriction, check_item, coverage
-from .csv_import import parse_menu_csv
+from .csv_import import parse_menu_rows, read_rows
 from .model import Issue, MenuEntry
 from .validation import validate_item
 
@@ -260,12 +260,27 @@ def import_menu_csv(
     unit: str = "",
     meal: str = "almoco",
     batch: str = "",
+    month: int | None = None,
+    year: int | None = None,
 ) -> ImportResult:
     """Le, valida e publica o cardapio. Item bloqueado nao chega ao cardapio."""
+    return import_menu_rows(conn, read_rows(text), unit=unit, meal=meal, batch=batch, month=month, year=year)
+
+
+def import_menu_rows(
+    conn: sqlite3.Connection,
+    rows: list[list[str]],
+    unit: str = "",
+    meal: str = "almoco",
+    batch: str = "",
+    month: int | None = None,
+    year: int | None = None,
+) -> ImportResult:
+    """Mesma importacao, a partir de linhas ja lidas (CSV ou planilha)."""
     batch = batch or now_iso()
     result = ImportResult(batch)
 
-    entries, issues = parse_menu_csv(text, unit=unit, meal=meal)
+    entries, issues = parse_menu_rows(rows, unit=unit, meal=meal, month=month, year=year)
     result.issues.extend(issues)
 
     for entry in entries:
@@ -288,13 +303,18 @@ def import_menu_csv(
             """
             INSERT INTO menu_item (code, name, portion_g, kcal, cho_g, lip_g, ptn_g, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            -- COALESCE em todo macro: a planilha de planejamento traz o prato
+            -- sem valor nutricional nenhum. Sem isso, importar o planejamento
+            -- depois da ficha tecnica zeraria os macros que ja estavam certos.
+            -- Valor novo nao-nulo continua vencendo, entao correcao de ficha
+            -- segue valendo.
             ON CONFLICT(code) DO UPDATE SET
                 name = excluded.name,
                 portion_g = COALESCE(excluded.portion_g, menu_item.portion_g),
-                kcal = excluded.kcal,
-                cho_g = excluded.cho_g,
-                lip_g = excluded.lip_g,
-                ptn_g = excluded.ptn_g,
+                kcal = COALESCE(excluded.kcal, menu_item.kcal),
+                cho_g = COALESCE(excluded.cho_g, menu_item.cho_g),
+                lip_g = COALESCE(excluded.lip_g, menu_item.lip_g),
+                ptn_g = COALESCE(excluded.ptn_g, menu_item.ptn_g),
                 updated_at = excluded.updated_at
             """,
             (

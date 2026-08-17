@@ -1,11 +1,13 @@
 """Leitura do CSV de cardapio exportado pela operacao da Apetit.
 
-Dois layouts sao aceitos, porque os exports observados usam formatos diferentes:
+Tres layouts sao aceitos, porque os exports observados usam formatos diferentes:
 
 - largo: uma linha por dia, e cada categoria ocupa 5 colunas
   (NOME, KCAL, CHO, LIP, PTN). E o formato da planilha mensal.
 - longo: uma linha por item, com colunas nomeadas
   (data, refeicao, categoria, item, porcao, kcal, cho, lip, ptn).
+- planejamento: uma linha por dia, uma coluna por categoria, e a celula traz
+  tudo grudado — "BIFE ACEBOLADO (80g) - C51 - 3.11". Nao tem macro nenhum.
 
 O arquivo costuma vir do Brasil: separador ";" e decimal com virgula.
 """
@@ -14,10 +16,10 @@ import csv
 import io
 import re
 import unicodedata
-from datetime import datetime
+from datetime import date, datetime
 
 from .allergens import ALLERGENS
-from .model import DISCARDED_COLUMNS, Issue, MenuEntry, MenuItem, Nutrition
+from .model import CATEGORIES, DISCARDED_COLUMNS, Issue, MenuEntry, MenuItem, Nutrition
 
 MACRO_HEADERS = ("KCAL", "CHO", "LIP", "PTN")
 
@@ -123,10 +125,31 @@ def _is_wide(header: list[str]) -> bool:
     return sum(1 for cell in header if normalize(cell).upper() == "KCAL") > 1
 
 
+def _category_columns(header: list[str]) -> int:
+    """Quantas colunas do cabecalho sao categoria conhecida do cardapio."""
+    total = 0
+    for cell in header:
+        categoria, _ = split_category(cell)
+        if categoria in CATEGORIES:
+            total += 1
+    return total
+
+
+def _is_planning(header: list[str]) -> bool:
+    """Planilha de planejamento: coluna "Dia" + categorias, e nenhum macro."""
+    if not header or normalize(header[0]) not in ("dia", "data"):
+        return False
+    if any(normalize(cell).upper() == "KCAL" for cell in header):
+        return False
+    return _category_columns(header) >= 2
+
+
 def _find_header(rows: list[list[str]]) -> int:
     for index, row in enumerate(rows):
         upper = [normalize(cell).upper() for cell in row]
         if "KCAL" in upper or {"ITEM", "CATEGORIA"} <= set(upper):
+            return index
+        if _is_planning(row):
             return index
     return -1
 
@@ -189,6 +212,183 @@ def parse_wide(rows: list[list[str]], header_index: int, unit: str, meal: str) -
                 )
             )
     return entries, issues
+
+
+# Colunas de insumo operacional: descartaveis, produto de limpeza, kit de
+# tempero e de galeteiro. Nao e comida que a pessoa se serve, entao nao entra
+# no cardapio do funcionario.
+NON_FOOD_CATEGORIES = ("KIT",)
+
+# Codigo de ficha tecnica como aparece grudado na celula: "C51", "1",
+# "06.03.01.258", "09.03.01.077-1".
+FICHA_CODE = re.compile(r"^[A-Za-z]{0,2}\d[\d.\-]*$")
+PERCENT = re.compile(r"^\d+\s*%$")
+PORTION_IN_NAME = re.compile(r"\((\d+(?:[.,]\d+)?)\s*g\)", re.IGNORECASE)
+
+
+def is_non_food(category: str) -> bool:
+    return any(category.startswith(prefix) for prefix in NON_FOOD_CATEGORIES)
+
+
+def parse_planning_cell(raw: str) -> tuple[str, float | None, str]:
+    """Separa "BIFE ACEBOLADO (80g) - C51 - 3.11" em nome, porcao e ficha.
+
+    A celula do planejamento junta quatro coisas com " - ": um percentual de
+    adesao opcional, o codigo da ficha tecnica, o nome do prato e o custo per
+    capita. O custo e dado comercial da Apetit e morre aqui — nunca chega ao
+    app do funcionario.
+
+    O nome pode conter " - " ("KIT - QUIMICO - A. YOSHII"), entao o que sobra
+    depois de tirar as pontas conhecidas e remontado inteiro, em vez de a
+    funcao chutar qual pedaco e o nome.
+    """
+    partes = [p.strip() for p in str(raw or "").split(" - ") if p.strip()]
+    if not partes:
+        return "", None, ""
+
+    if len(partes) > 1 and PERCENT.match(partes[0]):
+        partes.pop(0)
+    # O ultimo pedaco numerico e o custo per capita.
+    if len(partes) > 1 and parse_number(partes[-1]) is not None and not FICHA_CODE.match(partes[-1] or ""):
+        partes.pop()
+    elif len(partes) > 1 and parse_number(partes[-1]) is not None and "." in partes[-1]:
+        partes.pop()
+
+    ficha = ""
+    if len(partes) > 1 and FICHA_CODE.match(partes[0]):
+        ficha = partes.pop(0)
+    elif len(partes) > 1 and FICHA_CODE.match(partes[-1]):
+        ficha = partes.pop()
+
+    nome = " - ".join(partes).strip()
+    portion = None
+    achado = PORTION_IN_NAME.search(nome)
+    if achado:
+        portion = parse_number(achado.group(1))
+        nome = PORTION_IN_NAME.sub("", nome).strip()
+    nome = re.sub(r"\s{2,}", " ", nome).strip(" -")
+    return nome, portion, ficha
+
+
+def parse_planning(
+    rows: list[list[str]],
+    header_index: int,
+    unit: str,
+    meal: str,
+    month: int | None = None,
+    year: int | None = None,
+) -> tuple[list[MenuEntry], list[Issue]]:
+    """Le a planilha de planejamento: nomes de pratos, sem macro nenhum.
+
+    A coluna do dia traz so o numero ("17"), sem mes nem ano. Publicar isso
+    chutando o mes colocaria o cardapio de uma semana no dia errado, entao a
+    falta de mes/ano barra a importacao em vez de adivinhar.
+    """
+    header = rows[header_index]
+    issues: list[Issue] = []
+
+    colunas: list[tuple[str, int, int]] = []
+    descartadas: list[str] = []
+    for index, cell in enumerate(header[1:], start=1):
+        rotulo = normalize(cell).upper()
+        if not rotulo:
+            continue
+        categoria, slot = split_category(cell)
+        if is_non_food(categoria):
+            descartadas.append(rotulo)
+            continue
+        if categoria not in CATEGORIES:
+            issues.append(Issue("warn", "categoria_desconhecida", f'Coluna "{rotulo}" nao e uma categoria conhecida; itens dela ficam de fora.'))
+            continue
+        colunas.append((categoria, slot, index))
+
+    if descartadas:
+        issues.append(
+            Issue(
+                "warn",
+                "coluna_insumo",
+                f"Colunas de insumo operacional ignoradas (nao sao comida servida): {', '.join(sorted(set(descartadas)))}.",
+            )
+        )
+    if not colunas:
+        issues.append(Issue("block", "layout_desconhecido", "Nenhuma coluna de categoria reconhecida na planilha de planejamento."))
+        return [], issues
+
+    entries: list[MenuEntry] = []
+    sem_data = 0
+    for row in rows[header_index + 1 :]:
+        if not any(cell.strip() for cell in row):
+            continue
+        service_date = _planning_date(row[0] if row else "", month, year)
+        if not service_date:
+            sem_data += 1
+            continue
+        for categoria, slot, col in colunas:
+            if col >= len(row):
+                continue
+            nome, portion, ficha = parse_planning_cell(row[col])
+            if not nome:
+                continue
+            entries.append(
+                MenuEntry(
+                    unit=unit,
+                    service_date=service_date,
+                    meal=meal,
+                    category=categoria,
+                    slot=slot,
+                    item=MenuItem(
+                        code=ficha_slug(ficha, nome),
+                        name=nome,
+                        portion_g=portion,
+                        nutrition=Nutrition(),
+                    ),
+                )
+            )
+
+    if sem_data:
+        detalhe = (
+            f"{sem_data} linha(s) com dia que nao virou data."
+            if month and year
+            else f"{sem_data} linha(s) trazem so o numero do dia. Informe mes e ano da semana para importar."
+        )
+        issues.append(Issue("block", "data_indefinida", detalhe))
+    if entries:
+        issues.append(
+            Issue(
+                "warn",
+                "planilha_sem_macro",
+                f"{len(entries)} item(ns) publicados sem informacao nutricional: esta planilha nao traz kcal nem macros.",
+            )
+        )
+    return entries, issues
+
+
+def ficha_slug(ficha: str, name: str) -> str:
+    """Codigo do item: prefere a ficha tecnica, cai no nome quando nao tem.
+
+    A ficha e o que liga o mesmo prato entre semanas e entre planilhas — e o
+    gancho para casar esta planilha com a que tem os macros. Mas "C51" se
+    repete em pratos diferentes na mesma planilha, entao o nome entra junto
+    para o codigo continuar identificando um prato so.
+    """
+    base = slugify(name)
+    if not ficha:
+        return base
+    return f"{slugify(ficha)}_{base}"[:64]
+
+
+def _planning_date(raw: str, month: int | None, year: int | None) -> str | None:
+    """Aceita a data completa se vier; senao monta a partir do dia + mes/ano."""
+    completa = parse_date(raw)
+    if completa:
+        return completa
+    texto = str(raw or "").strip()
+    if not (texto.isdigit() and month and year):
+        return None
+    try:
+        return date(year, month, int(texto)).isoformat()
+    except ValueError:
+        return None
 
 
 def _allergen_columns(header: list[str]) -> dict[str, int]:
@@ -271,12 +471,21 @@ def parse_long(rows: list[list[str]], header_index: int, unit: str, meal: str) -
     return entries, issues
 
 
-def parse_menu_csv(text: str, unit: str = "", meal: str = "almoco") -> tuple[list[MenuEntry], list[Issue]]:
-    """Le o CSV e devolve as entradas do cardapio e os problemas de formato."""
-    rows = read_rows(text)
+def parse_menu_rows(
+    rows: list[list[str]],
+    unit: str = "",
+    meal: str = "almoco",
+    month: int | None = None,
+    year: int | None = None,
+) -> tuple[list[MenuEntry], list[Issue]]:
+    """Reconhece o layout e devolve as entradas do cardapio e os problemas.
+
+    Trabalha sobre linhas ja lidas, para que CSV e planilha do Excel entrem
+    pelo mesmo caminho e passem exatamente pelas mesmas regras.
+    """
     header_index = _find_header(rows)
     if header_index < 0:
-        return [], [Issue("block", "cabecalho_nao_encontrado", "Nao encontrei o cabecalho do cardapio no CSV.")]
+        return [], [Issue("block", "cabecalho_nao_encontrado", "Nao encontrei o cabecalho do cardapio.")]
 
     header = rows[header_index]
     issues: list[Issue] = []
@@ -292,6 +501,19 @@ def parse_menu_csv(text: str, unit: str = "", meal: str = "almoco") -> tuple[lis
 
     if _is_wide(header):
         entries, parse_issues = parse_wide(rows, header_index, unit, meal)
+    elif _is_planning(header):
+        entries, parse_issues = parse_planning(rows, header_index, unit, meal, month, year)
     else:
         entries, parse_issues = parse_long(rows, header_index, unit, meal)
     return entries, issues + parse_issues
+
+
+def parse_menu_csv(
+    text: str,
+    unit: str = "",
+    meal: str = "almoco",
+    month: int | None = None,
+    year: int | None = None,
+) -> tuple[list[MenuEntry], list[Issue]]:
+    """Le o CSV e devolve as entradas do cardapio e os problemas de formato."""
+    return parse_menu_rows(read_rows(text), unit=unit, meal=meal, month=month, year=year)

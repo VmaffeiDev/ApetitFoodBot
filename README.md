@@ -166,16 +166,69 @@ A partir dali o valor para de mudar sozinho.
 
 ## Importacao do cardapio
 
-O cardapio chega em CSV. O importador aceita os dois layouts observados — largo
-(uma linha por dia, cinco colunas por categoria) e longo (uma linha por item) —
-com separador `;` ou `,` e decimal com virgula.
+O cardapio chega em CSV ou `.xlsx`. O importador aceita os tres layouts
+observados, com separador `;` ou `,` e decimal com virgula:
+
+| Layout | Como e | Traz macro? |
+|---|---|---|
+| **largo** | uma linha por dia, cinco colunas por categoria (NOME, KCAL, CHO, LIP, PTN) | sim |
+| **longo** | uma linha por item, colunas nomeadas | sim |
+| **planejamento** | uma linha por dia, uma coluna por categoria, tudo grudado na celula | **nao** |
 
 ```powershell
 python scripts/import_cardapio.py cardapio.csv --unidade SM --refeicao almoco
+python scripts/import_cardapio.py Cardapio_17_a_2108.xlsx --unidade SM --mes 8 --ano 2025
 python scripts/import_cardapio.py --pendencias
 ```
 
 Categoria com numero, como `PRATO PRINCIPAL 2`, e a mesma categoria em outro slot.
+
+### A planilha de planejamento
+
+E o formato que a operacao manda toda semana. Cada celula junta quatro coisas:
+
+```
+BIFE ACEBOLADO (80g) - C51 - 3.11
+└─ nome         └ porcao └ ficha └ custo per capita
+```
+
+O importador separa os quatro. **O custo morre na leitura** — e dado comercial
+da Apetit e nao existe caminho por onde ele chegue ao app do funcionario; ha
+teste garantindo isso. A porcao entre parenteses vira `portion_g`, e o codigo
+da ficha entra no identificador do item, que e o gancho para casar esta
+planilha com a que tiver os macros.
+
+Tres detalhes que o formato exige:
+
+- **O nome pode conter o proprio separador** (`KIT - QUIMICO - A. YOSHII`).
+  Por isso o que sobra depois de tirar as pontas conhecidas e remontado
+  inteiro, em vez de o parser chutar qual pedaco e o nome.
+- **Colunas de insumo sao descartadas** — descartaveis, produto de limpeza,
+  kit de tempero e de galeteiro nao sao comida que alguem se serve.
+- **A coluna do dia traz so o numero** (`17`), sem mes nem ano. Sem `--mes` e
+  `--ano` a importacao **para**, em vez de chutar: um mes errado publicaria o
+  cardapio da semana no dia errado.
+
+Importar planejamento por cima de uma ficha tecnica ja carregada **nao apaga os
+macros** — todo campo nutricional entra por `COALESCE`, entao valor novo
+nao-nulo vence e ausencia preserva o que estava la.
+
+### O que essa planilha sozinha nao resolve
+
+Ela nao tem valor nutricional nenhum. Com so ela no banco, a semana de 17 a 21
+importa 80 itens em 5 dias e o funcionario ve o cardapio inteiro, organizado na
+ordem da fila — mas:
+
+- **`/quanto_pegar` nao responde.** Sem kcal e proteina nao ha o que sugerir, e
+  o app diz isso em vez de inventar porcao.
+- **`/meu_dia` registra o prato, com total zerado.** A fotografia guarda o que
+  foi pego; os macros ficam nulos e o dia se declara incompleto.
+- **Todo prato aparece como ⚠️** para quem tem alergia declarada, porque sem
+  ficha tecnica nao da para afirmar que e seguro.
+
+Falta a ficha tecnica com os macros. Como o codigo dela (`C51`,
+`06.03.01.258`) ja vem nesta planilha, os dois arquivos casam pelo codigo assim
+que o segundo existir.
 
 Colunas de **custo e per capita sao descartadas**: sao dado comercial da operacao
 e nao podem chegar ao app do funcionario.
@@ -381,7 +434,8 @@ python scripts/backup_db.py
 ```
 apetit/
   model.py       entidades do cardapio
-  csv_import.py  leitura dos dois layouts de CSV
+  csv_import.py  leitura dos tres layouts de cardapio
+  spreadsheet.py planilha do Excel -> as mesmas linhas do CSV
   validation.py  regras nutricionais de entrada
   catalog.py     persistencia, publicacao e conferencia
   allergens.py   alergenicos e verificacao em tres estados
