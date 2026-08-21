@@ -563,9 +563,12 @@ exige cuidado alem do aviso de consentimento:
 Se um token foi colado em chat, issue, commit ou qualquer lugar publico, gere outro
 no BotFather. Nao salve o token no codigo.
 
-Um token de verdade ja esteve versionado no `.env.example` deste repositorio, que e
-publico. O valor foi removido do arquivo, mas continua acessivel no historico do
-Git, entao **esse token precisa ser revogado no BotFather** (`/revoke`) mesmo com o
+**Este repositorio e publico por decisao do projeto.** Isso significa que qualquer
+coisa commitada aqui e visivel para qualquer pessoa, para sempre — inclusive o que
+for removido depois, porque o valor antigo continua no historico do Git.
+
+Um token de verdade ja esteve versionado no `.env.example` deste repositorio. O
+valor foi removido do arquivo, mas continua acessivel no historico do Git, entao **esse token precisa ser revogado no BotFather** (`/revoke`) mesmo com o
 arquivo atual limpo. Remover num commit posterior nao invalida a credencial.
 
 ## Comandos administrativos
@@ -597,17 +600,37 @@ deploy**, levando cadastro, historico e avaliacoes de todo mundo junto. O
 container guarda o banco em `/data/apetit.db` e a imagem declara `/data` como
 volume justamente para essa pegadinha nao passar despercebida.
 
-### Onde hospedar
+### Subir em tres passos (Render)
 
-O bot sobe em **polling** quando `TELEGRAM_WEBHOOK_URL` esta vazio — sem URL
-publica, sem certificado, sem porta aberta. E o caminho mais curto para colocar
-de pe, e o recomendado para piloto.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/VmaffeiDev/ApetitFoodBot)
+
+1. **Token novo no BotFather.** No Telegram, `@BotFather` > `/newbot` (ou
+   `/revoke` no bot que ja existe, para invalidar o token antigo e gerar outro).
+   Guarde o token que ele devolve.
+2. **Seu ID do Telegram.** Fale com `@userinfobot`; ele responde com o seu ID
+   numerico. E o que libera publicar cardapio e ver relatorio.
+3. **Deploy.** O botao acima abre o Render ja lendo o `render.yaml`: ele cria o
+   worker com o disco persistente e pergunta `TELEGRAM_BOT_TOKEN` e
+   `ADMIN_TELEGRAM_IDS`. Cole os dois valores e confirme.
+
+Em um a dois minutos o bot responde `/start` no Telegram. Sem cardapio
+importado ele diz que ainda nao ha cardapio publicado — mande a planilha da
+semana como anexo e ele publica.
+
+> O plano gratuito do Render nao tem disco persistente. Sem disco o bot roda,
+> mas o banco some a cada deploy: serve para demonstrar, nao para operar.
+
+### Outros provedores
+
+O mesmo `Dockerfile` serve em qualquer lugar. O bot sobe em **polling** quando
+`TELEGRAM_WEBHOOK_URL` esta vazio — sem URL publica, sem certificado, sem porta
+aberta.
 
 | Provedor | Como | Cuidado |
 |---|---|---|
-| **Render** | `render.yaml` no repositorio: New > Blueprint | Use **worker**, nao web: servico web gratuito dorme por inatividade, e bot dormindo perde mensagem |
 | **Railway** | Deploy from repo, detecta o Dockerfile | Crie um **Volume** montado em `/data` |
 | **Fly.io** | `fly launch` | `fly volumes create apetit_dados --size 1` e monte em `/data` |
+| **VPS** | `docker run` da secao acima | Use `--restart unless-stopped` |
 
 Em qualquer um: `TELEGRAM_BOT_TOKEN` e `ADMIN_TELEGRAM_IDS` entram como variavel
 de ambiente secreta, nunca versionadas.
@@ -653,12 +676,21 @@ apetit/
   feedback.py    avaliacao do refeitorio, agregada e sem autor
   intake.py      de que semana e o arquivo que chegou
 bot.py           camada do Telegram
+LICENSE          todos os direitos reservados
 Dockerfile       imagem, com o banco em /data
 render.yaml      blueprint do Render, ja com disco persistente
 ```
 
 A regra de dominio fica fora do `bot.py` de proposito, para servir depois a um
 painel do nutricionista sem reescrita.
+
+## Licenca
+
+**Todos os direitos reservados.** Veja [LICENSE](LICENSE).
+
+O repositorio e publico para consulta e avaliacao; isso nao concede licenca de
+uso. Se o software for entregue a Apetit, o titular no `LICENSE` precisa mudar
+para refletir isso.
 
 ## Fluxo
 
