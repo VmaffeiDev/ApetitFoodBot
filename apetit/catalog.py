@@ -175,7 +175,17 @@ def now_iso() -> str:
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    """Abre o banco, criando a pasta se ela ainda nao existir.
+
+    Em deploy o banco mora num volume montado (`/data/apetit.db`). Sem criar a
+    pasta, o SQLite morre com "unable to open database file" — mensagem que nao
+    diz o que fazer e some junto com o container. Criar antes troca isso por
+    um bot que sobe.
+    """
+    caminho = Path(db_path)
+    if caminho.parent and str(caminho.parent) not in ("", "."):
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(caminho)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn

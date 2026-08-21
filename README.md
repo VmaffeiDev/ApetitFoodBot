@@ -587,7 +587,35 @@ APETIT_DB_PATH=apetit.db
 
 ## Deploy
 
-Com `TELEGRAM_WEBHOOK_URL` preenchido o bot sobe em webhook; sem ela, em polling.
+```powershell
+docker build -t apetitfoodbot .
+docker run -d --name apetit --env-file .env -v apetit-dados:/data apetitfoodbot
+```
+
+O `-v apetit-dados:/data` nao e detalhe: **sem volume o banco some no proximo
+deploy**, levando cadastro, historico e avaliacoes de todo mundo junto. O
+container guarda o banco em `/data/apetit.db` e a imagem declara `/data` como
+volume justamente para essa pegadinha nao passar despercebida.
+
+### Onde hospedar
+
+O bot sobe em **polling** quando `TELEGRAM_WEBHOOK_URL` esta vazio — sem URL
+publica, sem certificado, sem porta aberta. E o caminho mais curto para colocar
+de pe, e o recomendado para piloto.
+
+| Provedor | Como | Cuidado |
+|---|---|---|
+| **Render** | `render.yaml` no repositorio: New > Blueprint | Use **worker**, nao web: servico web gratuito dorme por inatividade, e bot dormindo perde mensagem |
+| **Railway** | Deploy from repo, detecta o Dockerfile | Crie um **Volume** montado em `/data` |
+| **Fly.io** | `fly launch` | `fly volumes create apetit_dados --size 1` e monte em `/data` |
+
+Em qualquer um: `TELEGRAM_BOT_TOKEN` e `ADMIN_TELEGRAM_IDS` entram como variavel
+de ambiente secreta, nunca versionadas.
+
+### Webhook, quando fizer sentido
+
+Com `TELEGRAM_WEBHOOK_URL` preenchido o bot troca polling por webhook. Vale
+quando o volume de mensagem crescer; para piloto, polling basta.
 
 ```env
 TELEGRAM_WEBHOOK_URL=https://seu-app.onrender.com
@@ -596,8 +624,11 @@ TELEGRAM_WEBHOOK_SECRET_TOKEN=um-segredo-forte
 PORT=8000
 ```
 
-SQLite atende o piloto. Para operacao real, migre para PostgreSQL: em Render,
-Railway ou Fly o disco e efemero e o banco some no redeploy.
+### Banco
+
+SQLite com volume atende o piloto de uma unidade. Para operacao com varias
+unidades, migre para PostgreSQL: o gargalo do SQLite aparece em escrita
+concorrente, que e exatamente o que acontece no horario do almoco.
 
 Backup:
 
@@ -622,6 +653,8 @@ apetit/
   feedback.py    avaliacao do refeitorio, agregada e sem autor
   intake.py      de que semana e o arquivo que chegou
 bot.py           camada do Telegram
+Dockerfile       imagem, com o banco em /data
+render.yaml      blueprint do Render, ja com disco persistente
 ```
 
 A regra de dominio fica fora do `bot.py` de proposito, para servir depois a um

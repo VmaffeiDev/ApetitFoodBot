@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import tempfile
 import unittest
@@ -6,6 +7,7 @@ from pathlib import Path
 from apetit.allergens import Declaration, Restriction, Verdict
 from apetit.catalog import (
     check_menu_for_employee,
+    connect,
     import_menu_csv,
     init_schema,
     item_allergens,
@@ -222,6 +224,37 @@ class ImportTest(unittest.TestCase):
 
         row = self.conn.execute("SELECT portion_g FROM menu_item WHERE code = '01.01.04.280-0.9'").fetchone()
         self.assertEqual(row["portion_g"], 100)
+
+
+class AberturaDoBancoTest(unittest.TestCase):
+    """Falha que so aparece em producao, entao precisa de teste."""
+
+    def test_opening_creates_the_folder_when_it_is_missing(self):
+        # Em deploy o banco mora num volume ("/data/apetit.db"). Sem criar a
+        # pasta, o SQLite morre com "unable to open database file" — mensagem
+        # que nao diz o que fazer e some junto com o container.
+        with tempfile.TemporaryDirectory() as tmp:
+            caminho = Path(tmp) / "volume" / "ainda" / "nao" / "existe" / "apetit.db"
+
+            conn = connect(caminho)
+            try:
+                init_schema(conn)
+            finally:
+                conn.close()
+
+            self.assertTrue(caminho.exists())
+
+    def test_a_bare_file_name_still_works(self):
+        # "apetit.db" sem pasta nenhuma e o padrao de quem roda local.
+        with tempfile.TemporaryDirectory() as tmp:
+            anterior = os.getcwd()
+            os.chdir(tmp)
+            try:
+                conn = connect("apetit.db")
+                conn.close()
+                self.assertTrue(Path(tmp, "apetit.db").exists())
+            finally:
+                os.chdir(anterior)
 
 
 if __name__ == "__main__":

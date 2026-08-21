@@ -1,0 +1,25 @@
+# O que nao entra na imagem. Segredo e banco local ficam de fora com prioridade:
+# uma imagem carregando .env vaza o token para qualquer registry.
+.env
+*.db
+*.sqlite
+*.sqlite3
+backups/
+
+.git/
+.github/
+.gitignore
+
+.venv/
+.venv-1/
+.venv-2/
+env/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+
+tests/
+README.md
+Dockerfile
+.dockerignore

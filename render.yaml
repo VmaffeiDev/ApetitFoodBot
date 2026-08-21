@@ -1,0 +1,27 @@
+# Blueprint do Render. Em Render > New > Blueprint, apontando para o repositorio,
+# isto cria o servico ja com o disco persistente.
+#
+# E um "worker", nao um "web": o bot sobe em polling e nao precisa de porta nem
+# de URL publica. Servico web no plano gratuito ainda dorme por inatividade, e
+# bot dormindo perde mensagem.
+services:
+  - type: worker
+    name: apetitfoodbot
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # O disco e o que faz o banco sobreviver ao deploy. Sem ele o SQLite some
+    # a cada publicacao, levando cadastro, historico e avaliacoes junto.
+    disk:
+      name: apetit-dados
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      # Token do BotFather. sync:false = o Render pergunta na criacao e guarda
+      # como segredo, em vez de deixar versionado aqui.
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      # Telegram ID de quem publica cardapio e ve relatorio. Vazio = ninguem.
+      - key: ADMIN_TELEGRAM_IDS
+        sync: false
+      - key: APETIT_DB_PATH
+        value: /data/apetit.db
