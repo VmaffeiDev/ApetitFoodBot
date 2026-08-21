@@ -570,12 +570,14 @@ arquivo atual limpo. Remover num commit posterior nao invalida a credencial.
 
 ## Comandos administrativos
 
-`/pendencias`, `/alergenico`, `/relatorio`, `/atendimento` e `/avisar_favoritos`
-sao restritos.
+Sao restritos: **publicar cardapio** (mandar o arquivo para o bot), `/importar`,
+`/pendencias`, `/alergenico`, `/cobertura`, `/relatorio`, `/atendimento` e
+`/avisar_favoritos`.
 
 A lista de administradores e obrigatoria: enquanto `ADMIN_TELEGRAM_IDS` estiver
-vazio, **ninguem** usa esses comandos. Isso e proposital, porque `/avisar_favoritos`
-dispara mensagem para a base e `/alergenico` altera informacao de seguranca alimentar.
+vazio, **ninguem** usa esses comandos. Isso e proposital: publicar cardapio muda o
+que o refeitorio inteiro ve, `/avisar_favoritos` dispara mensagem para a base e
+`/alergenico` altera informacao de seguranca alimentar.
 
 ```env
 TELEGRAM_BOT_TOKEN=seu_token
