@@ -2050,10 +2050,21 @@ async def register_commands(app: Application) -> None:
     await app.bot.set_my_commands(COMMANDS)
 
 
+# Valor que vem no .env.example. Quem copia o exemplo e esquece de trocar
+# receberia "InvalidToken" do Telegram — erro que nao diz qual e o problema.
+TOKEN_EXEMPLO = "cole_seu_token_novo_aqui"
+
+
 def main() -> None:
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
     if not token:
         raise RuntimeError("Defina TELEGRAM_BOT_TOKEN no arquivo .env antes de iniciar o bot.")
+    if token == TOKEN_EXEMPLO:
+        raise RuntimeError(
+            "O .env ainda esta com o texto de exemplo no lugar do token.\n"
+            "Troque a linha TELEGRAM_BOT_TOKEN pelo token que o @BotFather te deu "
+            "(algo como 8842397289:AAF...)."
+        )
     db().close()
 
     app = Application.builder().token(token).post_init(register_commands).build()

@@ -757,6 +757,39 @@ class EnvioDoCardapioTest(BotBase):
         self.assertIn("me mandar o arquivo", update.last)
 
 
+class ConfiguracaoTest(unittest.TestCase):
+    """Erro de configuracao precisa dizer o que fazer, nao so que falhou."""
+
+    def setUp(self):
+        self.anterior = os.environ.get("TELEGRAM_BOT_TOKEN")
+
+    def tearDown(self):
+        if self.anterior is None:
+            os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+        else:
+            os.environ["TELEGRAM_BOT_TOKEN"] = self.anterior
+
+    def test_missing_token_says_where_to_put_it(self):
+        os.environ["TELEGRAM_BOT_TOKEN"] = ""
+
+        with self.assertRaises(RuntimeError) as erro:
+            bot.main()
+
+        self.assertIn(".env", str(erro.exception))
+
+    def test_the_example_placeholder_is_caught_before_telegram(self):
+        # Quem copia o .env.example e esquece de trocar receberia "InvalidToken"
+        # do Telegram — erro que nao diz qual e o problema.
+        os.environ["TELEGRAM_BOT_TOKEN"] = bot.TOKEN_EXEMPLO
+
+        with self.assertRaises(RuntimeError) as erro:
+            bot.main()
+
+        mensagem = str(erro.exception)
+        self.assertIn("texto de exemplo", mensagem)
+        self.assertIn("BotFather", mensagem)
+
+
 class LgpdTest(BotBase):
     async def test_my_data_shows_what_is_stored_and_who_cannot_see_it(self):
         context = FakeContext()
