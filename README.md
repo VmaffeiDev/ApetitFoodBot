@@ -194,6 +194,43 @@ ADMIN_TELEGRAM_IDS=123456789,987654321
 APETIT_DB_PATH=apetit.db
 ```
 
+## Atualizar o cardapio inteiro por CSV
+
+Quando o cliente quiser trocar o cardapio da semana, nao precisa mais
+cadastrar prato por prato: basta enviar (ou colocar) uma planilha CSV
+com o cardapio novo, que o cardapio antigo e substituido automaticamente
+(pratos que nao estiverem na planilha nova sao removidos do banco).
+
+O CSV deve ter uma linha de cabecalho com estas colunas (nomes em
+portugues ou ingles, com ou sem acento):
+
+```text
+nome,preco,dia,ingredientes,alergenicos,tags,disponivel
+```
+
+Exemplo (o separador `;` tambem funciona, util para planilhas feitas no
+Excel em portugues, onde `,` costuma ser o separador decimal do preco):
+
+```text
+nome;preco;dia;ingredientes;alergenicos;tags;disponivel
+Frango Grelhado;29,90;segunda;frango, arroz;nenhum;proteico;sim
+Sopa de Abobora;19,90;terca;abobora, temperos;nenhum;leve;sim
+```
+
+**Opcao 1 - pelo Telegram (recomendado para o cliente):** basta anexar o
+arquivo `.csv` e enviar como documento no chat com o bot. Um administrador
+(numero cadastrado em `ADMIN_TELEGRAM_IDS`) recebe de volta a confirmacao
+com quantos pratos foram salvos e quantos foram removidos.
+
+**Opcao 2 - pelo terminal/Codespace:**
+
+```bash
+python scripts/import_menu_csv.py caminho/para/cardapio_semana.csv
+```
+
+Em ambos os casos o cardapio anterior e totalmente substituido pelo da
+planilha enviada - por isso, envie sempre a lista completa da semana.
+
 ## Deploy
 
 Para operar de verdade, use webhook em producao e deixe polling apenas para testes locais.
