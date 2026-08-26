@@ -2054,17 +2054,36 @@ async def register_commands(app: Application) -> None:
 # receberia "InvalidToken" do Telegram — erro que nao diz qual e o problema.
 TOKEN_EXEMPLO = "cole_seu_token_novo_aqui"
 
+# Id do bot cujo token foi versionado no .env.example num commit antigo deste
+# repositorio, que e publico. So o id (a parte antes de ":"), que nao e segredo:
+# o segredo e a parte depois, e ela nao entra aqui.
+#
+# Esse token precisa ser revogado, e enquanto nao for, qualquer pessoa que leia
+# o historico controla o bot. Subir com ele seria subir com uma credencial que
+# ja esta na rua.
+BOT_ID_COMPROMETIDO = "8842397289"
 
-def main() -> None:
-    token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+
+def _validar_token(token: str) -> None:
+    """Barra os tres jeitos conhecidos de comecar com o token errado."""
     if not token:
         raise RuntimeError("Defina TELEGRAM_BOT_TOKEN no arquivo .env antes de iniciar o bot.")
     if token == TOKEN_EXEMPLO:
         raise RuntimeError(
             "O .env ainda esta com o texto de exemplo no lugar do token.\n"
-            "Troque a linha TELEGRAM_BOT_TOKEN pelo token que o @BotFather te deu "
-            "(algo como 8842397289:AAF...)."
+            "Troque a linha TELEGRAM_BOT_TOKEN pelo token que o @BotFather te deu."
         )
+    if token.split(":", 1)[0].strip() == BOT_ID_COMPROMETIDO:
+        raise RuntimeError(
+            "Esse token e o que vazou no historico publico deste repositorio.\n"
+            "Ele precisa ser revogado, nao usado: no Telegram, @BotFather > /revoke,\n"
+            "escolha o bot e use o token novo que ele devolver."
+        )
+
+
+def main() -> None:
+    token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+    _validar_token(token)
     db().close()
 
     app = Application.builder().token(token).post_init(register_commands).build()

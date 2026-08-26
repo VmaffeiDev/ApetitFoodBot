@@ -789,6 +789,30 @@ class ConfiguracaoTest(unittest.TestCase):
         self.assertIn("texto de exemplo", mensagem)
         self.assertIn("BotFather", mensagem)
 
+    def test_the_leaked_token_refuses_to_start(self):
+        # O token que ficou no historico publico deste repositorio. Subir com
+        # ele e subir com uma credencial que qualquer pessoa consegue ler.
+        os.environ["TELEGRAM_BOT_TOKEN"] = f"{bot.BOT_ID_COMPROMETIDO}:qualquer-coisa"
+
+        with self.assertRaises(RuntimeError) as erro:
+            bot.main()
+
+        mensagem = str(erro.exception)
+        self.assertIn("vazou", mensagem)
+        self.assertIn("/revoke", mensagem)
+
+    def test_the_secret_half_of_the_leaked_token_is_not_in_the_code(self):
+        # A guarda usa so o id do bot, que nao e segredo. Guardar a outra
+        # metade aqui seria versionar a credencial de novo.
+        fonte = Path("bot.py").read_text(encoding="utf-8")
+
+        self.assertNotIn("AAFf9GaV", fonte)
+        self.assertEqual(bot.BOT_ID_COMPROMETIDO, bot.BOT_ID_COMPROMETIDO.split(":")[0])
+
+    def test_a_normal_token_passes_the_checks(self):
+        # A guarda nao pode barrar quem fez tudo certo.
+        bot._validar_token("1234567890:AAHrealisticlookingtokenvalue123456789")
+
 
 class LgpdTest(BotBase):
     async def test_my_data_shows_what_is_stored_and_who_cannot_see_it(self):
