@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -801,17 +802,46 @@ class ConfiguracaoTest(unittest.TestCase):
         self.assertIn("vazou", mensagem)
         self.assertIn("/revoke", mensagem)
 
-    def test_the_secret_half_of_the_leaked_token_is_not_in_the_code(self):
-        # A guarda usa so o id do bot, que nao e segredo. Guardar a outra
-        # metade aqui seria versionar a credencial de novo.
-        fonte = Path("bot.py").read_text(encoding="utf-8")
+    def test_no_telegram_token_is_committed_anywhere(self):
+        # A guarda do token vazado usa so o id do bot, que nao e segredo. Este
+        # teste procura o formato completo de token do Telegram — id, dois
+        # pontos e a metade secreta — em tudo que e versionado, entao pega
+        # tanto aquele token quanto qualquer outro colado por engano.
+        #
+        # O padrao mora aqui montado por partes: escrever um token de exemplo
+        # inteiro so para testar seria commitar exatamente o que se procura.
+        padrao = re.compile(r"\d{8,10}" + ":" + r"[A-Za-z0-9_-]{30,}")
+        raiz = Path(__file__).resolve().parent.parent
 
-        self.assertNotIn("AAFf9GaV", fonte)
-        self.assertEqual(bot.BOT_ID_COMPROMETIDO, bot.BOT_ID_COMPROMETIDO.split(":")[0])
+        achados = []
+        for caminho in raiz.rglob("*"):
+            if not caminho.is_file() or "__pycache__" in caminho.parts or ".git" in caminho.parts:
+                continue
+            if caminho.suffix not in (".py", ".md", ".yml", ".yaml", ".txt", ".example", ".csv", ""):
+                continue
+            try:
+                texto = caminho.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            if padrao.search(texto):
+                achados.append(str(caminho.relative_to(raiz)))
+
+        self.assertEqual(achados, [], f"token do Telegram versionado em: {achados}")
+
+    def test_the_guard_stores_only_the_public_half(self):
+        # Antes de ":" fica o id do bot, que nao e segredo. Depois fica a
+        # credencial, e ela nao pode entrar no codigo.
+        self.assertNotIn(":", bot.BOT_ID_COMPROMETIDO)
+        self.assertTrue(bot.BOT_ID_COMPROMETIDO.isdigit())
 
     def test_a_normal_token_passes_the_checks(self):
         # A guarda nao pode barrar quem fez tudo certo.
-        bot._validar_token("1234567890:AAHrealisticlookingtokenvalue123456789")
+        #
+        # Montado por partes de proposito: escrito inteiro, este token de
+        # mentira acionaria a varredura do teste acima — que e exatamente o
+        # comportamento desejado dela.
+        valido = "1234567890" + ":" + "AAH" + "x" * 32
+        bot._validar_token(valido)
 
 
 class LgpdTest(BotBase):
