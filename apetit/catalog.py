@@ -184,6 +184,28 @@ CREATE TABLE IF NOT EXISTS favorite (
     PRIMARY KEY (telegram_id, item_code)
 );
 
+-- Quais avisos a pessoa aceita receber. A ausencia de linha vale como o
+-- padrao de apetit/nudges.py, entao quem nunca abriu /avisos nao fica sem
+-- resumo nem passa a receber lembrete que nao pediu.
+CREATE TABLE IF NOT EXISTS employee_notification (
+    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    kind TEXT NOT NULL,
+    enabled INTEGER NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (telegram_id, kind)
+);
+
+-- Marca o envio por periodo, nao por data: assim reiniciar o bot no meio do dia
+-- nao reenvia o resumo que ja saiu, e a chave primaria torna o reenvio
+-- impossivel em vez de improvavel.
+CREATE TABLE IF NOT EXISTS notification_sent (
+    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    kind TEXT NOT NULL,
+    period TEXT NOT NULL,
+    sent_at TEXT NOT NULL,
+    PRIMARY KEY (telegram_id, kind, period)
+);
+
 -- A restricao unica e o que torna a pontuacao idempotente: reavaliar o mesmo
 -- dia nao concede pontos de novo.
 CREATE TABLE IF NOT EXISTS points_event (

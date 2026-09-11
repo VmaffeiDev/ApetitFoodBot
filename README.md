@@ -30,6 +30,7 @@ publicado, e o funcionario monta o prato e registra o consumo.
 | `/favoritos` | Pratos guardados |
 | `/progresso` | Sequencia e conquistas da pessoa |
 | `/ficha` | Ficha do nutricionista da propria pessoa |
+| `/avisos` | Liga e desliga o resumo semanal e o lembrete do almoco |
 | `/ajuda` | Como usar |
 | `/meus_dados` `/excluir_dados` | LGPD |
 | `/recadastrar` | Refaz o cadastro |
@@ -511,6 +512,53 @@ PDF escaneado ou foto volta vazio de proposito: **nao ha OCR**. Reconhecer letra
 imagem erra, e errar aqui vira orientacao errada a partir do documento clinico de
 alguem. O app admite que nao leu e oferece digitar os numeros.
 
+## Avisos de progresso (`/avisos`)
+
+Ate aqui o app so respondia. Uma mensagem que ele manda sozinho e outra coisa:
+ela chega no celular da pessoa, num app da empresa, sobre o que ela come. Isso
+pode ser util ou pode ser pressao, e a diferenca esta em poucas regras.
+
+**Fala do proprio progresso, nunca do prato.** "Voce registrou 4 de 5 dias" e
+sobre constancia. "Voce passou das calorias" seria o empregador comentando o
+almoco de alguem, e nao existe aqui — ha teste varrendo o texto atras de
+`caloria`, `peso` e `emagrec`.
+
+**Nunca compara com colega.** Vale a mesma regra do resto do app: sem ranking,
+sem media do setor.
+
+**Quem nao esta usando para de receber.** Duas semanas sem nenhum registro e o
+resumo cala. Sem isso o aviso vira cobranca semanal de um app corporativo para
+quem ja decidiu nao usar — o jeito mais rapido de a pessoa passar a ignorar
+tudo, inclusive o alerta de alergenico. A primeira semana em branco convida
+("sem pressa"); a segunda nao chega.
+
+**Bloquear o bot desliga o aviso**, em vez de render uma tentativa por semana
+para sempre.
+
+Dois avisos:
+
+| Aviso | Quando | Padrao |
+|---|---|---|
+| Resumo da semana | sexta, 16h (Brasilia) | ligado |
+| Lembrete do almoco | dia util, 11h, so se ainda nao registrou e ha cardapio | **desligado** |
+
+O resumo ja vem ligado porque e o proprio progresso da pessoa, uma vez por
+semana, desligavel em dois toques. O lembrete nao: ele chega todo dia util, e
+ninguem pediu para um app da empresa lembrar da hora do almoco. Toda mensagem
+termina com como parar de recebe-la.
+
+O horario e fixo no fuso de Brasilia (UTC-3, sem horario de verao desde 2019),
+nao em UTC: um lembrete de almoco precisa cair na hora do almoco de quem recebe.
+
+Nada e enviado duas vezes — o envio fica marcado por periodo, entao reiniciar o
+bot no meio do dia nao reenvia. E a marca so e gravada **depois** que o Telegram
+aceitou: marcar antes faria uma queda de rede virar um resumo que a pessoa nunca
+recebe e que nunca seria reenviado.
+
+Os envios rodam na `JobQueue` do python-telegram-bot (extra `job-queue`). Se ela
+faltar, o bot sobe do mesmo jeito e avisa no log: cardapio e alergenico nao caem
+por causa do resumo semanal.
+
 ## Avaliacao do refeitorio
 
 Depois de registrar a refeicao, o app pergunta como foi. Sao tres toques —
@@ -752,6 +800,7 @@ apetit/
   feedback.py    avaliacao do refeitorio, agregada e sem autor
   intake.py      de que semana e o arquivo que chegou
   prescription.py ficha do nutricionista: le, confirma, guarda so os numeros
+  nudges.py      quem recebe qual aviso, e quando o app cala
   pilot.py       relatorio do piloto, sem individualizar ninguem
 bot.py           camada do Telegram
 LICENSE          todos os direitos reservados

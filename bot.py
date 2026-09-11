@@ -18,7 +18,7 @@ nutricionista sem reescrita.
 import io
 import logging
 import os
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta, timezone
 from html import escape
 from pathlib import Path
 
@@ -52,6 +52,15 @@ from apetit.catalog import (
 )
 from apetit.csv_import import parse_menu_rows, read_rows
 from apetit.intake import build_preview, infer_period
+from apetit.nudges import (
+    LEMBRETE_ALMOCO,
+    RESUMO_SEMANAL,
+    lunch_nudges,
+    mark_sent,
+    notification_settings,
+    set_notification,
+    weekly_nudges,
+)
 from apetit.pilot import daily_activity, format_report, pilot_report
 from apetit.prescription import (
     FRACAO_ALMOCO_SUGERIDA,
@@ -162,6 +171,7 @@ COMMANDS = [
     BotCommand("favoritos", "Pratos que eu guardei"),
     BotCommand("progresso", "Minha sequencia e conquistas"),
     BotCommand("ficha", "Minha ficha do nutricionista"),
+    BotCommand("avisos", "Ligar ou desligar os avisos"),
     BotCommand("meus_dados", "Ver tudo o que o app guarda de mim"),
     BotCommand("excluir_dados", "Apagar meus dados"),
     BotCommand("ajuda", "Como usar o app"),
@@ -217,7 +227,8 @@ def main_menu() -> list[list[tuple[str, str]]]:
         [("⭐ Avaliar o refeitorio", "avaliar")],
         [("\U0001f4c8 Meu progresso", "progresso"), ("\U0001f4cb Minha ficha", "ficha")],
         [("\U0001f4ca Meu dia", "meu_dia"), ("⭐ Favoritos", "favoritos")],
-        [("\U0001f464 Meu cadastro", "perfil"), ("❓ Ajuda", "ajuda")],
+        [("\U0001f464 Meu cadastro", "perfil"), ("\U0001f514 Avisos", "avisos")],
+        [("❓ Ajuda", "ajuda")],
     ]
 
 
@@ -1266,6 +1277,9 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bo
         "atendimento e se faltou algo. <b>Vai sem o seu nome:</b> a Apetit ve como o "
         "refeitorio esta indo, nunca quem disse o que — nem a sua empresa, nem o seu "
         "setor. E a unica coisa do app que sai de voce.\n\n"
+        "<b>Avisos</b> — na sexta eu te mando o resumo da sua semana, e se voce quiser "
+        "eu te lembro de registrar o almoco. Eu nunca comento o que voce comeu, e "
+        "voce liga e desliga em /avisos quando quiser.\n\n"
         "<b>Sobre os simbolos</b>\n"
         "⛔ contem algo que voce marcou como alergia\n"
         "⚠️ sem informacao de alergenico — pergunte no balcao\n"
@@ -1708,6 +1722,142 @@ async def remove_prescription(update: Update, context: ContextTypes.DEFAULT_TYPE
         [[("\U0001f519 Voltar", "menu")]],
         edit=True,
     )
+
+
+# --------------------------------------------------------------------------
+# Avisos de progresso
+# --------------------------------------------------------------------------
+#
+# O app passa a falar primeiro. A regra de quem recebe o que vive em
+# apetit/nudges.py; aqui fica so a entrega e a tela de ligar e desligar.
+#
+# O horario e fixo no fuso de Brasilia (UTC-3, sem horario de verao desde 2019)
+# em vez de UTC: um lembrete de almoco precisa cair na hora do almoco de quem
+# recebe, e o resto do app usar UTC nao muda isso.
+
+FUSO_BRASILIA = timezone(timedelta(hours=-3))
+HORA_LEMBRETE = time(11, 0, tzinfo=FUSO_BRASILIA)
+HORA_RESUMO = time(16, 0, tzinfo=FUSO_BRASILIA)
+DIA_DO_RESUMO = (4,)  # sexta: a semana ja aconteceu e ninguem comeca segunda cobrado
+
+ROTULO_AVISO = {
+    RESUMO_SEMANAL: "Resumo da minha semana (sexta)",
+    LEMBRETE_ALMOCO: "Lembrete de registrar o almoco",
+}
+
+
+async def show_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+    pessoa = await require_registration(update, context, edit=edit)
+    if not pessoa:
+        return
+    conn = db()
+    try:
+        escolhas = notification_settings(conn, pessoa.telegram_id)
+    finally:
+        conn.close()
+    botoes = [
+        [(f"{'☑️' if escolhas[kind] else '⬜'} {rotulo}", f"aviso:{kind}")]
+        for kind, rotulo in ROTULO_AVISO.items()
+    ]
+    botoes.append([("\U0001f519 Voltar", "menu")])
+    await reply(
+        update,
+        "\U0001f514 <b>Avisos</b>\n\n"
+        "Toque para ligar ou desligar. Da para mudar quando quiser.\n\n"
+        "<b>Resumo da semana</b> — na sexta eu te mando quantos dias voce "
+        "registrou e o que voce conquistou. So sobre voce: nao existe ranking "
+        "e sua empresa nao ve nada disso.\n\n"
+        "<b>Lembrete do almoco</b> — um toque no seu ombro na hora do almoco, "
+        "so nos dias em que voce ainda nao registrou.\n\n"
+        "<i>Eu nunca comento o que voce comeu.</i>",
+        botoes,
+        edit=edit,
+    )
+
+
+async def toggle_notification(update: Update, context: ContextTypes.DEFAULT_TYPE, kind: str) -> None:
+    pessoa = await require_registration(update, context, edit=True)
+    if not pessoa or kind not in ROTULO_AVISO:
+        return
+    conn = db()
+    try:
+        atual = notification_settings(conn, pessoa.telegram_id)[kind]
+        set_notification(conn, pessoa.telegram_id, kind, not atual)
+    finally:
+        conn.close()
+    await show_notifications(update, context, edit=True)
+
+
+async def deliver(context: ContextTypes.DEFAULT_TYPE, avisos: list) -> int:
+    """Entrega os avisos e marca cada um como enviado.
+
+    So marca depois que o Telegram aceitou: marcar antes faria uma queda de
+    rede virar um resumo que a pessoa nunca recebe e que nunca sera reenviado.
+
+    Quem bloqueou o bot tem o aviso **desligado**, nao reenviado — bloquear ja
+    e dizer "nao me mande mais".
+    """
+    from telegram.error import Forbidden, TelegramError
+
+    enviados = 0
+    for aviso in avisos:
+        try:
+            await context.bot.send_message(
+                chat_id=aviso.telegram_id, text=aviso.text, parse_mode=ParseMode.HTML
+            )
+        except Forbidden:
+            conn = db()
+            try:
+                set_notification(conn, aviso.telegram_id, aviso.kind, False)
+            finally:
+                conn.close()
+            logger.info("Aviso %s desligado: a pessoa bloqueou o bot.", aviso.kind)
+            continue
+        except TelegramError as erro:
+            logger.warning("Falha enviando %s: %s", aviso.kind, erro)
+            continue
+        conn = db()
+        try:
+            mark_sent(conn, aviso.telegram_id, aviso.kind, aviso.period)
+        finally:
+            conn.close()
+        enviados += 1
+    return enviados
+
+
+async def send_weekly_summaries(context: ContextTypes.DEFAULT_TYPE) -> None:
+    conn = db()
+    try:
+        avisos = weekly_nudges(conn, today())
+    finally:
+        conn.close()
+    logger.info("Resumo semanal: %s enviado(s).", await deliver(context, avisos))
+
+
+async def send_lunch_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
+    conn = db()
+    try:
+        avisos = lunch_nudges(conn, today())
+    finally:
+        conn.close()
+    logger.info("Lembrete de almoco: %s enviado(s).", await deliver(context, avisos))
+
+
+def schedule_nudges(app: Application) -> None:
+    """Agenda os dois envios. Sem JobQueue, o bot sobe do mesmo jeito.
+
+    A fila de jobs vem do extra `job-queue` do python-telegram-bot. Se ela
+    faltar num deploy antigo, o certo e o bot continuar servindo cardapio e
+    alergenico — nao cair por causa do aviso semanal.
+    """
+    if app.job_queue is None:
+        logger.warning(
+            "Sem JobQueue: os avisos de progresso nao vao sair. "
+            "Instale com: pip install \"python-telegram-bot[job-queue]\""
+        )
+        return
+    app.job_queue.run_daily(send_weekly_summaries, time=HORA_RESUMO, days=DIA_DO_RESUMO, name="resumo_semanal")
+    app.job_queue.run_daily(send_lunch_reminders, time=HORA_LEMBRETE, name="lembrete_almoco")
 
 
 # --------------------------------------------------------------------------
@@ -2562,6 +2712,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await submit_rating(update, context)
         return
 
+    if data == "avisos":
+        await show_notifications(update, context, edit=True)
+        return
+    if data.startswith("aviso:"):
+        await toggle_notification(update, context, data.split(":", 1)[1])
+        return
+
     if data.startswith("ficha"):
         if data == "ficha" or data == "ficha_cancelar":
             context.user_data.pop(FICHA, None)
@@ -2705,12 +2862,15 @@ def main() -> None:
     app.add_handler(CommandHandler("atendimento", show_service_report))
     app.add_handler(CommandHandler("importar", show_import_help))
     app.add_handler(CommandHandler("ficha", show_prescription))
+    app.add_handler(CommandHandler("avisos", show_notifications))
     # Anexo do cardapio: e o caminho de publicacao da semana, entao vem antes
     # do handler de texto solto.
     app.add_handler(MessageHandler(filters.Document.ALL, receive_document))
     app.add_handler(CommandHandler("avisar_favoritos", notify_favorites))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    schedule_nudges(app)
 
     webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL", "").rstrip("/")
     if webhook_url:
