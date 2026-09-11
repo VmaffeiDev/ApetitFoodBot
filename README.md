@@ -449,6 +449,46 @@ cardapio.
 
 **3. Prato a prato**, pelo `/alergenico` no Telegram.
 
+**4. Pela planilha de receitas da operacao** — o caminho que cobre mais de uma vez:
+
+```powershell
+python scripts/receitas.py --importar Receitas-Cardapio-Nutri.xlsx --so-conferir
+python scripts/receitas.py --importar Receitas-Cardapio-Nutri.xlsx
+python scripts/receitas.py --revisar Receitas.xlsx --prato strogonoff_de_carne
+```
+
+A planilha de receitas traz **a lista de ingredientes de cada prato** — 4.952
+receitas, 27.298 linhas de ingrediente. E dela que sai a declaracao que a ficha
+tecnica nunca trouxe. O `apetit/allergens.py` abre dizendo qual era o problema:
+"STROGONOFF DE CARNE nao avisa que leva creme de leite". A receita avisa — ela
+lista `COMPOSTO LACTEO`.
+
+Tres regras seguram a deducao (detalhe em `apetit/recipes.py`):
+
+- **Ingrediente prova presenca, nunca ausencia.** O script **nunca grava
+  `nao_contem`**: a receita pode omitir o molho pronto, o ingrediente composto
+  pode esconder alergenico na formula e existe contaminacao cruzada na cozinha,
+  que nenhuma lista enxerga. Liberar um prato continua sendo decisao da
+  nutricionista.
+- **Casamento por palavra inteira, com excecao explicita.** "COUVE MANTEIGA"
+  nao tem manteiga, "PAO DE QUEIJO" e de polvilho e nao tem gluten, "PAO SIRIO"
+  nao tem siri, "LEITE DE COCO" nao e leite e "NOZ MOSCADA" nao e noz. Cada uma
+  dessas e um ⚠️ falso que nao aparece — e ⚠️ falso ensina a pessoa a ignorar o
+  ⚠️ verdadeiro.
+- **Prato com variantes que discordam fica sem declaracao.** "CARNE ASSADA AO
+  MOLHO" existe com champignon e ao molho madeira, com ingredientes diferentes.
+  Onde as variantes concordam, a resposta e a mesma qualquer que seja a que foi
+  para a panela e da para declarar; onde discordam, nao.
+
+Oleo de soja aparece em 1.811 das 27.298 linhas. A RDC 26/2015 dispensa os
+oleos vegetais totalmente refinados, e marcar "contem soja" em todo prato
+apagaria o aviso para quem tem alergia de verdade. O app marca `pode_conter` e
+deixa visivel; `OLEO_VEGETAL_REFINADO`, no topo de `apetit/recipes.py`, e a
+linha unica para a nutricionista mudar se o caso for outro.
+
+O resultado entra com `source = "lista de ingredientes"`: e deducao para a
+nutricionista revisar, nao declaracao da cozinha.
+
 Acompanhe com `/cobertura` ou `--cobertura`.
 
 ## Progresso
@@ -801,6 +841,7 @@ apetit/
   intake.py      de que semana e o arquivo que chegou
   prescription.py ficha do nutricionista: le, confirma, guarda so os numeros
   nudges.py      quem recebe qual aviso, e quando o app cala
+  recipes.py     alergenico deduzido da lista de ingredientes
   pilot.py       relatorio do piloto, sem individualizar ninguem
 bot.py           camada do Telegram
 LICENSE          todos os direitos reservados
