@@ -646,7 +646,9 @@ class EnvioDoCardapioTest(BotBase):
     async def mandar(self, nome="Cardapio_17_a_2108.csv", conteudo=CARDAPIO_SEMANA, context=None):
         context = context or FakeContext(arquivo=conteudo)
         update = FakeUpdate(user_id=self.user, document=FakeDocument(nome, conteudo))
-        await bot.receive_menu_file(update, context)
+        # Passa pelo roteador de documentos de proposito: e por onde o arquivo
+        # chega de verdade, e e ele que separa cardapio de ficha.
+        await bot.receive_document(update, context)
         return update, context
 
     async def test_non_admin_cannot_publish_a_menu(self):
@@ -736,7 +738,7 @@ class EnvioDoCardapioTest(BotBase):
         self.assertNotIn("BIFE ACEBOLADO", nomes)
 
     async def test_a_file_type_it_cannot_read_is_refused_clearly(self):
-        update, _ = await self.mandar(nome="cardapio.pdf", conteudo=b"%PDF-1.4")
+        update, _ = await self.mandar(nome="cardapio.jpg", conteudo=b"\xff\xd8\xff")
 
         self.assertIn("Nao sei ler", update.last)
         self.assertIn(".csv", update.last)

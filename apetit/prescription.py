@@ -44,7 +44,8 @@ def _normaliza(texto: str) -> str:
     return re.sub(r"[ \t]+", " ", sem_acento).lower()
 
 
-def _numero(bruto: str) -> float | None:
+def parse_number(bruto: str) -> float | None:
+    """Numero no formato brasileiro: "1.800" e mil e oitocentos, "1,8" e um virgula oito."""
     try:
         return float(bruto.replace(".", "").replace(",", ".") if "," in bruto else bruto)
     except (ValueError, AttributeError):
@@ -176,7 +177,7 @@ def _procura_campo(linha_norm: str, linha_original: str, padrao: str) -> Campo |
         busca = re.search(regex, linha_norm)
         if not busca:
             continue
-        valor = _numero(busca.group(1))
+        valor = parse_number(busca.group(1))
         if valor is None or valor <= 0:
             continue
         return Campo(

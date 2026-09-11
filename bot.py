@@ -52,6 +52,19 @@ from apetit.catalog import (
 )
 from apetit.csv_import import parse_menu_rows, read_rows
 from apetit.intake import build_preview, infer_period
+from apetit.pilot import daily_activity, format_report, pilot_report
+from apetit.prescription import (
+    FRACAO_ALMOCO_SUGERIDA,
+    Campo,
+    Leitura,
+    Prescription,
+    delete_prescription,
+    extract_prescription,
+    load_prescription,
+    parse_number,
+    read_pdf,
+    save_prescription,
+)
 from apetit.spreadsheet import is_spreadsheet, read_spreadsheet_rows
 from apetit.feedback import (
     MISSING_TAGS,
@@ -148,6 +161,7 @@ COMMANDS = [
     BotCommand("meu_dia", "O que eu comi hoje e nos ultimos dias"),
     BotCommand("favoritos", "Pratos que eu guardei"),
     BotCommand("progresso", "Minha sequencia e conquistas"),
+    BotCommand("ficha", "Minha ficha do nutricionista"),
     BotCommand("meus_dados", "Ver tudo o que o app guarda de mim"),
     BotCommand("excluir_dados", "Apagar meus dados"),
     BotCommand("ajuda", "Como usar o app"),
@@ -201,14 +215,53 @@ def main_menu() -> list[list[tuple[str, str]]]:
         [("\U0001f957 Quanto pegar hoje", "quanto")],
         [("\U0001f37d️ Montar meu prato", "montar"), ("\U0001f4c5 Cardapio", "cardapio")],
         [("⭐ Avaliar o refeitorio", "avaliar")],
-        [("\U0001f4c8 Meu progresso", "progresso")],
+        [("\U0001f4c8 Meu progresso", "progresso"), ("\U0001f4cb Minha ficha", "ficha")],
         [("\U0001f4ca Meu dia", "meu_dia"), ("⭐ Favoritos", "favoritos")],
         [("\U0001f464 Meu cadastro", "perfil"), ("❓ Ajuda", "ajuda")],
     ]
 
 
-def target_for(pessoa: Employee) -> dict:
-    return TARGETS.get(pessoa.goal, TARGET_PADRAO)
+def prescription_for(pessoa: Employee) -> Prescription | None:
+    """A ficha do nutricionista da pessoa, se ela tiver trazido uma."""
+    conn = db()
+    try:
+        return load_prescription(conn, pessoa.telegram_id)
+    finally:
+        conn.close()
+
+
+def target_for(pessoa: Employee, ficha: Prescription | None = None) -> dict:
+    """Alvo do almoco: o do nutricionista quando existe, o do objetivo quando nao.
+
+    A ficha confirmada ganha do objetivo generico — ela e o numero de um
+    profissional, o outro e ilustrativo. Campo que a ficha nao traz continua
+    vindo do objetivo: sem proteina nao ha como pontuar o dia, e deixar o alvo
+    pela metade quebraria o resto do app. `target_source` diz de onde veio cada
+    numero, para a tela nao apresentar palpite como prescricao.
+
+    Ficha implausivel (numero do dia inteiro entrando como refeicao) e ignorada
+    aqui de proposito: melhor cair no alvo generico que sugerir 1.800 kcal num
+    prato so.
+
+    Sem `ficha`, busca a da pessoa: quem tem ficha tem ficha em toda tela, e
+    esquecer de passar em uma delas faria o mesmo prato ser lido contra dois
+    alvos diferentes.
+    """
+    if ficha is None:
+        ficha = prescription_for(pessoa)
+    alvo = dict(TARGETS.get(pessoa.goal, TARGET_PADRAO))
+    if ficha and ficha.tem_alvo and not ficha.implausivel():
+        alvo.update(ficha.alvo_almoco())
+    return alvo
+
+
+def target_source(pessoa: Employee, ficha: Prescription | None) -> dict[str, str]:
+    """De onde veio cada numero do alvo: "ficha" ou "objetivo"."""
+    origem = {"kcal": "objetivo", "ptn": "objetivo"}
+    if ficha and ficha.tem_alvo and not ficha.implausivel():
+        for campo in ficha.alvo_almoco():
+            origem[campo] = "ficha"
+    return origem
 
 
 # --------------------------------------------------------------------------
@@ -491,15 +544,25 @@ def describe_restrictions(pessoa: Employee) -> str:
 
 
 def load_menu(pessoa: Employee, dia: str) -> list[dict]:
+    """O cardapio do dia ja conferido contra o que a pessoa nao pode comer.
+
+    O que o nutricionista mandou evitar entra pelo mesmo caminho do "prefiro
+    evitar": bloqueia quando o termo aparece no nome do prato, sem virar aviso
+    de alergenico. E o tratamento correto — e uma orientacao profissional, nao
+    um risco de reacao alergica, e tratar como alergia encheria o cardapio de
+    ⚠️ onde nao ha perigo nenhum.
+    """
     conn = db()
     try:
+        ficha = load_prescription(conn, pessoa.telegram_id)
+        evitar = list(dict.fromkeys(pessoa.avoid_foods + (ficha.proibidos if ficha else [])))
         return check_menu_for_employee(
             conn,
             dia,
             pessoa.restrictions,
             unit=pessoa.apetit_unit,
             unverifiable=pessoa.free_restrictions,
-            avoid_terms=pessoa.avoid_foods,
+            avoid_terms=evitar,
         )
     finally:
         conn.close()
@@ -603,18 +666,31 @@ async def show_portions(update: Update, context: ContextTypes.DEFAULT_TYPE, edit
         )
         return
 
+    ficha = prescription_for(pessoa)
+    origem = target_source(pessoa, ficha)
+    base = "sua ficha do nutricionista" if "ficha" in origem.values() else f"objetivo: {pessoa.goal}"
     linhas = [
         f"\U0001f37d️ <b>Quanto pegar hoje</b>",
-        f"<i>{escape(friendly_date(dia))} · objetivo: {escape(pessoa.goal)}</i>\n",
+        f"<i>{escape(friendly_date(dia))} · {escape(base)}</i>\n",
     ]
     linhas.extend(f"• {escape(linha)}" for linha in sugestao.lines())
     linhas.append(f"\n{escape(sugestao.summary())}")
     for nota in sugestao.notes:
         linhas.append(f"\n⚠️ {escape(nota)}")
-    linhas.append(
-        "\n<i>E uma sugestao com base no que tem hoje e no objetivo que voce escolheu. "
-        "Quem define quantidade individual e o nutricionista.</i>"
-    )
+    if "ficha" in origem.values():
+        # Quando so metade do alvo veio da ficha, a pessoa precisa saber qual
+        # metade: o outro numero e ilustrativo do app, nao do profissional dela.
+        misto = [rotulo for rotulo, fonte in origem.items() if fonte == "objetivo"]
+        nota_ficha = "\n<i>Estou seguindo os numeros da sua ficha."
+        if misto:
+            falta = " e ".join("calorias" if r == "kcal" else "proteina" for r in misto)
+            nota_ficha += f" A ficha nao trazia {falta}: esse numero ainda vem do seu objetivo."
+        linhas.append(nota_ficha + "</i>")
+    else:
+        linhas.append(
+            "\n<i>E uma sugestao com base no que tem hoje e no objetivo que voce escolheu. "
+            "Quem define quantidade individual e o nutricionista.</i>"
+        )
 
     await reply(
         update,
@@ -1182,6 +1258,10 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bo
         "de cada coisa. Registrar de novo no mesmo dia substitui o registro anterior.\n\n"
         "<b>Favoritos</b> — pratos que voce gostou. Aviso quando voltarem.\n\n"
         "<b>Meu progresso</b> — sua sequencia e suas conquistas. So suas.\n\n"
+        "<b>Minha ficha</b> — se voce faz acompanhamento com nutricionista, mande a "
+        "ficha em PDF (ou digite os numeros) e eu passo a seguir <b>ela</b> em vez do "
+        "objetivo generico. Voce confere tudo o que eu li antes de valer, e o arquivo "
+        "nao fica guardado: so os numeros que voce confirmar.\n\n"
         "<b>Avaliar o refeitorio</b> — tres toques dizendo como foi a comida, o "
         "atendimento e se faltou algo. <b>Vai sem o seu nome:</b> a Apetit ve como o "
         "refeitorio esta indo, nunca quem disse o que — nem a sua empresa, nem o seu "
@@ -1208,10 +1288,25 @@ async def show_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE, edit:
         guardados = favorites(conn, pessoa.telegram_id)
         pontos = total_points(conn, pessoa.telegram_id)
         avaliacoes = my_ratings(conn, pessoa.telegram_id, 200)
+        ficha = load_prescription(conn, pessoa.telegram_id)
     finally:
         conn.close()
     restricoes = describe_restrictions(pessoa)
     dias = len({linha["service_date"] for linha in historico})
+    if ficha:
+        alvo = ficha.alvo_almoco()
+        numeros = " · ".join(
+            filtro for filtro in (
+                f"{alvo['kcal']:.0f} kcal" if "kcal" in alvo else "",
+                f"{alvo['ptn']:.0f} g de proteina" if "ptn" in alvo else "",
+            ) if filtro
+        )
+        linha_ficha = (
+            f"<b>Ficha do nutricionista:</b> {escape(numeros or 'sem numeros')}\n"
+            "<i>so estes numeros — o documento que voce mandou nao foi guardado</i>\n"
+        )
+    else:
+        linha_ficha = ""
     await reply(
         update,
         "\U0001f512 <b>Tudo o que eu guardo sobre voce</b>\n\n"
@@ -1221,7 +1316,8 @@ async def show_my_data(update: Update, context: ContextTypes.DEFAULT_TYPE, edit:
         f"<b>Setor:</b> {escape(pessoa.sector)}\n"
         f"<b>Objetivo:</b> {escape(pessoa.goal)}\n"
         f"<b>Restricoes:</b> {escape(restricoes)}\n"
-        f"<b>Aceite:</b> {escape(pessoa.consented_at or 'nao informado')}\n\n"
+        + linha_ficha
+        + f"<b>Aceite:</b> {escape(pessoa.consented_at or 'nao informado')}\n\n"
         f"<b>Dias com refeicao registrada:</b> {dias}\n"
         f"<b>Pratos guardados:</b> {len(guardados)}\n"
         f"<b>Pontos:</b> {pontos}\n"
@@ -1246,6 +1342,371 @@ async def confirm_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         "Vou remover seu cadastro, restricoes, historico, pratos guardados e progresso. "
         "Isso nao tem volta.",
         [[("Sim, apagar tudo", "del_sim")], [("Nao, cancelar", "del_nao")]],
+    )
+
+
+# --------------------------------------------------------------------------
+# Ficha de controle nutricional que o funcionario traz
+# --------------------------------------------------------------------------
+
+FICHA = "ficha_pendente"
+ROTULO_CAMPO = {
+    "kcal": "Calorias",
+    "ptn_g": "Proteina",
+    "cho_g": "Carboidrato",
+    "lip_g": "Gordura",
+}
+UNIDADE_CAMPO = {"kcal": "kcal", "ptn_g": "g", "cho_g": "g", "lip_g": "g"}
+
+
+def ficha_pendente(context: ContextTypes.DEFAULT_TYPE) -> dict:
+    return context.user_data.setdefault(FICHA, {})
+
+
+def _descreve_ficha(ficha: Prescription) -> list[str]:
+    linhas = []
+    alvo = ficha.alvo_almoco()
+    if "kcal" in alvo:
+        linhas.append(f"<b>Calorias no almoco:</b> {alvo['kcal']:.0f} kcal")
+    if "ptn" in alvo:
+        linhas.append(f"<b>Proteina no almoco:</b> {alvo['ptn']:.0f} g")
+    if ficha.escopo == "dia" and ficha.fracao_almoco:
+        linhas.append(
+            f"<i>A ficha trazia o total do dia. Estou usando "
+            f"{ficha.fracao_almoco * 100:.0f}% dele para o almoco.</i>"
+        )
+    if ficha.proibidos:
+        linhas.append(f"<b>Evitar:</b> {escape(', '.join(ficha.proibidos))}")
+    if ficha.recomendados:
+        linhas.append(f"<b>Preferir:</b> {escape(', '.join(ficha.recomendados))}")
+    if ficha.profissional:
+        linhas.append(f"<i>{escape(ficha.profissional)}</i>")
+    return linhas
+
+
+async def show_prescription(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
+    """Tela da ficha: o que esta valendo hoje, ou como mandar a sua."""
+    pessoa = await require_registration(update, context, edit=edit)
+    if not pessoa:
+        return
+    ficha = prescription_for(pessoa)
+
+    if not ficha:
+        await reply(
+            update,
+            "\U0001f4cb <b>Ficha do nutricionista</b>\n\n"
+            "Se voce faz acompanhamento com nutricionista e tem uma ficha com "
+            "os seus numeros, eu passo a seguir <b>ela</b> em vez do objetivo "
+            "generico que voce escolheu no cadastro.\n\n"
+            "Mande a ficha aqui em <b>PDF</b> e eu leio. Voce confere tudo o "
+            "que eu entendi antes de valer.\n\n"
+            "<b>O arquivo nao fica guardado.</b> Eu tiro os numeros, voce "
+            "confirma, e o documento e descartado — ficha costuma trazer peso e "
+            "historico, e disso eu nao preciso.\n\n"
+            "Se a sua ficha for foto ou papel, eu nao consigo ler: toque em "
+            "<b>Digitar os numeros</b>.",
+            [
+                [("✍️ Digitar os numeros", "ficha_manual")],
+                [("\U0001f519 Voltar", "menu")],
+            ],
+            edit=edit,
+        )
+        return
+
+    linhas = ["\U0001f4cb <b>Sua ficha do nutricionista</b>\n"]
+    linhas.extend(_descreve_ficha(ficha))
+    aviso = ficha.implausivel()
+    if aviso:
+        linhas.append(f"\n⚠️ {escape(aviso)}\n<b>Nao estou usando esse numero</b> — confira a ficha.")
+    linhas.append(f"\n<i>Confirmada por voce em {escape(ficha.confirmada_em[:10] or 'data nao registrada')}.</i>")
+    linhas.append("<i>O documento nao ficou guardado, so estes numeros.</i>")
+    await reply(
+        update,
+        "\n".join(linhas),
+        [
+            [("\U0001f504 Mandar outra ficha", "ficha_manual")],
+            [("\U0001f5d1️ Remover a ficha", "ficha_remover")],
+            [("\U0001f519 Voltar", "menu")],
+        ],
+        edit=edit,
+    )
+
+
+async def receive_prescription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Le o PDF da ficha e mostra o que entendeu, para a pessoa conferir."""
+    pessoa = await require_registration(update, context)
+    if not pessoa:
+        return
+
+    documento = update.effective_message.document
+    nome = documento.file_name or "ficha.pdf"
+    if (documento.file_size or 0) > MAX_ARQUIVO_BYTES:
+        await reply(update, "Arquivo grande demais. Uma ficha costuma ter poucos KB.")
+        return
+
+    arquivo = await context.bot.get_file(documento.file_id)
+    conteudo = bytes(await arquivo.download_as_bytearray())
+    try:
+        texto = read_pdf(conteudo) if nome.lower().endswith(".pdf") else conteudo.decode("utf-8", "ignore")
+    except Exception as erro:  # PDF corrompido ou protegido por senha
+        logger.warning("Falha lendo ficha: %s", erro)
+        texto = ""
+    # O conteudo morre aqui: nada de gravar o documento em disco ou no banco.
+    del conteudo
+
+    leitura = extract_prescription(texto)
+    if leitura.vazia:
+        await reply(
+            update,
+            "Nao consegui tirar nenhum numero de <b>" + escape(nome) + "</b>.\n\n"
+            "Isso acontece quando a ficha e uma <b>foto ou digitalizacao</b>: o "
+            "arquivo tem a imagem do texto, nao o texto. Eu nao tento adivinhar "
+            "letra de imagem de proposito — errar aqui viraria orientacao errada "
+            "a partir de um documento do seu nutricionista.\n\n"
+            "Me diga os numeros e eu sigo por eles.",
+            [[("✍️ Digitar os numeros", "ficha_manual")], [("\U0001f519 Voltar", "menu")]],
+        )
+        return
+
+    context.user_data[FICHA] = {"leitura": leitura, "fonte": nome, "fora": [], "escopo": ""}
+    await show_prescription_reading(update, context, edit=False)
+
+
+async def show_prescription_reading(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = True) -> None:
+    """O que o app entendeu, campo a campo, com o trecho de onde saiu.
+
+    O trecho e o ponto da tela: sem ele a pessoa confirmaria um numero sem ter
+    como saber se ele veio da linha certa da ficha dela.
+    """
+    dados = ficha_pendente(context)
+    leitura = dados.get("leitura")
+    if not leitura:
+        await show_prescription(update, context, edit=edit)
+        return
+
+    fora = set(dados.get("fora", []))
+    linhas = [
+        "\U0001f4cb <b>Confira o que eu entendi da sua ficha</b>",
+        "<i>Nada disso vale enquanto voce nao confirmar.</i>\n",
+    ]
+    botoes: list[list[tuple[str, str]]] = []
+    for campo, valor in leitura.campos.items():
+        marca = "⬜" if campo in fora else "☑️"
+        rotulo = ROTULO_CAMPO.get(campo, campo)
+        unidade = UNIDADE_CAMPO.get(campo, "")
+        marca_dia = " <i>(por dia)</i>" if valor.por_dia else ""
+        linhas.append(f"{marca} <b>{rotulo}:</b> {valor.valor:.0f} {unidade}{marca_dia}")
+        linhas.append(f"     <i>li de: “{escape(valor.trecho)}”</i>")
+        botoes.append([(f"{marca} {rotulo} {valor.valor:.0f} {unidade}", f"ficha_campo:{campo}")])
+
+    if leitura.proibidos:
+        linhas.append(f"\n⛔ <b>Evitar:</b> {escape(', '.join(leitura.proibidos))}")
+        linhas.append("<i>Vou marcar no cardapio quando aparecer no nome do prato.</i>")
+    if leitura.recomendados:
+        linhas.append(f"\n✅ <b>Preferir:</b> {escape(', '.join(leitura.recomendados))}")
+    if leitura.profissional:
+        linhas.append(f"\n<i>{escape(leitura.profissional)}</i>")
+
+    linhas.append("\nToque num numero para <b>tirar</b> ele, se eu li errado.")
+    botoes.append([("✅ Esta certo, continuar", "ficha_escopo")])
+    botoes.append([("❌ Cancelar", "ficha_cancelar")])
+    await reply(update, "\n".join(linhas), botoes, edit=edit)
+
+
+async def ask_prescription_scope(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """A pergunta que evita o erro grave: dia inteiro ou so o almoco?
+
+    E perguntada sempre, mesmo quando a ficha parecia dizer. Uma ficha que
+    escreve "1.800 kcal" sem mais nada e quase certo o dia inteiro, e aplicar
+    isso ao almoco mandaria a pessoa comer o dia todo num prato.
+    """
+    dados = ficha_pendente(context)
+    leitura = dados.get("leitura")
+    if not leitura:
+        await show_prescription(update, context, edit=True)
+        return
+    fora = set(dados.get("fora", []))
+    if not [c for c in leitura.campos if c not in fora]:
+        # So restaram termos de alimento: nao ha numero para repartir.
+        dados["escopo"] = "almoco"
+        await confirm_prescription(update, context)
+        return
+
+    suspeita = " Pelo que eu li, parece ser do dia inteiro." if leitura.algum_valor_diario else ""
+    await reply(
+        update,
+        "\U0001f914 <b>Esses numeros sao do dia inteiro ou so do almoco?</b>\n\n"
+        f"E a diferenca que mais importa aqui.{suspeita} "
+        "Se eu tratar o total do dia como se fosse o almoco, eu vou te mandar "
+        "comer o dia inteiro num prato so.\n\n"
+        "Se voce nao tiver certeza, <b>pergunte ao seu nutricionista</b> — ele "
+        "e quem reparte o dia entre as refeicoes.",
+        [
+            [("\U0001f37d️ E so do almoco", "ficha_escopo:almoco")],
+            [("\U0001f4c5 E do dia inteiro", "ficha_escopo:dia")],
+            [("❌ Cancelar", "ficha_cancelar")],
+        ],
+        edit=True,
+    )
+
+
+async def confirm_prescription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Ultima tela antes de valer: o alvo do almoco, ja repartido se for o caso."""
+    pessoa = await require_registration(update, context, edit=True)
+    if not pessoa:
+        return
+    dados = ficha_pendente(context)
+    leitura = dados.get("leitura")
+    if not leitura:
+        await show_prescription(update, context, edit=True)
+        return
+
+    fora = set(dados.get("fora", []))
+    escopo = dados.get("escopo") or "almoco"
+    valores = {c: v.valor for c, v in leitura.campos.items() if c not in fora}
+    ficha = Prescription(
+        kcal=valores.get("kcal"),
+        ptn_g=valores.get("ptn_g"),
+        cho_g=valores.get("cho_g"),
+        lip_g=valores.get("lip_g"),
+        proibidos=list(leitura.proibidos),
+        recomendados=list(leitura.recomendados),
+        profissional=leitura.profissional,
+        fonte=dados.get("fonte", ""),
+        escopo=escopo,
+        fracao_almoco=FRACAO_ALMOCO_SUGERIDA if escopo == "dia" else None,
+    )
+    dados["ficha"] = ficha
+
+    linhas = ["\U0001f4cb <b>Vai ficar assim</b>\n"]
+    linhas.extend(_descreve_ficha(ficha))
+    aviso = ficha.implausivel()
+    if aviso:
+        linhas.append(
+            f"\n⚠️ <b>{escape(aviso)}</b>\n"
+            "Se for do dia, volte e marque <b>do dia inteiro</b>. "
+            "Enquanto esse numero estiver assim eu nao vou usar ele."
+        )
+    elif escopo == "dia":
+        linhas.append(
+            f"\n<i>Repartir o dia entre as refeicoes e decisao do seu nutricionista. "
+            f"Os {FRACAO_ALMOCO_SUGERIDA * 100:.0f}% sao a proporcao usual do almoco — "
+            "se ele te passou outra, me diga digitando os numeros do almoco.</i>"
+        )
+    linhas.append("\n<b>A partir daqui eu sigo esses numeros</b> no lugar do objetivo do cadastro.")
+    linhas.append("<i>Guardo so os numeros. O documento nao fica.</i>")
+
+    await reply(
+        update,
+        "\n".join(linhas),
+        [
+            [("✅ Confirmar", "ficha_ok")],
+            [("\U0001f519 Rever o que eu li", "ficha_rever")],
+            [("❌ Cancelar", "ficha_cancelar")],
+        ],
+        edit=True,
+    )
+
+
+async def save_prescription_confirmed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    pessoa = await require_registration(update, context, edit=True)
+    if not pessoa:
+        return
+    ficha = ficha_pendente(context).get("ficha")
+    if not ficha:
+        await show_prescription(update, context, edit=True)
+        return
+    conn = db()
+    try:
+        save_prescription(conn, pessoa.telegram_id, ficha)
+    finally:
+        conn.close()
+    context.user_data.pop(FICHA, None)
+
+    linhas = ["✅ <b>Ficha guardada.</b>\n"]
+    linhas.extend(_descreve_ficha(ficha))
+    if ficha.proibidos:
+        linhas.append("\nVou marcar no cardapio o que voce deve evitar.")
+    linhas.append("\nToque em <b>Quanto pegar hoje</b> para ver o almoco pela sua ficha.")
+    await reply(
+        update,
+        "\n".join(linhas),
+        [[("\U0001f957 Quanto pegar hoje", "quanto")], [("\U0001f519 Voltar", "menu")]],
+        edit=True,
+    )
+
+
+async def ask_prescription_manual(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Caminho para quem tem a ficha no papel ou em foto.
+
+    Sem ele, quem nao tem a ficha em PDF fica de fora — e no refeitorio a ficha
+    quase sempre e papel.
+    """
+    context.user_data[FICHA] = {"leitura": None, "fonte": "digitado", "fora": [], "escopo": ""}
+    context.user_data[STEP] = "ficha_kcal"
+    await reply(
+        update,
+        "✍️ <b>Os numeros do seu almoco</b>\n\n"
+        "Quantas <b>calorias</b> o seu nutricionista passou <b>para o almoco</b>?\n\n"
+        "Escreva so o numero (ex.: <code>600</code>).\n"
+        "Se a ficha so traz o total do dia, escreva o total — eu pergunto depois.\n\n"
+        "Se ela nao traz calorias, escreva <code>pular</code>.",
+        edit=bool(update.callback_query),
+    )
+
+
+async def receive_prescription_number(update: Update, context: ContextTypes.DEFAULT_TYPE, texto: str) -> None:
+    """Recebe kcal e depois proteina, digitados a mao."""
+    step = context.user_data.get(STEP)
+    dados = ficha_pendente(context)
+    leitura = dados.get("leitura") or Leitura()
+    dados["leitura"] = leitura
+
+    campo = "kcal" if step == "ficha_kcal" else "ptn_g"
+    if texto.strip().lower() not in ("pular", "nao", "não", "-"):
+        valor = parse_number(texto.strip().replace("kcal", "").replace("g", "").strip())
+        if valor is None or valor <= 0:
+            await reply(update, "Nao entendi esse numero. Escreva so o valor, como <code>600</code>.")
+            return
+        leitura.campos[campo] = Campo(valor=valor, trecho="voce digitou", por_dia=False)
+
+    if step == "ficha_kcal":
+        context.user_data[STEP] = "ficha_ptn"
+        await reply(
+            update,
+            "E quantos gramas de <b>proteina</b>?\n\n"
+            "Escreva so o numero (ex.: <code>30</code>), ou <code>pular</code>.",
+        )
+        return
+
+    context.user_data.pop(STEP, None)
+    if not leitura.campos:
+        context.user_data.pop(FICHA, None)
+        await reply(
+            update,
+            "Sem nenhum numero eu nao tenho o que seguir. Quando tiver a ficha em maos, "
+            "e so voltar em /ficha.",
+            [[("\U0001f519 Voltar", "menu")]],
+        )
+        return
+    await ask_prescription_scope(update, context)
+
+
+async def remove_prescription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    pessoa = await require_registration(update, context, edit=True)
+    if not pessoa:
+        return
+    conn = db()
+    try:
+        delete_prescription(conn, pessoa.telegram_id)
+    finally:
+        conn.close()
+    await reply(
+        update,
+        "\U0001f5d1️ <b>Ficha removida.</b>\n\n"
+        f"Voltei a usar o objetivo do seu cadastro: <b>{escape(pessoa.goal)}</b>.",
+        [[("\U0001f519 Voltar", "menu")]],
+        edit=True,
     )
 
 
@@ -1365,6 +1826,73 @@ async def show_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.effective_message.reply_text("\n".join(linhas), parse_mode=ParseMode.HTML)
 
 
+async def show_pilot_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/piloto [convidados] [desde] [ate] — o retrato do teste para a empresa.
+
+    Este e o relatorio que vai para a Apetit no fim do piloto. Ele responde
+    "isso funciona no refeitorio?" com adesao, retencao e uso — e nao responde
+    "quem usou e qual a meta de cada um", que e dado de saude do funcionario
+    dentro da relacao de emprego. O proprio texto do relatorio diz isso, para a
+    ausencia ser lida como escolha e nao como relatorio incompleto.
+    """
+    if not is_admin(tg_id(update)):
+        await deny_admin(update, "ver o relatorio do piloto")
+        return
+
+    args = list(context.args or [])
+    convidados = int(args.pop(0)) if args and args[0].isdigit() else 0
+    hoje = date.fromisoformat(today())
+    desde = args[0] if len(args) > 0 else (hoje - timedelta(days=30)).isoformat()
+    ate = args[1] if len(args) > 1 else hoje.isoformat()
+    try:
+        date.fromisoformat(desde), date.fromisoformat(ate)
+    except ValueError:
+        await update.effective_message.reply_text(
+            "Data em formato estranho. Use assim:\n\n"
+            "/piloto 15 2026-09-01 2026-09-30\n\n"
+            "O primeiro numero e quantas pessoas foram convidadas."
+        )
+        return
+
+    conn = db()
+    try:
+        relatorio = pilot_report(conn, desde, ate, convidados=convidados)
+        curva = daily_activity(conn, desde, ate)
+    finally:
+        conn.close()
+
+    linhas = format_report(relatorio)
+    if curva:
+        linhas += ["", "PESSOAS POR DIA"]
+        linhas += [f"  {dia}  {'▇' * min(pessoas, 20)} {pessoas}" for dia, pessoas in curva[-14:]]
+    if not convidados:
+        linhas += [
+            "",
+            "<i>Para calcular a adesao, diga quantas pessoas foram convidadas:</i>",
+            "<i>/piloto 15</i>",
+        ]
+
+    texto = "\n".join(linhas)
+    # O relatorio inteiro nao cabe numa mensagem do Telegram quando o piloto
+    # tem muitos dias; cortar no limite perderia justamente o rodape que diz o
+    # que ficou de fora.
+    for pedaco in _split_message(texto):
+        await update.effective_message.reply_text(pedaco, parse_mode=ParseMode.HTML)
+
+
+def _split_message(texto: str, limite: int = 3500) -> list[str]:
+    """Quebra em mensagens do tamanho do Telegram, sempre em fim de linha."""
+    partes, atual = [], ""
+    for linha in texto.split("\n"):
+        if len(atual) + len(linha) + 1 > limite and atual:
+            partes.append(atual)
+            atual = ""
+        atual += (linha + "\n")
+    if atual.strip():
+        partes.append(atual)
+    return partes or [texto]
+
+
 # --------------------------------------------------------------------------
 # Cardapio da semana chegando pelo Telegram
 # --------------------------------------------------------------------------
@@ -1382,6 +1910,34 @@ IMPORTACAO = "importacao"
 MAX_ARQUIVO_BYTES = 5 * 1024 * 1024
 
 
+async def receive_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Decide o que fazer com um arquivo pela extensao.
+
+    Dois documentos diferentes chegam pela mesma porta: o cardapio da operacao
+    (planilha, so admin) e a ficha do nutricionista do funcionario (PDF). A
+    extensao separa os dois sem perguntar nada — e um admin tambem almoca, entao
+    perguntar "isso e cardapio?" apareceria para ele toda vez.
+    """
+    documento = update.effective_message.document
+    nome = (documento.file_name or "").lower()
+
+    if is_spreadsheet(nome) or nome.endswith((".csv", ".txt")):
+        await receive_menu_file(update, context)
+        return
+    if nome.endswith(".pdf"):
+        await receive_prescription(update, context)
+        return
+
+    await reply(
+        update,
+        f"Nao sei ler <b>{escape(documento.file_name or 'esse arquivo')}</b>.\n\n"
+        "<b>Ficha do nutricionista:</b> mande em PDF.\n"
+        "<b>Cardapio:</b> .csv ou .xlsx.\n\n"
+        "Se a sua ficha for foto ou papel, toque em <b>Digitar os numeros</b>.",
+        [[("✍️ Digitar os numeros", "ficha_manual")], [("\U0001f519 Voltar", "menu")]],
+    )
+
+
 async def receive_menu_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Recebe o CSV ou .xlsx do cardapio e mostra o que sera publicado."""
     if not is_admin(tg_id(update)):
@@ -1390,13 +1946,6 @@ async def receive_menu_file(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     documento = update.effective_message.document
     nome = documento.file_name or "cardapio"
-    if not (is_spreadsheet(nome) or nome.lower().endswith((".csv", ".txt"))):
-        await reply(
-            update,
-            f"Nao sei ler <b>{escape(nome)}</b>.\n\n"
-            "Mande o cardapio em <b>.csv</b> ou <b>.xlsx</b> — e o que a operacao exporta.",
-        )
-        return
     if (documento.file_size or 0) > MAX_ARQUIVO_BYTES:
         await reply(update, "Arquivo grande demais. O cardapio costuma ter poucos KB.")
         return
@@ -1735,6 +2284,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await show_import_preview(update, context)
         return
 
+    if step in ("ficha_kcal", "ficha_ptn"):
+        await receive_prescription_number(update, context, texto)
+        return
+
     if step == "avaliacao_comentario":
         # Comentario e o unico texto livre que sai do app para a Apetit. Cortar
         # no limite evita que um desabafo longo vire dado identificavel por
@@ -2009,6 +2562,51 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await submit_rating(update, context)
         return
 
+    if data.startswith("ficha"):
+        if data == "ficha" or data == "ficha_cancelar":
+            context.user_data.pop(FICHA, None)
+            context.user_data.pop(STEP, None)
+            await show_prescription(update, context, edit=True)
+            return
+        if data == "ficha_manual":
+            await ask_prescription_manual(update, context)
+            return
+        if data.startswith("ficha_campo:"):
+            campo = data.split(":", 1)[1]
+            fora = ficha_pendente(context).setdefault("fora", [])
+            if campo in fora:
+                fora.remove(campo)
+            else:
+                fora.append(campo)
+            await show_prescription_reading(update, context)
+            return
+        if data == "ficha_rever":
+            await show_prescription_reading(update, context)
+            return
+        if data == "ficha_escopo":
+            await ask_prescription_scope(update, context)
+            return
+        if data.startswith("ficha_escopo:"):
+            ficha_pendente(context)["escopo"] = data.split(":", 1)[1]
+            await confirm_prescription(update, context)
+            return
+        if data == "ficha_ok":
+            await save_prescription_confirmed(update, context)
+            return
+        if data == "ficha_remover":
+            await reply(
+                update,
+                "⚠️ <b>Remover a ficha?</b>\n\n"
+                "Eu volto a usar o objetivo do seu cadastro, e o que o "
+                "nutricionista mandou evitar deixa de aparecer marcado no cardapio.",
+                [[("Sim, remover", "ficha_remover_sim")], [("Nao, manter", "ficha")]],
+                edit=True,
+            )
+            return
+        if data == "ficha_remover_sim":
+            await remove_prescription(update, context)
+            return
+
     if data == "meu_dia":
         await show_day(update, context, edit=True)
         return
@@ -2103,11 +2701,13 @@ def main() -> None:
     app.add_handler(CommandHandler("alergenico", declare_allergen))
     app.add_handler(CommandHandler("cobertura", show_coverage))
     app.add_handler(CommandHandler("relatorio", show_report))
+    app.add_handler(CommandHandler("piloto", show_pilot_report))
     app.add_handler(CommandHandler("atendimento", show_service_report))
     app.add_handler(CommandHandler("importar", show_import_help))
+    app.add_handler(CommandHandler("ficha", show_prescription))
     # Anexo do cardapio: e o caminho de publicacao da semana, entao vem antes
     # do handler de texto solto.
-    app.add_handler(MessageHandler(filters.Document.ALL, receive_menu_file))
+    app.add_handler(MessageHandler(filters.Document.ALL, receive_document))
     app.add_handler(CommandHandler("avisar_favoritos", notify_favorites))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

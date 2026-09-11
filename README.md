@@ -29,6 +29,7 @@ publicado, e o funcionario monta o prato e registra o consumo.
 | `/meu_dia` | O que comeu hoje e nos dias anteriores |
 | `/favoritos` | Pratos guardados |
 | `/progresso` | Sequencia e conquistas da pessoa |
+| `/ficha` | Ficha do nutricionista da propria pessoa |
 | `/ajuda` | Como usar |
 | `/meus_dados` `/excluir_dados` | LGPD |
 | `/recadastrar` | Refaz o cadastro |
@@ -45,6 +46,7 @@ Administracao e nutricionista:
 | `/pendencias` | Fila de revisao da importacao |
 | `/alergenico <prato> <alergenico> <estado>` | Declara alergenico de um prato |
 | `/relatorio` | Adesao **agregada** por setor |
+| `/piloto [convidados] [desde] [ate]` | Relatorio do piloto, **sem individualizar ninguem** |
 | `/atendimento [refeitorio]` | Como cada refeitorio esta sendo avaliado, **sempre agregado** |
 | `/avisar_favoritos` | Dispara aviso de prato favorito voltando |
 
@@ -465,6 +467,50 @@ teste garantindo que nenhuma se apoie em deficit ou peso.
 Os alvos de kcal e proteina por objetivo sao **ilustrativos**. Quem define faixa
 individual e o nutricionista responsavel: o app informa e acompanha, nao prescreve.
 
+## A ficha do nutricionista (`/ficha`)
+
+Quem faz acompanhamento tem numero de verdade, nao o alvo ilustrativo de um
+objetivo generico. O funcionario manda a ficha em PDF (ou digita os numeros, que
+e o caso comum: ficha de papel), confere o que o app entendeu e confirma — so
+entao o app passa a seguir **a ficha dela** no lugar do objetivo do cadastro.
+
+Isso nao faz o app prescrever nada (Lei 8.234/1991). Ao contrario: quem
+prescreveu foi o nutricionista, e o app virou a ferramenta de **seguir** a
+prescricao no cardapio do dia.
+
+Tres regras seguram o resto:
+
+**1. Nada vale sem a pessoa confirmar.** A tela mostra cada numero com o trecho
+da ficha de onde ele saiu — `li de: "VET: 1800 kcal/dia"`. Sem o trecho, a pessoa
+confirmaria as cegas uma leitura automatica de documento clinico. Numero lido
+errado sai com um toque.
+
+**2. Total do dia nunca vira alvo de refeicao.** E o erro que machuca: uma ficha
+de 1.800 kcal/dia aplicada ao almoco mandaria a pessoa comer o dia inteiro num
+prato so. O app **sempre** pergunta se os numeros sao do dia ou do almoco, mesmo
+quando a ficha parece dizer, e reparte usando a proporcao usual do almoco (35%)
+deixando claro que repartir o dia e decisao do nutricionista. Se ainda assim
+sobrar um alvo implausivel para uma refeicao (acima de 1.500 kcal ou 150 g de
+proteina), o app **nao usa** esse numero e avisa.
+
+**3. O documento nao fica guardado.** Ficha de nutricionista costuma trazer peso,
+diagnostico e historico — dado de saude bem mais sensivel que "objetivo:
+emagrecer". O app extrai os numeros, a pessoa confirma, e o documento e
+descartado. Ha teste que vasculha o banco inteiro atras do conteudo da ficha.
+
+O que a ficha manda evitar entra pelo mesmo caminho do "prefiro evitar": bloqueia
+quando o termo aparece no nome do prato, sem virar alerta de alergenico — e
+orientacao profissional, nao risco de reacao alergica.
+
+Quando a ficha traz so metade do alvo (calorias mas nao proteina), a outra metade
+continua vindo do objetivo, e a tela **diz qual e qual**. Sem proteina nao ha como
+pontuar o dia, e apresentar palpite do app como numero do profissional seria pior
+que o palpite.
+
+PDF escaneado ou foto volta vazio de proposito: **nao ha OCR**. Reconhecer letra de
+imagem erra, e errar aqui vira orientacao errada a partir do documento clinico de
+alguem. O app admite que nao leu e oferece digitar os numeros.
+
 ## Avaliacao do refeitorio
 
 Depois de registrar a refeicao, o app pergunta como foi. Sao tres toques —
@@ -556,7 +602,37 @@ exige cuidado alem do aviso de consentimento:
   e a avaliacao nao guarda empresa nem setor de quem respondeu
 - recorte com menos de **5 pessoas** e suprimido, porque setor pequeno mais dado
   alimentar reidentifica alguem sem precisar do nome
-- `/excluir_dados` apaga cadastro, restricoes, consumo, favoritos e pontos
+- `/excluir_dados` apaga cadastro, restricoes, consumo, favoritos, pontos e ficha
+- a ficha do nutricionista entra como **numeros**: o documento nao e guardado
+
+## O relatorio do piloto (`/piloto`)
+
+O piloto responde uma pergunta: **isso funciona na vida real do refeitorio?**
+`/piloto 15 2026-09-01 2026-09-30` monta o retrato para levar a empresa.
+
+O que entra:
+
+- **adesao** — convidados, cadastrados, quantos chegaram a usar
+- **retencao** — quantos voltaram noutro dia, quantos dias por pessoa, curva diaria
+- **uso por funcao** — o que as pessoas realmente usam do app
+- **objetivo declarado**, agregado e suprimido abaixo de 5 pessoas
+- **qualidade do dado do cardapio** — quanto chegou sem macro e sem alergenico,
+  porque isso limita o que o app consegue entregar
+- **avaliacao do refeitorio**, agregada e sem autor
+
+O que **nao** entra, e a razao importa: *o relatorio nao diz o que cada pessoa
+comeu, nem qual e a meta dela, nem se ela bateu a meta.* Isso nao e cautela
+excessiva — e o desenho do produto. Dado alimentar e meta nutricional sao dado de
+saude (LGPD art. 5o, II) dentro de uma relacao de emprego, e o funcionario aceitou
+o termo justamente porque o app promete que a empresa nao ve isso sobre ele. Um
+relatorio que entregasse a meta de cada um quebraria o consentimento que tornou o
+piloto possivel; num grupo de 15, qualquer recorte a mais aponta para alguem.
+
+O proprio relatorio termina dizendo isso, para a ausencia ser lida como escolha e
+nao como relatorio incompleto.
+
+Taxa sem base volta como `—`, nao como `0%`: "0% de adesao" mentiria dizendo que
+ninguem aderiu, quando o que houve foi ninguem ter sido contado.
 
 ## Seguranca do token
 
@@ -574,8 +650,8 @@ arquivo atual limpo. Remover num commit posterior nao invalida a credencial.
 ## Comandos administrativos
 
 Sao restritos: **publicar cardapio** (mandar o arquivo para o bot), `/importar`,
-`/pendencias`, `/alergenico`, `/cobertura`, `/relatorio`, `/atendimento` e
-`/avisar_favoritos`.
+`/pendencias`, `/alergenico`, `/cobertura`, `/relatorio`, `/piloto`,
+`/atendimento` e `/avisar_favoritos`.
 
 A lista de administradores e obrigatoria: enquanto `ADMIN_TELEGRAM_IDS` estiver
 vazio, **ninguem** usa esses comandos. Isso e proposital: publicar cardapio muda o
@@ -675,6 +751,8 @@ apetit/
   tracking.py    historico congelado, favoritos e pontos
   feedback.py    avaliacao do refeitorio, agregada e sem autor
   intake.py      de que semana e o arquivo que chegou
+  prescription.py ficha do nutricionista: le, confirma, guarda so os numeros
+  pilot.py       relatorio do piloto, sem individualizar ninguem
 bot.py           camada do Telegram
 LICENSE          todos os direitos reservados
 Dockerfile       imagem, com o banco em /data
