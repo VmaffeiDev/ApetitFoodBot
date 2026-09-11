@@ -172,6 +172,7 @@ def delete_employee_data(conn: sqlite3.Connection, telegram_id: int) -> None:
     )
     for tabela in (
         "service_rating", "points_event", "favorite", "consumption",
+        "employee_prescription_term", "employee_prescription",
         "employee_free_restriction", "employee_restriction", "employee",
     ):
         conn.execute(f"DELETE FROM {tabela} WHERE telegram_id = ?", (telegram_id,))

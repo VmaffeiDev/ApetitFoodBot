@@ -75,6 +75,35 @@ CREATE TABLE IF NOT EXISTS employee (
 );
 CREATE INDEX IF NOT EXISTS idx_employee_org ON employee (client_company, sector);
 
+-- Ficha de controle nutricional que o proprio funcionario trouxe. Guarda os
+-- numeros ja confirmados por ele, nunca o documento: ficha de nutricionista
+-- carrega peso, diagnostico e historico — dado de saude bem mais sensivel que
+-- o resto do app. O arquivo e lido, confirmado e descartado.
+--
+-- `escopo` e o campo que impede o erro que machuca: guardar so o valor
+-- repartido perderia a informacao de que a ficha era do dia inteiro, e a
+-- proxima leitura nao saberia mais conferir.
+CREATE TABLE IF NOT EXISTS employee_prescription (
+    telegram_id INTEGER PRIMARY KEY REFERENCES employee(telegram_id),
+    kcal REAL,
+    ptn_g REAL,
+    cho_g REAL,
+    lip_g REAL,
+    escopo TEXT NOT NULL DEFAULT 'almoco',
+    fracao_almoco REAL,
+    profissional TEXT NOT NULL DEFAULT '',
+    fonte TEXT NOT NULL DEFAULT '',
+    confirmada_em TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS employee_prescription_term (
+    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    term TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'proibido',
+    PRIMARY KEY (telegram_id, term, kind)
+);
+
 CREATE TABLE IF NOT EXISTS employee_restriction (
     telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
     allergen_code TEXT NOT NULL,
