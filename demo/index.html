@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Apetit · Cores da Apetit</title>
+<title>Cores da Apetit</title>
 <meta name="description" content="Demonstração do acompanhamento nutricional do refeitório Apetit.">
 
 <link rel="manifest" href="manifest.webmanifest">
@@ -1311,9 +1311,11 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
   // `regras.json`, gerado do proprio `apetit/prescription.py`. Duplicar regex
   // em dois idiomas seria o caminho mais curto para as duas leituras
   // discordarem justamente no documento de alguem.
-  var REGRAS = null;
-  fetch("regras.json").then(function(r){ return r.json(); })
-    .then(function(d){ REGRAS = d; }).catch(function(){ /* segue sem anexo */ });
+  var REGRAS = (window.__APETIT__ || {}).regras || null;
+  if (!REGRAS){
+    fetch("regras.json").then(function(r){ return r.json(); })
+      .then(function(d){ REGRAS = d; }).catch(function(){ /* segue sem anexo */ });
+  }
 
   function re(padrao, flags){
     // Python nomeia grupo com (?P<x>...); JS usa (?<x>...).
@@ -1461,10 +1463,20 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
   });
 
   // ---------- carga ----------
-  Promise.all([
-    fetch("telas.json").then(function(r){ return r.json(); }),
-    fetch("dados.json").then(function(r){ return r.json(); }).catch(function(){ return null; })
-  ]).then(function(par){
+  //
+  // Servido por HTTP, o app busca os arquivos. Empacotado numa pagina so — e
+  // o que acontece quando ele vira um link para alguem testar —, os mesmos
+  // dados ja chegam embutidos em `window.__APETIT__`. Um caminho de codigo,
+  // dois jeitos de entregar: o que a pessoa ve e igual nos dois.
+  var embutido = window.__APETIT__;
+  var carregar = embutido
+    ? Promise.resolve([embutido.telas, embutido.dados || null])
+    : Promise.all([
+        fetch("telas.json").then(function(r){ return r.json(); }),
+        fetch("dados.json").then(function(r){ return r.json(); }).catch(function(){ return null; })
+      ]);
+
+  carregar.then(function(par){
     TELAS = par[0];
     DADOS = par[1];
     mostrar("inicio", false);
