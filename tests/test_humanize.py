@@ -1,8 +1,10 @@
 import unittest
 
 from apetit.humanize import (
+    PAPEL,
     category_label,
     dish_hint,
+    dish_role,
     dish_weight,
     friendly_date,
     order_categories,
@@ -138,6 +140,26 @@ class ProgressoTest(unittest.TestCase):
             texto = week_summary(dias).lower()
             for palavra in ("media", "colega", "ranking", "melhor que"):
                 self.assertNotIn(palavra, texto)
+
+
+class PapelDoPratoTest(unittest.TestCase):
+    """O papel descreve a posicao no prato; nao e alegacao nutricional."""
+
+    def test_reads_the_role_from_the_published_category(self):
+        self.assertEqual(dish_role("SALADA"), "Vitaminas e minerais")
+        self.assertEqual(dish_role("ARROZ"), "Energia")
+        self.assertEqual(dish_role("PRATO PRINCIPAL"), "Proteína do prato")
+
+    def test_unknown_category_has_no_role(self):
+        # Sem categoria nao se inventa papel: a linha simplesmente nao aparece.
+        self.assertEqual(dish_role(""), "")
+        self.assertEqual(dish_role("CATEGORIA NOVA"), "")
+
+    def test_never_claims_to_be_a_source_of_anything(self):
+        # "Fonte de" e alegacao com limite por porcao (RDC 54/2012). O app
+        # descreve o papel no prato; quem alega e quem mediu.
+        for papel in PAPEL.values():
+            self.assertNotIn("fonte", papel.lower())
 
 
 if __name__ == "__main__":

@@ -110,6 +110,33 @@ def dish_hint(kcal: float | None, ptn_g: float | None) -> str:
     return " · ".join(partes)
 
 
+# O que cada parte faz no prato, pela posicao que ela ocupa no cardapio.
+#
+# E de proposito que aqui nao se escreve "fonte de proteina": no Brasil, "fonte
+# de" e alegacao nutricional com limite definido por porcao (RDC 54/2012), e uma
+# empresa de alimentacao publicar isso sem conferir grama por grama cria um
+# problema que nao e de design. Papel no prato e outra coisa: sai da categoria
+# que a propria operacao publicou, e descreve em vez de alegar.
+PAPEL = {
+    "PRATO PRINCIPAL": "Proteína do prato",
+    "OPCAO AO PP": "Proteína do prato",
+    "GUARNICAO": "Acompanhamento",
+    "ARROZ": "Energia",
+    "FEIJAO": "Fibras",
+    "SALADA": "Vitaminas e minerais",
+    "FRUTA": "Vitaminas e minerais",
+    "SOBREMESA": "Sobremesa",
+    "BEBIDA": "Bebida",
+    "LANCHE": "Lanche",
+    "ACOMPANHAMENTO": "Acompanhamento",
+}
+
+
+def dish_role(category: str) -> str:
+    """"SALADA" -> "Vitaminas e minerais". Categoria desconhecida nao vira papel."""
+    return PAPEL.get((category or "").upper(), "")
+
+
 def plate_reading(
     kcal: float,
     ptn_g: float,

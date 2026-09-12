@@ -704,7 +704,7 @@
   ]
  },
  "meus_dados": {
-  "texto": "🔒 <b>Tudo o que eu guardo sobre voce</b>\n\n<b>Nome:</b> Mariana\n<b>Refeitorio:</b> SM\n<b>Empresa:</b> Industria Exemplo\n<b>Setor:</b> Producao\n<b>Objetivo:</b> Manter o equilibrio\n<b>Restricoes:</b> Leite e derivados, Ovos\n<b>Aceite:</b> 2026-09-12T20:25:58+00:00\n\n<b>Dias com refeicao registrada:</b> 2\n<b>Pratos guardados:</b> 0\n<b>Pontos:</b> 50\n<b>Avaliacoes do refeitorio:</b> 0\n\n<b>Sua empresa nao ve nada disso sobre voce.</b>\nA unica coisa que sai daqui e a avaliacao do refeitorio — e ela vai sem o seu nome, sem a sua empresa e sem o seu setor, junto com a de todo mundo. A Apetit ve como o refeitorio esta indo, nunca quem disse o que.\n\nPara apagar tudo: /excluir_dados",
+  "texto": "🔒 <b>Tudo o que eu guardo sobre voce</b>\n\n<b>Nome:</b> Mariana\n<b>Refeitorio:</b> SM\n<b>Empresa:</b> Industria Exemplo\n<b>Setor:</b> Producao\n<b>Objetivo:</b> Manter o equilibrio\n<b>Restricoes:</b> Leite e derivados, Ovos\n<b>Aceite:</b> 2026-09-12T21:20:06+00:00\n\n<b>Dias com refeicao registrada:</b> 2\n<b>Pratos guardados:</b> 0\n<b>Pontos:</b> 50\n<b>Avaliacoes do refeitorio:</b> 0\n\n<b>Sua empresa nao ve nada disso sobre voce.</b>\nA unica coisa que sai daqui e a avaliacao do refeitorio — e ela vai sem o seu nome, sem a sua empresa e sem o seu setor, junto com a de todo mundo. A Apetit ve como o refeitorio esta indo, nunca quem disse o que.\n\nPara apagar tudo: /excluir_dados",
   "botoes": [
    {
     "rotulo": "🔙 Voltar",

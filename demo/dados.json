@@ -20,6 +20,7 @@
      "etiqueta": "sem declaracao de leite e derivados, ovos",
      "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
      "peso": "moderado",
+     "papel": "Proteína do prato",
      "dica": "moderado",
      "kcal": 134.0,
      "ptn": 12.0
@@ -36,6 +37,7 @@
      "etiqueta": "contem ovos",
      "motivo": "Este prato contem Ovos, que voce evita. Nao recomendo pedir.",
      "peso": "leve",
+     "papel": "Proteína do prato",
      "dica": "leve",
      "kcal": 78.0,
      "ptn": 6.3
@@ -52,6 +54,7 @@
      "etiqueta": "sem declaracao de leite e derivados, ovos",
      "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
      "peso": "moderado",
+     "papel": "Acompanhamento",
      "dica": "moderado",
      "kcal": 126.0,
      "ptn": 2.0
@@ -68,6 +71,7 @@
      "etiqueta": "sem declaracao de leite e derivados, ovos",
      "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
      "peso": "moderado",
+     "papel": "Energia",
      "dica": "moderado",
      "kcal": 138.0,
      "ptn": 2.0
@@ -84,6 +88,7 @@
      "etiqueta": "sem declaracao de leite e derivados, ovos",
      "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
      "peso": "leve",
+     "papel": "Fibras",
      "dica": "leve",
      "kcal": 29.0,
      "ptn": 2.0
@@ -100,6 +105,7 @@
      "etiqueta": "conferido para a sua ficha",
      "motivo": "Nenhum alergenico da sua ficha aparece neste prato.",
      "peso": "leve",
+     "papel": "Vitaminas e minerais",
      "dica": "leve",
      "kcal": 4.0,
      "ptn": 0.6
@@ -199,6 +205,142 @@
    {
     "nome": "Incluiu salada ou fruta no prato",
     "vezes": 1
+   }
+  ]
+ },
+ "semana": [
+  {
+   "data": "2025-08-26",
+   "sigla": "Ter",
+   "hoje": false,
+   "registrado": false,
+   "kcal": null,
+   "ptn": null
+  },
+  {
+   "data": "2025-08-27",
+   "sigla": "Qua",
+   "hoje": false,
+   "registrado": false,
+   "kcal": null,
+   "ptn": null
+  },
+  {
+   "data": "2025-08-28",
+   "sigla": "Qui",
+   "hoje": false,
+   "registrado": false,
+   "kcal": null,
+   "ptn": null
+  },
+  {
+   "data": "2025-08-29",
+   "sigla": "Sex",
+   "hoje": false,
+   "registrado": true,
+   "kcal": 292,
+   "ptn": 35
+  },
+  {
+   "data": "2025-09-01",
+   "sigla": "Seg",
+   "hoje": true,
+   "registrado": false,
+   "kcal": null,
+   "ptn": null
+  }
+ ],
+ "perfil": {
+  "nome": "Mariana",
+  "iniciais": "M",
+  "refeitorio": "SM",
+  "empresa": "Industria Exemplo",
+  "setor": "Producao",
+  "objetivo": "Manter o equilibrio",
+  "alvo": {
+   "kcal": 700,
+   "ptn": 30
+  },
+  "restricoes": [
+   "Leite e derivados",
+   "Ovos"
+  ],
+  "restricoes_livres": [],
+  "evitar": [],
+  "favoritos": [],
+  "avisos": [
+   {
+    "codigo": "resumo_semanal",
+    "nome": "Resumo da semana",
+    "detalhe": "Sexta, 16h. Só sobre você: não existe ranking.",
+    "ligado": true
+   },
+   {
+    "codigo": "lembrete_almoco",
+    "nome": "Lembrete do almoço",
+    "detalhe": "Dia útil, 11h, só se você ainda não registrou.",
+    "ligado": false
+   }
+  ]
+ },
+ "avaliacao": {
+  "escala": [
+   {
+    "nota": 3,
+    "rotulo": "Bom"
+   },
+   {
+    "nota": 2,
+    "rotulo": "Regular"
+   },
+   {
+    "nota": 1,
+    "rotulo": "Ruim"
+   }
+  ],
+  "faltas": [
+   {
+    "codigo": "acabou",
+    "rotulo": "Acabou antes de eu chegar"
+   },
+   {
+    "codigo": "pouca_quantidade",
+    "rotulo": "Pouca quantidade"
+   },
+   {
+    "codigo": "sem_opcao_restricao",
+    "rotulo": "Nada que eu pudesse comer"
+   },
+   {
+    "codigo": "faltou_utensilio",
+    "rotulo": "Faltou talher, prato ou copo"
+   },
+   {
+    "codigo": "faltou_bebida",
+    "rotulo": "Faltou bebida"
+   },
+   {
+    "codigo": "comida_fria",
+    "rotulo": "Comida fria"
+   }
+  ]
+ },
+ "registro_previsto": {
+  "pontos_antes": 25,
+  "pontos_depois": 50,
+  "ganho": 25,
+  "conquistas": [
+   {
+    "nome": "Registrou a refeicao",
+    "pontos": 10
+   },
+   {
+    "nome": "Incluiu salada ou fruta no prato",
+    "pontos": 5
+   },
+   {
+    "nome": "Atingiu a meta de proteina do dia",
+    "pontos": 10
    }
   ]
  },

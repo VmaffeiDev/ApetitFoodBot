@@ -19,6 +19,7 @@ import json
 import os
 import sys
 import tempfile
+from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -26,13 +27,19 @@ os.environ.setdefault("TELEGRAM_BOT_TOKEN", "demo")
 
 import bot  # noqa: E402
 from apetit.allergens import ALLERGENS  # noqa: E402
+from apetit.feedback import MISSING_TAGS, SCALE  # noqa: E402
+from apetit.humanize import DIAS  # noqa: E402
 from apetit.humanize import (  # noqa: E402
-    category_label, clean_dish_name, dish_hint, dish_weight, friendly_date,
-    order_categories, week_summary,
+    category_label, clean_dish_name, dish_hint, dish_role, dish_weight,
+    friendly_date, order_categories, week_summary,
 )
+from apetit.nudges import LEMBRETE_ALMOCO, RESUMO_SEMANAL  # noqa: E402
 from apetit.portions import FREE_CATEGORIES, measure_label  # noqa: E402
 from apetit.prescription import extract_meal_plan, lunch_from_plan, read_pdf  # noqa: E402
-from apetit.tracking import RULES, history_by_day, points_breakdown, total_points  # noqa: E402
+from apetit.tracking import (  # noqa: E402
+    RULES, favorites, history_by_day, log_consumption, points_breakdown,
+    score_day, total_points,
+)
 from scripts.demo_telas import DIA, USUARIO, preparar_banco  # noqa: E402
 
 MARCA = {"bloqueio": "bloqueio", "atencao": "atencao", "liberado": "liberado", "sem_restricao": "liberado"}
@@ -72,6 +79,7 @@ def cardapio(pessoa) -> list[dict]:
             "etiqueta": etiqueta(check),
             "motivo": check.message() if check.verdict.value != "sem_restricao" else "",
             "peso": dish_weight(item.get("kcal")),
+            "papel": dish_role(item["category"]),
             "dica": dish_hint(item.get("kcal"), item.get("ptn_g")),
             "kcal": item.get("kcal"),
             "ptn": item.get("ptn_g"),
@@ -174,6 +182,132 @@ def progresso(pessoa) -> dict:
     }
 
 
+def semana(pessoa) -> list[dict]:
+    """Os cinco ultimos dias uteis, para o grafico do progresso.
+
+    Janela movel, e nao "a semana corrente", porque o cardapio de exemplo
+    comeca numa segunda: "esta semana" teria um dia so e o grafico nasceria
+    vazio. Cinco dias uteis ate hoje mostra o que existe sem inventar dia
+    nenhum — e o dia sem registro aparece como o que e, um dia sem registro.
+    """
+    conn = bot.db()
+    try:
+        registrados = {
+            linha["service_date"]: linha
+            for linha in conn.execute(
+                "SELECT service_date, SUM(kcal * quantity) AS kcal, "
+                "SUM(ptn_g * quantity) AS ptn FROM consumption "
+                "WHERE telegram_id = ? GROUP BY service_date",
+                (pessoa.telegram_id,),
+            ).fetchall()
+        }
+    finally:
+        conn.close()
+
+    dias, cursor = [], date.fromisoformat(DIA)
+    while len(dias) < 5:
+        if cursor.weekday() < 5:            # sabado e domingo nao tem refeitorio
+            dias.append(cursor)
+        cursor -= timedelta(days=1)
+    dias.reverse()
+
+    saida = []
+    for d in dias:
+        iso = d.isoformat()
+        linha = registrados.get(iso)
+        saida.append({
+            "data": iso,
+            "sigla": DIAS[d.weekday()][:3].capitalize(),
+            "hoje": iso == DIA,
+            "registrado": linha is not None,
+            "kcal": round(linha["kcal"]) if linha and linha["kcal"] else None,
+            "ptn": round(linha["ptn"]) if linha and linha["ptn"] else None,
+        })
+    return saida
+
+
+def perfil(pessoa) -> dict:
+    """O cadastro em campos, para a tela de perfil parar de ser um paragrafo.
+
+    Nao ha e-mail: o app fala por Telegram e nunca pediu endereco nenhum.
+    Campo que o cadastro nao coleta nao vira linha vazia na tela — inventar
+    um lugar para ele seria prometer que existe.
+    """
+    conn = bot.db()
+    try:
+        guardados = [
+            {"nome": clean_dish_name(f["name"]), "codigo": f["item_code"]}
+            for f in favorites(conn, pessoa.telegram_id)
+        ]
+    finally:
+        conn.close()
+    return {
+        "nome": pessoa.name,
+        "iniciais": "".join(p[0] for p in pessoa.name.split()[:2]).upper(),
+        "refeitorio": pessoa.apetit_unit,
+        "empresa": pessoa.client_company,
+        "setor": pessoa.sector,
+        "objetivo": pessoa.goal,
+        "alvo": bot.target_for(pessoa),
+        "restricoes": [ALLERGENS.get(r.allergen, r.allergen) for r in pessoa.restrictions],
+        "restricoes_livres": list(pessoa.free_restrictions),
+        "evitar": list(pessoa.avoid_foods),
+        "favoritos": guardados,
+        "avisos": [
+            {"codigo": RESUMO_SEMANAL, "nome": "Resumo da semana",
+             "detalhe": "Sexta, 16h. Só sobre você: não existe ranking.", "ligado": True},
+            {"codigo": LEMBRETE_ALMOCO, "nome": "Lembrete do almoço",
+             "detalhe": "Dia útil, 11h, só se você ainda não registrou.", "ligado": False},
+        ],
+    }
+
+
+def avaliacao() -> dict:
+    """As opcoes da avaliacao, como o dominio ja as define."""
+    return {
+        "escala": [{"nota": n, "rotulo": r} for n, r in sorted(SCALE.items(), reverse=True)],
+        "faltas": [{"codigo": c, "rotulo": r} for c, r in MISSING_TAGS.items()],
+    }
+
+
+def registro_previsto(pessoa) -> dict:
+    """O que a pessoa ganha se registrar o prato sugerido hoje.
+
+    Roda o registro de verdade num banco descartavel e le o resultado. A tela
+    de "Vou pegar isso" precisa mostrar o ganho antes de ele acontecer, e
+    calcular isso no navegador seria uma segunda implementacao das regras de
+    pontuacao — que um dia discordaria desta.
+    """
+    sugestao = bot.build_suggestion(pessoa, DIA)
+    if not sugestao or not sugestao.portions:
+        return {}
+    codigos = [p.code for p in sugestao.portions for _ in range(p.quantity)]
+
+    conn = bot.db()
+    try:
+        antes = total_points(conn, pessoa.telegram_id)
+        log_consumption(conn, pessoa.telegram_id, DIA, codigos)
+        regras = score_day(conn, pessoa.telegram_id, DIA,
+                           protein_target_g=bot.target_for(pessoa)["ptn"])
+        depois = total_points(conn, pessoa.telegram_id)
+        # O banco e temporario e morre no fim do script, mas desfazer aqui
+        # mantem as outras exportacoes lendo o estado de antes do registro.
+        conn.execute("DELETE FROM consumption WHERE telegram_id = ? AND service_date = ?",
+                     (pessoa.telegram_id, DIA))
+        conn.execute("DELETE FROM points_event WHERE telegram_id = ? AND reference_date = ?",
+                     (pessoa.telegram_id, DIA))
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "pontos_antes": antes,
+        "pontos_depois": depois,
+        "ganho": depois - antes,
+        "conquistas": [{"nome": r.label, "pontos": r.points} for r in regras],
+    }
+
+
 def plano_exemplo(ficha: Path | None) -> list[dict]:
     """O almoco de uma ficha de exemplo, para a tela nascer com conteudo."""
     if not ficha or not ficha.exists():
@@ -212,6 +346,10 @@ def main() -> int:
             "porcoes": porcoes(pessoa),
             "meu_dia": meu_dia(pessoa),
             "progresso": progresso(pessoa),
+            "semana": semana(pessoa),
+            "perfil": perfil(pessoa),
+            "avaliacao": avaliacao(),
+            "registro_previsto": registro_previsto(pessoa),
             "plano_exemplo": plano_exemplo(ficha),
         }
     finally:
