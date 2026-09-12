@@ -233,5 +233,45 @@ class VarianteTest(unittest.TestCase):
         self.assertIn("gluten", match.conflicting)                        # so uma tem
 
 
+class FichaDeExemploTest(unittest.TestCase):
+    """A demonstracao mostra os tres estados. Isso tem que continuar verdade.
+
+    As telas do simulador nascem desta ficha quando a planilha da empresa nao
+    esta a mao. Se um dia ela deixar de provar um `contem`, a demonstracao
+    passa a mostrar so ⚠️ — e quem assiste conclui que o app nunca sabe de
+    nada, que e o oposto do que ele faz.
+    """
+
+    def declaracoes(self):
+        import csv
+        from pathlib import Path
+
+        caminho = Path(__file__).resolve().parent / "fixtures" / "receitas.csv"
+        linhas = list(csv.reader(caminho.read_text(encoding="utf-8").splitlines(), delimiter=";"))
+        return declarations_by_item(read_recipe_rows(linhas), slugify)
+
+    def test_proves_presence_where_the_ingredient_says_so(self):
+        pratos = self.declaracoes()
+
+        self.assertEqual(pratos["ovo_cozido"].declarations["ovos"], Declaration.CONTEM)
+        self.assertEqual(pratos["pure_de_batata"].declarations["leite"], Declaration.CONTEM)
+
+    def test_industrialized_ingredient_only_reaches_pode_conter(self):
+        molho = self.declaracoes()["bife_suino_ao_molho_barbecue"].declarations
+
+        self.assertEqual(molho["gluten"], Declaration.PODE_CONTER)
+        self.assertEqual(molho["soja"], Declaration.PODE_CONTER)
+
+    def test_never_says_a_dish_is_free_of_anything(self):
+        # O ✅ do simulador vem de uma declaracao escrita a mao no
+        # `demo_telas.py`, nunca daqui: ingrediente prova presenca, nao ausencia.
+        for prato in self.declaracoes().values():
+            for alergenico, declaracao in prato.declarations.items():
+                self.assertNotEqual(
+                    declaracao, Declaration.NAO_CONTEM,
+                    f"{prato.item_code} afirmou ausencia de {alergenico}",
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

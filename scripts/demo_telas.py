@@ -15,6 +15,7 @@ capturada depender da ordem em que o crawler passou por ela.
 """
 
 import asyncio
+import csv
 import json
 import os
 import sys
@@ -68,23 +69,40 @@ def preparar_banco(caminho: Path, receitas: Path | None) -> None:
     init_schema(conn)
     import_menu_csv(conn, (FIXTURES / "cardapio_largo.csv").read_text(encoding="utf-8"), unit="SM")
 
-    # O alergenico deduzido da planilha de receitas: e o que faz o cardapio do
+    # O alergenico deduzido da lista de ingredientes: e o que faz o cardapio do
     # simulador mostrar ⛔ e ⚠️ de verdade, em vez de "nao declarado" em tudo.
-    if receitas and receitas.exists():
-        pratos = declarations_by_item(read_recipe_rows(read_spreadsheet_rows(receitas, sheet="Receitas")), slugify)
-        publicados = {linha["code"] for linha in conn.execute("SELECT code FROM menu_item").fetchall()}
-        for match in pratos.values():
-            if match.item_code in publicados and match.declarations:
-                set_item_allergens(
-                    conn, match.item_code,
-                    {a: d.value for a, d in match.declarations.items()},
-                    source="lista de ingredientes",
-                )
+    #
+    # Sem a planilha da empresa a demonstracao cai na ficha de exemplo, e nao em
+    # "nenhum alergenico". Ela e pequena de proposito — cobre so os pratos do
+    # cardapio de exemplo —, mas passa pelo mesmo `allergens_for_recipe`: quem
+    # decide o que cada prato declara continua sendo o codigo, nao esta tabela.
+    linhas = (
+        read_spreadsheet_rows(receitas, sheet="Receitas")
+        if receitas and receitas.exists()
+        else list(csv.reader((FIXTURES / "receitas.csv").read_text(encoding="utf-8").splitlines(), delimiter=";"))
+    )
+    pratos = declarations_by_item(read_recipe_rows(linhas), slugify)
+    publicados = {linha["code"] for linha in conn.execute("SELECT code FROM menu_item").fetchall()}
+    for match in pratos.values():
+        if match.item_code in publicados and match.declarations:
+            set_item_allergens(
+                conn, match.item_code,
+                {a: d.value for a, d in match.declarations.items()},
+                source="lista de ingredientes",
+            )
 
-    # Ovo e leite de proposito: com o alergenico vindo da receita, OVO COZIDO
-    # vira ⛔ ("contem ovos") e PURE DE BATATA vira ⚠️ ("pode conter leite"),
-    # enquanto o resto segue ⚠️ de "ninguem declarou". As tres respostas na
-    # mesma tela — que e o ponto do modelo de tres estados.
+    # O ✅ nao sai de ingrediente: ingrediente prova presenca, nunca ausencia.
+    # Ele so existe quando alguem conferiu o prato e assinou embaixo — e e essa
+    # a unica origem dele aqui, com a fonte dizendo isso em voz alta.
+    set_item_allergens(
+        conn, "sal_mix_de_alface",
+        {"ovos": "nao_contem", "leite": "nao_contem"},
+        source="declaracao da cozinha",
+    )
+
+    # Ovo e leite de proposito: OVO COZIDO vira ⛔ ("contem ovos"), SAL. MIX DE
+    # ALFACE vira ✅ (alguem declarou), e o resto segue ⚠️ de "ninguem
+    # declarou". As tres respostas na mesma tela — que e o ponto do modelo.
     save_employee(conn, Employee(
         telegram_id=USUARIO, name="Mariana", apetit_unit="SM",
         client_company="Industria Exemplo", sector="Producao",

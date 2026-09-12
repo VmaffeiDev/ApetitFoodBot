@@ -47,8 +47,8 @@ self.addEventListener("fetch", (evento) => {
   const url = new URL(requisicao.url);
   if (url.origin !== self.location.origin) return;
 
-  // As telas mudam a cada geracao: rede primeiro, cache como rede de seguranca.
-  if (url.pathname.endsWith("telas.json")) {
+  // Os dados mudam a cada geracao: rede primeiro, cache como rede de seguranca.
+  if (/\/(telas|dados|regras)\.json$/.test(url.pathname)) {
     evento.respondWith(
       fetch(requisicao)
         .then((resposta) => {

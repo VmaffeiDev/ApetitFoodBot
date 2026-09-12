@@ -17,7 +17,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 
 <!-- pdf.js na build UMD, que define window.pdfjsLib. Se nao carregar, o app
-     cai no exemplo pronto em vez de quebrar: ver `lerPdf` no script. -->
+     avisa em vez de quebrar: ver `lerPdf` no script. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,11 +27,11 @@
 :root{
   /* Cores da Apetit: vermelho #DE013B e amarelo #F0DE4D, do site da empresa.
      O vermelho da marca fica **so na identidade** — barra do app, icone,
-     splash. Dentro da conversa ele nao aparece, e por um motivo: o aviso mais
+     splash. No corpo das telas ele nao aparece, e por um motivo: o aviso mais
      importante do app e o ⛔ "nao pode", que tambem e vermelho. Se o vermelho
      da marca estivesse por toda parte, o alerta de alergia viraria decoracao.
      Por isso o perigo usa um vermelho mais fechado (--perigo), e e o unico
-     vermelho que aparece no corpo das mensagens. */
+     vermelho que aparece dentro do conteudo. */
   --marca:#DE013B;
   --marca-ink:#FFFFFF;
   --acao:#F0DE4D;
@@ -39,22 +39,23 @@
   --acao-soft:#FDF7D6;
   --acao-linha:#E6D585;
 
-  --ground:#F5F2F0;
+  --ground:#F6F3F1;
   --surface:#FFFFFF;
-  --chat:#EDE6E5;
-  --bubble:#FFFFFF;
-  --ink:#241A1C;
-  --muted:#6B5B5E;
-  --faint:#8C7C7F;
-  --line:#DFD5D5;
-  --line-soft:#EBE3E2;
+  --surface-2:#F5F0EE;
+  --ink:#231A1C;
+  --muted:#695A5D;
+  --faint:#8C7D80;
+  --line:#E3DAD9;
+  --line-soft:#EFE8E7;
 
   --perigo:#9B1B14;
   --perigo-soft:#F8E6E4;
-  --atencao:#875E00;
-  --atencao-soft:#F7ECD7;
-  --ok:#1F6B3F;
-  --ok-soft:#E4EFE8;
+  --atencao:#7C5500;
+  --atencao-soft:#F8EDD8;
+  --ok:#1B6238;
+  --ok-soft:#E3EFE8;
+
+  --sombra:0 1px 2px rgba(35,26,28,.05), 0 10px 24px -18px rgba(35,26,28,.45);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -62,25 +63,26 @@
     --marca-ink:#FFFFFF;
     --acao:#F0DE4D;
     --acao-ink:#2B2118;
-    --acao-soft:#2C2617;
-    --acao-linha:#5A4F24;
+    --acao-soft:#2E2718;
+    --acao-linha:#5C5026;
 
-    --ground:#141011;
-    --surface:#1C1718;
-    --chat:#171213;
-    --bubble:#221C1D;
-    --ink:#EDE6E6;
-    --muted:#A99B9D;
-    --faint:#8C7E80;
-    --line:#2E2627;
-    --line-soft:#241E1F;
+    --ground:#131011;
+    --surface:#1D1819;
+    --surface-2:#262021;
+    --ink:#EFE8E8;
+    --muted:#AA9C9E;
+    --faint:#8D7F81;
+    --line:#302829;
+    --line-soft:#261F20;
 
-    --perigo:#F0918A;
-    --perigo-soft:#35191A;
-    --atencao:#DCA745;
-    --atencao-soft:#2E2513;
-    --ok:#6FBF85;
-    --ok-soft:#16281C;
+    --perigo:#F19A93;
+    --perigo-soft:#37191A;
+    --atencao:#E0AC4C;
+    --atencao-soft:#302714;
+    --ok:#74C489;
+    --ok-soft:#15291D;
+
+    --sombra:0 1px 2px rgba(0,0,0,.45), 0 10px 24px -18px rgba(0,0,0,.9);
   }
 }
 :root[data-theme="dark"]{
@@ -88,179 +90,311 @@
   --marca-ink:#FFFFFF;
   --acao:#F0DE4D;
   --acao-ink:#2B2118;
-  --acao-soft:#2C2617;
-  --acao-linha:#5A4F24;
+  --acao-soft:#2E2718;
+  --acao-linha:#5C5026;
 
-  --ground:#141011;
-  --surface:#1C1718;
-  --chat:#171213;
-  --bubble:#221C1D;
-  --ink:#EDE6E6;
-  --muted:#A99B9D;
-  --faint:#8C7E80;
-  --line:#2E2627;
-  --line-soft:#241E1F;
+  --ground:#131011;
+  --surface:#1D1819;
+  --surface-2:#262021;
+  --ink:#EFE8E8;
+  --muted:#AA9C9E;
+  --faint:#8D7F81;
+  --line:#302829;
+  --line-soft:#261F20;
 
-  --perigo:#F0918A;
-  --perigo-soft:#35191A;
-  --atencao:#DCA745;
-  --atencao-soft:#2E2513;
-  --ok:#6FBF85;
-  --ok-soft:#16281C;
+  --perigo:#F19A93;
+  --perigo-soft:#37191A;
+  --atencao:#E0AC4C;
+  --atencao-soft:#302714;
+  --ok:#74C489;
+  --ok-soft:#15291D;
+
+  --sombra:0 1px 2px rgba(0,0,0,.45), 0 10px 24px -18px rgba(0,0,0,.9);
 }
 
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
-  margin:0;background:var(--chat);color:var(--ink);
+  margin:0;background:var(--ground);color:var(--ink);
   font-family:"IBM Plex Sans", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;
+  font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;
   overscroll-behavior-y:none;
 }
-button{font:inherit}
+button{font:inherit;color:inherit}
+h1,h2{font-family:Archivo,sans-serif;letter-spacing:-.015em;margin:0}
 
 .app{
   display:flex;flex-direction:column;
   height:100dvh;max-width:560px;margin:0 auto;
-  background:var(--chat);
+  background:var(--ground);box-shadow:0 0 0 1px var(--line-soft);
 }
 
 /* ---------- barra do app ---------- */
-.barra{
-  flex:none;display:flex;align-items:center;gap:11px;
+.topo{
+  flex:none;display:flex;align-items:center;gap:10px;
   background:var(--marca);color:var(--marca-ink);
-  padding:10px 14px;
-  padding-top:calc(10px + env(safe-area-inset-top));
-  box-shadow:0 1px 0 rgba(0,0,0,.06);
+  padding:9px 12px;padding-top:calc(9px + env(safe-area-inset-top));
 }
-.marca{
-  width:36px;height:36px;border-radius:10px;flex:none;
-  display:grid;place-items:center;background:rgba(255,255,255,.18);
-  font-size:1.05rem;
+.topo .selo{
+  width:34px;height:34px;border-radius:10px;flex:none;
+  display:grid;place-items:center;background:rgba(255,255,255,.18);font-size:1rem;
 }
-
-
-.titulo{display:flex;flex-direction:column;line-height:1.25;min-width:0;flex:1}
-.titulo b{font-family:Archivo,sans-serif;font-size:1rem;font-weight:600;letter-spacing:-.01em}
-.titulo span{font-size:.735rem;opacity:.82}
-.barra button{
-  background:rgba(255,255,255,.14);color:inherit;border:0;
+.topo .rotulo{display:flex;flex-direction:column;line-height:1.25;min-width:0;flex:1}
+.topo .rotulo b{
+  font-family:Archivo,sans-serif;font-size:1rem;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.topo .rotulo span{font-size:.72rem;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topo button{
+  background:rgba(255,255,255,.15);border:0;
   width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:.95rem;
   display:grid;place-items:center;flex:none;
 }
+.topo button:hover{background:rgba(255,255,255,.28)}
+.topo button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.topo button[hidden]{display:none}
 
+/* ---------- corpo ---------- */
+.tela{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px 24px}
+.tela > * + *{margin-top:12px}
 
-.barra button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
-
-/* ---------- conversa ---------- */
-.chat{
-  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding:15px;display:flex;flex-direction:column;gap:10px;
+.saudacao .dia{
+  font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-weight:500;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--faint);
 }
-.cmd{
-  align-self:flex-end;background:var(--marca);color:var(--marca-ink);
-  font-family:"IBM Plex Mono",monospace;font-size:.78rem;
-  padding:6px 11px;border-radius:13px 13px 3px 13px;
-}
-.arquivo{
-  align-self:flex-end;display:flex;align-items:center;gap:8px;
+.saudacao h1{font-size:1.5rem;font-weight:700;margin-top:3px}
+.saudacao p{margin:4px 0 0;font-size:.81rem;color:var(--muted)}
+
+.cartao{
   background:var(--surface);border:1px solid var(--line);
-  padding:8px 12px;border-radius:13px 13px 3px 13px;font-size:.8rem;
+  border-radius:16px;padding:16px;box-shadow:var(--sombra);
 }
-.arquivo b{font-weight:600}
-.arquivo em{color:var(--faint);font-size:.72rem;font-style:normal}
-.bubble{
-  align-self:flex-start;max-width:97%;
-  background:var(--bubble);border-radius:3px 14px 14px 14px;padding:13px 15px;
-  font-size:.92rem;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;
-  box-shadow:0 1px 2px rgba(22,31,25,.07), 0 6px 16px -12px rgba(22,31,25,.35);
+.cartao > * + *{margin-top:11px}
+.etiqueta{
+  display:block;font-family:"IBM Plex Mono",monospace;font-size:.65rem;font-weight:500;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--faint);
 }
-.bubble.mono{
-  align-self:stretch;max-width:100%;
-  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.7rem;line-height:1.5;
-  white-space:pre;overflow-x:auto;
-}
-.bubble b{font-weight:600}
 
-/* ---------- teclado ---------- */
-.keys{
-  flex:none;display:flex;flex-direction:column;gap:6px;
-  padding:10px 12px;
-  padding-bottom:calc(10px + env(safe-area-inset-bottom));
-  background:var(--surface);border-top:1px solid var(--line-soft);
+/* ---------- cartao da meta do dia ---------- */
+.meta .numeros{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;margin-top:5px}
+.meta .numero{display:flex;align-items:baseline;gap:5px}
+.meta .numero b{font-family:Archivo,sans-serif;font-size:1.85rem;font-weight:700;line-height:1}
+.meta .numero span{font-size:.79rem;color:var(--muted)}
+.meta ul{margin:0;padding:11px 0 0;list-style:none;border-top:1px solid var(--line-soft)}
+.meta li{
+  display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+  font-size:.87rem;padding:3px 0;
 }
-.key{
-  font-size:.875rem;font-weight:500;text-align:left;width:100%;
-  background:var(--acao-soft);color:var(--ink);
-  border:1px solid var(--acao-linha);border-radius:10px;padding:12px 14px;
-  cursor:pointer;transition:background .12s ease,border-color .12s ease,transform .1s ease;
+.meta li span{color:var(--muted);font-size:.79rem;white-space:nowrap}
+
+.primario,.secundario{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  border-radius:12px;cursor:pointer;text-align:center;
   -webkit-tap-highlight-color:transparent;
 }
-.key:active{transform:scale(.99)}
-.key:hover,
-.key:focus-visible,
-.key:active{background:var(--acao);border-color:var(--acao);color:var(--acao-ink)}
-.key:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
-.key.anexo{background:var(--surface);border:1px dashed var(--marca);color:var(--marca);font-weight:600}
-.key.anexo:hover{background:var(--perigo-soft);border-style:solid}
-.key[disabled]{opacity:.45;cursor:default}
-.key[disabled]:hover{background:var(--acao-soft);border-color:var(--acao-linha)}
-.key .tag{float:right;font-family:"IBM Plex Mono",monospace;font-size:.65rem;color:var(--faint);padding-left:8px}
-.voltar{
-  background:none;color:var(--muted);border:1px solid var(--line);
-  font-weight:400;font-size:.82rem;padding:9px 14px;
+.primario{
+  background:var(--acao);color:var(--acao-ink);border:0;
+  padding:14px;font-size:.93rem;font-weight:600;
+  transition:filter .12s ease,transform .1s ease;
 }
-.voltar:hover{background:none;border-color:var(--marca);color:var(--marca)}
+.primario:hover{filter:brightness(.95)}
+.primario:active{transform:scale(.99)}
+.secundario{
+  background:var(--surface);color:var(--ink);border:1px solid var(--line);
+  padding:13px;font-size:.89rem;font-weight:500;
+  transition:border-color .12s ease,background .12s ease;
+}
+.secundario:hover{border-color:var(--ink);background:var(--surface-2)}
+.primario:focus-visible,.secundario:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
+.secundario[disabled]{opacity:.5;cursor:default}
+.secundario[disabled]:hover{border-color:var(--line);background:var(--surface)}
+.so-bot{
+  margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.6rem;
+  color:var(--faint);letter-spacing:.07em;text-transform:uppercase;
+}
 
-/* ---------- folha de contexto ---------- */
-dialog{
-  border:0;padding:0;background:transparent;max-width:100%;width:100%;
-  margin:auto auto 0;
+/* ---------- resumo do cardapio em tres numeros ---------- */
+.resumo{
+  display:flex;width:100%;padding:0;overflow:hidden;
+  background:var(--surface);border:1px solid var(--line);border-radius:16px;
+  cursor:pointer;box-shadow:var(--sombra);
 }
-dialog::backdrop{background:rgba(10,16,12,.55)}
-.folha{
-  background:var(--surface);color:var(--ink);
-  border-radius:18px 18px 0 0;padding:22px 20px;
-  padding-bottom:calc(22px + env(safe-area-inset-bottom));
-  max-width:560px;margin:0 auto;max-height:86dvh;overflow-y:auto;
+.resumo:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
+.resumo .fatia{flex:1;padding:13px 8px;display:flex;flex-direction:column;gap:2px;align-items:center}
+.resumo .fatia + .fatia{border-left:1px solid var(--line-soft)}
+.resumo .fatia b{font-family:Archivo,sans-serif;font-size:1.3rem;font-weight:700;line-height:1.1}
+.resumo .fatia span{font-size:.71rem;color:var(--muted);text-align:center;line-height:1.3}
+.resumo .blk{background:var(--perigo-soft)}
+.resumo .wrn{background:var(--atencao-soft)}
+.resumo .okk{background:var(--ok-soft)}
+.resumo .blk b{color:var(--perigo)}
+.resumo .wrn b{color:var(--atencao)}
+.resumo .okk b{color:var(--ok)}
+
+/* ---------- grade de atalhos ---------- */
+.grade{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bloco{
+  display:flex;flex-direction:column;gap:7px;align-items:flex-start;text-align:left;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:14px 13px;cursor:pointer;font-size:.845rem;font-weight:500;line-height:1.3;
+  transition:border-color .12s ease,transform .1s ease;
 }
-.folha h2{
-  font-family:Archivo,sans-serif;font-size:1.1rem;font-weight:700;
-  letter-spacing:-.015em;margin:0 0 4px;
+.bloco:hover{border-color:var(--ink)}
+.bloco:active{transform:scale(.99)}
+.bloco:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
+.bloco i{font-size:1.15rem;font-style:normal;line-height:1}
+
+/* ---------- conteudo das telas ---------- */
+.secao{
+  font-family:"IBM Plex Mono",monospace;font-size:.65rem;font-weight:500;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--faint);
+  margin:18px 0 -2px;
 }
-.folha h3{
-  font-family:"IBM Plex Mono",monospace;font-size:.68rem;font-weight:500;
-  letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
-  margin:22px 0 8px;
+.tela > .secao:first-child{margin-top:0}
+.cabeca{font-size:1.3rem;font-weight:700;line-height:1.25}
+.paragrafo{margin:0;font-size:.9rem}
+.paragrafo b{font-weight:600}
+.nota{margin:0;font-size:.8rem;color:var(--muted);line-height:1.5}
+.prosa > * + *{margin-top:10px}
+.passo{
+  display:inline-block;background:var(--acao-soft);border:1px solid var(--acao-linha);
+  color:var(--ink);border-radius:999px;padding:4px 12px;font-size:.75rem;font-weight:600;
 }
-.folha p{margin:0 0 10px;font-size:.875rem;color:var(--muted)}
-.folha dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:0;font-size:.865rem}
-.folha dt{color:var(--faint)}
-.folha dd{margin:0}
-.folha .fechar{
-  width:100%;margin-top:20px;background:var(--acao);color:var(--acao-ink);
-  border:0;border-radius:10px;padding:13px;font-weight:600;cursor:pointer;
+
+/* prato do cardapio: a barra da esquerda e o veredito, nao enfeite */
+.prato{
+  display:flex;gap:11px;align-items:flex-start;width:100%;text-align:left;
+  background:var(--surface);border:1px solid var(--line);border-left-width:4px;
+  border-radius:12px;padding:12px 13px;box-shadow:var(--sombra);
 }
-.estados{display:flex;flex-direction:column;gap:7px;margin-top:4px}
-.estado{display:flex;gap:10px;align-items:baseline;font-size:.845rem;padding:9px 12px;border-radius:9px}
-.estado b{white-space:nowrap;font-weight:600}
-.blk{background:var(--perigo-soft);color:var(--perigo)}
-.wrn{background:var(--atencao-soft);color:var(--atencao)}
-.okk{background:var(--ok-soft);color:var(--ok)}
+.prato .glifo{font-size:1rem;line-height:1.35;flex:none}
+.prato .corpo{flex:1;min-width:0}
+.prato .nome{font-size:.92rem;font-weight:600;line-height:1.35}
+.prato .dica{font-size:.78rem;color:var(--muted);margin-top:1px}
+.prato .porque{
+  display:inline-block;margin-top:7px;border-radius:7px;padding:4px 9px;
+  font-size:.76rem;font-weight:600;
+}
+button.prato.tocavel{cursor:pointer;transition:border-color .12s ease,transform .1s ease}
+button.prato.tocavel:hover{border-color:var(--ink)}
+button.prato.tocavel:active{transform:scale(.995)}
+button.prato.tocavel:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
+button.prato.tocavel[disabled]{opacity:.55;cursor:default}
+.prato.blk{border-left-color:var(--perigo)}
+.prato.blk .porque{background:var(--perigo-soft);color:var(--perigo)}
+.prato.wrn{border-left-color:var(--atencao)}
+.prato.wrn .porque{background:var(--atencao-soft);color:var(--atencao)}
+.prato.okk{border-left-color:var(--ok)}
+.prato.okk .porque{background:var(--ok-soft);color:var(--ok)}
+.prato.neutro{border-left-color:var(--line)}
+
+/* linha de lista: o nome de um lado, a medida do outro */
+.linha{
+  display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:11px 13px;font-size:.89rem;
+}
+.linha .medida{
+  font-size:.755rem;font-weight:600;color:var(--muted);white-space:nowrap;
+  background:var(--surface-2);border-radius:999px;padding:3px 9px;
+}
+.pilha > * + *{margin-top:7px}
+
+.aviso{display:flex;gap:10px;align-items:flex-start;border-radius:12px;padding:12px 13px;font-size:.845rem;line-height:1.5}
+.aviso.blk{background:var(--perigo-soft);color:var(--perigo)}
+.aviso.wrn{background:var(--atencao-soft);color:var(--atencao)}
+.aviso.okk{background:var(--ok-soft);color:var(--ok)}
+.aviso b{font-weight:700}
+.aviso .glifo{flex:none}
+
+/* a visao da Apetit e tabela mesmo, e tabela quer monoespacada */
+.tabela{
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:13px;font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:.68rem;line-height:1.55;white-space:pre;overflow-x:auto;
+}
+
+/* ---------- acoes no rodape ---------- */
+.acoes{
+  flex:none;display:flex;flex-direction:column;gap:8px;
+  padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom));
+  background:var(--surface);border-top:1px solid var(--line);
+}
+.acoes:empty{display:none}
+.acoes .anexo{border:1.5px dashed var(--marca);color:var(--marca);font-weight:600}
+.acoes .anexo:hover{background:var(--perigo-soft);border-style:solid;border-color:var(--marca)}
+
+/* opcoes que sao o conteudo da tela (escolher prato, ligar aviso) */
+.opcao{
+  display:flex;gap:10px;align-items:center;width:100%;text-align:left;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:13px;font-size:.89rem;cursor:pointer;transition:border-color .12s ease;
+}
+.opcao:hover{border-color:var(--ink)}
+.opcao:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
+.opcao[disabled]{opacity:.55;cursor:default}
+.opcao[disabled]:hover{border-color:var(--line)}
+.opcao .marca{font-size:1.05rem;flex:none;line-height:1}
+.chips{display:flex;gap:8px}
+.chips .opcao{flex:1;flex-direction:column;justify-content:center;gap:5px;text-align:center;padding:14px 8px}
+.chips .opcao .marca{font-size:1.5rem}
+
+/* ---------- abas ---------- */
+.abas{flex:none;display:flex;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.aba{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  background:none;border:0;border-top:2px solid transparent;margin-top:-1px;
+  padding:8px 4px 9px;cursor:pointer;font-size:.665rem;color:var(--faint);font-weight:500;
+}
+.aba i{font-size:1.15rem;font-style:normal;line-height:1;filter:grayscale(1);opacity:.65}
+.aba[aria-current="page"]{color:var(--marca);border-top-color:var(--marca)}
+.aba[aria-current="page"] i{filter:none;opacity:1}
+.aba:focus-visible{outline:2px solid var(--marca);outline-offset:-3px}
 
 /* ---------- convite para instalar ---------- */
 .instalar{
   flex:none;display:none;align-items:center;gap:11px;
   background:var(--acao-soft);color:var(--ink);
-  padding:11px 14px;border-bottom:1px solid var(--acao-linha);font-size:.845rem;
+  padding:11px 14px;border-bottom:1px solid var(--acao-linha);font-size:.83rem;
 }
 .instalar.on{display:flex}
 .instalar p{margin:0;flex:1}
 .instalar button{
   background:var(--marca);color:var(--marca-ink);border:0;border-radius:8px;
-  padding:8px 13px;font-size:.82rem;font-weight:600;cursor:pointer;flex:none;
+  padding:8px 13px;font-size:.81rem;font-weight:600;cursor:pointer;flex:none;
 }
 .instalar .nao{background:none;color:var(--faint);font-weight:400;padding:8px 4px}
+
+/* ---------- folha de contexto ---------- */
+dialog{border:0;padding:0;background:transparent;max-width:100%;width:100%;margin:auto auto 0}
+dialog::backdrop{background:rgba(12,8,9,.55)}
+.folha{
+  background:var(--surface);color:var(--ink);border-radius:20px 20px 0 0;
+  padding:22px 20px;padding-bottom:calc(22px + env(safe-area-inset-bottom));
+  max-width:560px;margin:0 auto;max-height:86dvh;overflow-y:auto;
+}
+.folha h2{font-size:1.15rem;font-weight:700;margin-bottom:4px}
+.folha h3{
+  font-family:"IBM Plex Mono",monospace;font-size:.65rem;font-weight:500;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin:22px 0 8px;
+}
+.folha p{margin:0 0 10px;font-size:.86rem;color:var(--muted)}
+.folha dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:0;font-size:.86rem}
+.folha dt{color:var(--faint)}
+.folha dd{margin:0}
+.folha .fechar{
+  width:100%;margin-top:20px;background:var(--acao);color:var(--acao-ink);
+  border:0;border-radius:12px;padding:13px;font-weight:600;cursor:pointer;
+}
+.estados{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.estado{display:flex;gap:10px;align-items:baseline;font-size:.84rem;padding:9px 12px;border-radius:9px}
+.estado b{white-space:nowrap;font-weight:600}
+/* O fundo colorido e escopado de proposito. Se `.blk` pintasse qualquer coisa,
+   os quatro pratos "nao sei" do dia sairiam com o mesmo peso visual do unico
+   ⛔ — e o aviso que importa viraria mais um cartao amarelo na pilha. */
+.estado.blk{background:var(--perigo-soft);color:var(--perigo)}
+.estado.wrn{background:var(--atencao-soft);color:var(--atencao)}
+.estado.okk{background:var(--ok-soft);color:var(--ok)}
 
 @media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important} }
 </style>
@@ -268,10 +402,11 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
 <body>
 
 <div class="app">
-  <header class="barra">
-    <div class="marca" aria-hidden="true">🍽️</div>
-    <div class="titulo">
-      <b>Apetit · Nutrição</b>
+  <header class="topo">
+    <button id="btn-voltar" type="button" aria-label="Voltar" hidden>←</button>
+    <div class="selo" aria-hidden="true">🍽️</div>
+    <div class="rotulo">
+      <b id="titulo">Apetit</b>
       <span id="sub">segunda-feira, 1 de setembro</span>
     </div>
     <button id="info" type="button" aria-label="Sobre esta demonstração">ⓘ</button>
@@ -283,9 +418,10 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
     <button class="nao" id="btn-depois" type="button">Agora não</button>
   </div>
 
-  <main class="chat" id="chat" aria-live="polite"></main>
+  <main class="tela" id="tela" aria-live="polite"></main>
   <input type="file" id="arquivo-pdf" accept="application/pdf,.pdf" hidden>
-  <nav class="keys" id="keys" aria-label="Opções"></nav>
+  <div class="acoes" id="acoes"></div>
+  <nav class="abas" id="abas" aria-label="Seções"></nav>
 </div>
 
 <dialog id="folha">
@@ -309,7 +445,7 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
     </div>
 
     <h3>O que é de mentira aqui</h3>
-    <p>O cardápio é de exemplo, na estrutura que a operação exporta. O piloto de 15 pessoas nas telas da Apetit é simulado — nenhuma pessoa real aparece em relatório nenhum. No app de verdade, a ficha em PDF é anexada pelo clipe do Telegram.</p>
+    <p>O cardápio é de exemplo, na estrutura que a operação exporta. O piloto de 15 pessoas na visão da Apetit é simulado — nenhuma pessoa real aparece em relatório nenhum. No app de verdade, a ficha em PDF é anexada pelo clipe do Telegram.</p>
 
     <h3>O que não muda</h3>
     <p>Sua empresa não vê o que você come, nem o seu objetivo, nem as suas restrições. A avaliação do refeitório é a única coisa que sai de você — e vai sem nome, sem empresa e sem setor.</p>
@@ -322,18 +458,51 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
 (function(){
   "use strict";
 
-  var TELAS = {}, historico = [], atual = "inicio";
-  var chat = document.getElementById("chat");
-  var keys = document.getElementById("keys");
+  var TELAS = {}, DADOS = null, historico = [], atual = "inicio";
+  var tela = document.getElementById("tela");
+  var acoes = document.getElementById("acoes");
+  var abas = document.getElementById("abas");
+  var titulo = document.getElementById("titulo");
   var sub = document.getElementById("sub");
+  var btnVoltar = document.getElementById("btn-voltar");
 
+  // As quatro secoes que a pessoa abre por conta propria viram aba; o resto do
+  // menu vira atalho na tela inicial. A pilha de onze botoes iguais e o que um
+  // bot de Telegram **e** — nao e o que um aplicativo e.
+  var ABAS = [
+    { id: "inicio",   icone: "\u{1F3E0}", nome: "Início" },
+    { id: "cardapio", icone: "\u{1F37D}️", nome: "Cardápio" },
+    { id: "meu_dia",  icone: "\u{1F4CA}", nome: "Meu dia" },
+    { id: "ficha",    icone: "\u{1F4CB}", nome: "Ficha" }
+  ];
+
+  // Nenhum icone aqui e vermelho. O unico vermelho do corpo do app e o ⛔ do
+  // "nao pode" — um coracao de favorito ao lado dele disputaria a mesma cor.
+  var ATALHOS = [
+    { id: "montar",    icone: "\u{1F957}", nome: "Montar meu prato" },
+    { id: "progresso", icone: "\u{1F4C8}", nome: "Meu progresso" },
+    { id: "avaliar",   icone: "\u{1F4DD}", nome: "Avaliar o refeitório" },
+    { id: "favoritos", icone: "⭐",    nome: "Favoritos" },
+    { id: "avisos",    icone: "\u{1F514}", nome: "Avisos" },
+    { id: "perfil",    icone: "\u{1F464}", nome: "Meu cadastro" },
+    { id: "ajuda",     icone: "❓",    nome: "Como usar" }
+  ];
+
+  var ADMIN = [
+    { id: "piloto",      nome: "Relatório do piloto" },
+    { id: "relatorio",   nome: "Adesão por setor" },
+    { id: "atendimento", nome: "Avaliação do refeitório" },
+    { id: "cobertura",   nome: "Cobertura de alergênicos" }
+  ];
+
+  // ---------- texto ----------
   var PERMITIDAS = /^\/?(b|i|u|s|code|em|strong)$/i;
   function escapar(s){
-    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
   // O texto vem do proprio bot, que ja escapou o dado do usuario. Ainda assim
   // so estas tags passam: qualquer outra vira texto visivel.
-  function render(texto){
+  function inline(texto){
     var saida = "", resto = String(texto), re = /<([^>]{1,12})>/g, m, fim = 0;
     while ((m = re.exec(resto)) !== null){
       saida += escapar(resto.slice(fim, m.index));
@@ -342,92 +511,446 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
     }
     return saida + escapar(resto.slice(fim));
   }
+  function semTags(texto){ return String(texto).replace(/<[^>]{1,12}>/g, "").trim(); }
+  function el(tag, classe, html){
+    var n = document.createElement(tag);
+    if (classe) n.className = classe;
+    if (html != null) n.innerHTML = html;
+    if (tag === "button") n.type = "button";
+    return n;
+  }
 
+  // ---------- a tela do bot lida como estrutura, nao como paragrafo ----------
+  //
+  // O bot escreve para o Telegram, onde tudo e um bloco de texto so. Aqui o
+  // mesmo texto vira prato, medida, aviso e secao. Nada e reescrito: o que
+  // muda e a forma de mostrar.
+  var GLIFOS = { "⛔": "blk", "⚠️": "wrn", "✅": "okk" };
+  var PRATO   = /^(⛔|⚠️|✅|⬜|☑️)\s+([^<].*?)\s+—\s+<i>(.*?)<\/i>\s*(.*)$/;
+  var MARCADO = /^(⛔|⚠️|✅)\s+(.*)$/;
+  var DETALHE = /^\s{2,}<b>(.*)<\/b>\s*$/;
+  var CABECA  = /^(\S*)\s*<b>(.*?)<\/b>\s*$/;
+  var PORCAO  = /^•\s+(\d+)\s+(\S+)\s+de\s+(.+)$/;
+  var VONTADE = /^•\s+(.+?)\s+(?:a|à)\s+vontade$/i;
+  var ITEM    = /^•\s+(.+)$/;
+  var MEDIDA  = /^(.+?)\s+—\s+(.+)$/;
+
+  function blocos(texto){
+    var linhas = String(texto).split("\n"), saida = [], i, m;
+    for (i = 0; i < linhas.length; i++){
+      var linha = linhas[i];
+      if (!linha.trim()) continue;
+
+      m = DETALHE.exec(linha);
+      if (m && saida.length && saida[saida.length - 1].tipo === "prato"){
+        saida[saida.length - 1].porque = m[1];
+        continue;
+      }
+
+      m = PRATO.exec(linha);
+      if (m){
+        saida.push({
+          tipo: "prato",
+          estado: GLIFOS[m[1]] || GLIFOS[(m[4] || "").trim()] || "neutro",
+          glifo: m[1], nome: m[2], dica: m[3], porque: ""
+        });
+        continue;
+      }
+
+      m = MARCADO.exec(linha);
+      if (m){
+        // "⚠️ = sem informacao de alergenico" e legenda do simbolo, nao aviso
+        // sobre um prato. Gritar nela roubaria atencao do aviso de verdade.
+        saida.push(/^=/.test(m[2])
+          ? { tipo: "nota", texto: m[1] + " " + m[2] }
+          : { tipo: "aviso", estado: GLIFOS[m[1]], glifo: m[1], texto: m[2] });
+        continue;
+      }
+
+      m = PORCAO.exec(linha);
+      if (m){ saida.push({ tipo: "linha", nome: m[3], medida: m[1] + " " + m[2] }); continue; }
+
+      m = VONTADE.exec(linha);
+      if (m){ saida.push({ tipo: "linha", nome: m[1], medida: "à vontade" }); continue; }
+
+      m = ITEM.exec(linha);
+      if (m){
+        var partes = MEDIDA.exec(m[1]);
+        saida.push(partes
+          ? { tipo: "linha", nome: partes[1], medida: partes[2] }
+          : { tipo: "linha", nome: m[1], medida: "" });
+        continue;
+      }
+
+      if (/^<b>Passo /.test(linha)){ saida.push({ tipo: "passo", texto: linha }); continue; }
+
+      // A primeira linha inteiramente em negrito e sempre o titulo da tela,
+      // com pergunta e tudo ("Como foi o almoco de hoje?"). Ja no meio do
+      // texto, so vira secao a que nao termina em pontuacao: "<b>Minhas
+      // conquistas:</b>" e secao, "<b>25 pontos</b> acumulados." e frase.
+      m = CABECA.exec(linha);
+      if (m && (!saida.length || !/[.!?]$/.test(semTags(m[2])))){
+        saida.push({ tipo: saida.length ? "secao" : "titulo", glifo: m[1], texto: m[2] });
+        continue;
+      }
+
+      if (/^<i>[\s\S]*<\/i>$/.test(linha.trim())){
+        saida.push({ tipo: "nota", texto: linha.trim().slice(3, -4) });
+        continue;
+      }
+
+      saida.push({ tipo: "paragrafo", texto: linha });
+    }
+    return saida;
+  }
+
+  function pratoDe(b, escolha){
+    // Quando o prato do texto e o mesmo que esta no botao, ele vira o botao.
+    // Sem isso a tela de montar mostra o prato duas vezes: uma como texto com
+    // o aviso de alergenico, outra como botao sem aviso nenhum.
+    var no = el(escolha ? "button" : "div", "prato " + b.estado);
+    if (escolha){
+      no.classList.add("tocavel");
+      if (vivo(escolha)) no.addEventListener("click", function(){ mostrar(escolha.destino); });
+      else no.disabled = true;
+    }
+    no.appendChild(el("span", "glifo", escapar(b.glifo)));
+    var corpo = el("div", "corpo");
+    corpo.appendChild(el("div", "nome", inline(b.nome)));
+    if (b.dica) corpo.appendChild(el("div", "dica", inline(b.dica)));
+    if (b.porque) corpo.appendChild(el("span", "porque", inline(b.porque)));
+    no.appendChild(corpo);
+    return no;
+  }
+
+  // O mesmo prato chega escrito de dois jeitos: "CARNE ASSADA AO MOLHO" no
+  // texto e "⬜ CARNE ASSADA AO MOLHO" no botao. So o simbolo da frente sai —
+  // cortar a primeira palavra cortaria "CARNE" e os dois nunca se achariam.
+  function chave(texto){
+    return semTags(texto).replace(/^[^0-9A-Za-zÀ-ÿ]+/, "").trim().toLowerCase();
+  }
+
+  function desenhar(bs, destino, escolhas){
+    var pilha = null, prosa = null;
+
+    function agrupar(no, tipo){
+      // Prosa solta sobre o fundo da tela parece rascunho; dentro de um cartao
+      // parece tela. Mas um paragrafo sozinho nao merece moldura.
+      if (tipo === "prosa"){
+        if (!prosa) prosa = el("div", "prosa");
+        prosa.appendChild(no);
+        destino.appendChild(prosa);
+        return;
+      }
+      prosa = null;
+      destino.appendChild(no);
+    }
+
+    bs.forEach(function(b){
+      if (b.tipo !== "linha") pilha = null;
+      if (b.tipo !== "paragrafo" && b.tipo !== "nota") prosa = null;
+
+      if (b.tipo === "titulo") return;   // o titulo mora na barra do app
+      if (b.tipo === "secao"){ agrupar(el("p", "secao", inline(b.texto))); return; }
+      if (b.tipo === "nota"){ agrupar(el("p", "nota", inline(b.texto)), "prosa"); return; }
+      if (b.tipo === "paragrafo"){ agrupar(el("p", "paragrafo", inline(b.texto)), "prosa"); return; }
+
+      if (b.tipo === "passo"){
+        var caixa = el("div", "");
+        caixa.appendChild(el("span", "passo", inline(b.texto)));
+        agrupar(caixa);
+        return;
+      }
+
+      if (b.tipo === "aviso"){
+        var aviso = el("div", "aviso " + (b.estado || "wrn"));
+        aviso.appendChild(el("span", "glifo", escapar(b.glifo)));
+        aviso.appendChild(el("span", "", inline(b.texto)));
+        agrupar(aviso);
+        return;
+      }
+
+      if (b.tipo === "prato"){
+        var escolha = escolhas && escolhas[chave(b.nome)];
+        if (escolha) escolha.usado = true;
+        agrupar(pratoDe(b, escolha && escolha.botao));
+        return;
+      }
+
+      if (b.tipo === "linha"){
+        if (!pilha){ pilha = el("div", "pilha"); destino.appendChild(pilha); }
+        var linha = el("div", "linha");
+        linha.appendChild(el("span", "", inline(b.nome)));
+        if (b.medida) linha.appendChild(el("span", "medida", inline(b.medida)));
+        pilha.appendChild(linha);
+      }
+    });
+
+    // Um paragrafo sozinho sai do cartao: moldura em volta de uma frase e
+    // enfeite, nao estrutura.
+    destino.querySelectorAll(".prosa").forEach(function(caixa){
+      if (caixa.childElementCount > 1) caixa.classList.add("cartao");
+    });
+  }
+
+  // ---------- botoes ----------
+  //
+  // O bot repete o menu inteiro no pe de varias telas, porque no Telegram nao
+  // existe outro lugar para ele morar. Aqui existe: a barra de abas embaixo.
+  // Entao o menu repetido sai, e sobra so o que e daquela tela.
+  function noMenu(rotulo){
+    var botoes = (TELAS.inicio || {}).botoes || [], i;
+    for (i = 0; i < botoes.length; i++) if (botoes[i].rotulo === rotulo) return true;
+    return false;
+  }
+
+  function classificar(botoes){
+    var out = { opcoes: [], acoes: [] };
+    (botoes || []).forEach(function(b){
+      if (/voltar/i.test(b.rotulo)) return;                       // vai para a seta da barra
+      if (/^(pick:|aval_|aviso:|fav_)/.test(b.acao || "")){ out.opcoes.push(b); return; }
+      if (/^(⬜|☑️)/.test(b.rotulo)){ out.opcoes.push(b); return; }
+      if (noMenu(b.rotulo)) return;
+      out.acoes.push(b);
+    });
+    return out;
+  }
+
+  function vivo(b){ return !!(b.destino && TELAS[b.destino]); }
+
+  function acao(b, classe){
+    var no = el("button", classe);
+    if (b.acao === "__anexar_pdf__" || b.acao === "__anexar_meu__") no.classList.add("anexo");
+    no.appendChild(el("span", "", escapar(b.rotulo)));
+    if (b.acao === "__anexar_meu__"){
+      no.addEventListener("click", function(){ document.getElementById("arquivo-pdf").click(); });
+      return no;
+    }
+    if (vivo(b)){
+      no.addEventListener("click", function(){ mostrar(b.destino); });
+    } else {
+      no.disabled = true;
+      no.appendChild(el("span", "so-bot", "só no bot"));
+    }
+    return no;
+  }
+
+  function opcao(b){
+    var marca = (b.rotulo.match(/^(\S+)\s+/) || [])[1] || "";
+    var no = el("button", "opcao");
+    no.appendChild(el("span", "marca", escapar(marca)));
+    no.appendChild(el("span", "", escapar(b.rotulo.replace(/^\S+\s+/, ""))));
+    if (vivo(b)) no.addEventListener("click", function(){ mostrar(b.destino); });
+    else no.disabled = true;
+    return no;
+  }
+
+  // Onde um item do menu principal leva de verdade. Assim os atalhos e as abas
+  // usam os destinos capturados do bot, em vez de ids escritos a mao aqui.
+  function destinoDe(contem){
+    var botoes = (TELAS.inicio || {}).botoes || [], i;
+    for (i = 0; i < botoes.length; i++){
+      if (botoes[i].rotulo.indexOf(contem) >= 0 && vivo(botoes[i])) return botoes[i].destino;
+    }
+    return "";
+  }
+  function alvoDe(item){
+    if (TELAS[item.id]) return item.id;
+    return destinoDe(item.nome) || destinoDe(item.nome.split(" ")[0]);
+  }
+
+  // ---------- tela inicial ----------
+  function inicio(){
+    var d = DADOS;
+    var cabeca = el("div", "saudacao");
+    cabeca.appendChild(el("div", "dia", escapar(d ? d.dia_amigavel : "")));
+    cabeca.appendChild(el("h1", "", "Olá, " + escapar(d ? d.pessoa.nome : "")));
+    if (d) cabeca.appendChild(el("p", "",
+      "Você evita " + escapar(String(d.pessoa.restricoes).toLowerCase()) +
+      " — eu confiro isso no cardápio de hoje."));
+    tela.appendChild(cabeca);
+
+    if (d && d.porcoes && d.porcoes.itens){
+      var meta = el("div", "cartao meta");
+      meta.appendChild(el("span", "etiqueta", "Sua meta de hoje"));
+      var numeros = el("div", "numeros");
+      [[d.porcoes.alvo_kcal, "kcal"], [d.porcoes.alvo_ptn, "g de proteína"]].forEach(function(par){
+        var n = el("div", "numero");
+        n.appendChild(el("b", "", escapar(par[0])));
+        n.appendChild(el("span", "", escapar(par[1])));
+        numeros.appendChild(n);
+      });
+      meta.appendChild(numeros);
+
+      var lista = el("ul", "");
+      d.porcoes.itens.forEach(function(i){
+        var li = el("li", "");
+        li.appendChild(el("span", "", escapar(i.nome)));
+        li.appendChild(el("span", "", escapar(i.medida)));
+        lista.appendChild(li);
+      });
+      meta.appendChild(lista);
+
+      var ir = el("button", "primario", "Quanto pegar hoje");
+      var destino = destinoDe("Quanto pegar");
+      if (destino) ir.addEventListener("click", function(){ mostrar(destino); });
+      else ir.disabled = true;
+      meta.appendChild(ir);
+      tela.appendChild(meta);
+    }
+
+    if (d && d.contagem){
+      tela.appendChild(el("p", "secao", "Cardápio de hoje · " + d.contagem.total + " pratos"));
+      var resumo = el("button", "resumo");
+      [["blk", d.contagem.bloqueio, "não pode"],
+       ["wrn", d.contagem.atencao, "confirme no balcão"],
+       ["okk", d.contagem.liberado, "liberado"]].forEach(function(f){
+        var fatia = el("div", "fatia " + f[0]);
+        fatia.appendChild(el("b", "", String(f[1])));
+        fatia.appendChild(el("span", "", f[2]));
+        resumo.appendChild(fatia);
+      });
+      resumo.addEventListener("click", function(){ mostrar("cardapio"); });
+      tela.appendChild(resumo);
+    }
+
+    tela.appendChild(el("p", "secao", "Atalhos"));
+    var grade = el("div", "grade");
+    ATALHOS.forEach(function(a){
+      var alvo = alvoDe(a);
+      if (!alvo) return;
+      var b = el("button", "bloco");
+      b.appendChild(el("i", "", a.icone));
+      b.appendChild(el("span", "", escapar(a.nome)));
+      b.addEventListener("click", function(){ mostrar(alvo); });
+      grade.appendChild(b);
+    });
+    tela.appendChild(grade);
+
+    if (ADMIN.some(function(a){ return TELAS[a.id]; })){
+      tela.appendChild(el("p", "secao", "Visão da Apetit · gestão"));
+      tela.appendChild(el("p", "nota",
+        "Estas telas são da operação, não do funcionário. Elas mostram o piloto em " +
+        "número agregado: nenhuma pessoa aparece nominalmente em nenhuma delas."));
+      var pilha = el("div", "pilha");
+      ADMIN.forEach(function(a){
+        if (!TELAS[a.id]) return;
+        var b = el("button", "secundario");
+        b.appendChild(el("span", "", escapar(a.nome)));
+        b.addEventListener("click", function(){ mostrar(a.id); });
+        pilha.appendChild(b);
+      });
+      tela.appendChild(pilha);
+    }
+  }
+
+  // ---------- navegacao ----------
   function mostrar(id, guardar){
-    var tela = TELAS[id];
-    if (!tela) return;
+    var t = TELAS[id];
+    if (!t) return;
     if (guardar !== false && atual !== id) historico.push(atual);
     atual = id;
 
-    chat.textContent = "";
-    keys.textContent = "";
+    tela.textContent = "";
+    acoes.textContent = "";
 
-    if (tela.comando){
-      var cmd = document.createElement("div");
-      cmd.className = "cmd";
-      cmd.textContent = tela.comando;
-      chat.appendChild(cmd);
-    }
-    if (tela.arquivo){
-      var meu = document.createElement("div");
-      meu.className = "arquivo";
-      meu.innerHTML = '<span aria-hidden="true">\u{1F4C4}</span><b></b><em>enviado</em>';
-      meu.querySelector("b").textContent = tela.arquivo;
-      chat.appendChild(meu);
-    }
-    if (tela.caminho && tela.caminho[tela.caminho.length - 1] === "__anexar_pdf__"){
-      var arq = document.createElement("div");
-      arq.className = "arquivo";
-      arq.innerHTML = '<span aria-hidden="true">\u{1F4C4}</span>' +
-        '<b>ficha_nutricionista.pdf</b><em>exemplo</em>';
-      chat.appendChild(arq);
-    }
-
-    var bolha = document.createElement("div");
-    bolha.className = "bubble" + (tela.grupo === "administracao" ? " mono" : "");
-    bolha.innerHTML = render(tela.texto);
-    chat.appendChild(bolha);
-
-    // A tela que explica o clipe ganha o anexo de verdade: e ali que a pessoa
-    // procura, e mandar ela para um exemplo pronto seria responder outra coisa.
-    var botoes = (tela.botoes || []).slice();
-    if (tela.caminho && tela.caminho[tela.caminho.length - 1] === "ficha_pdf"){
-      botoes.unshift({ rotulo: "\u{1F4CE} Anexar a minha ficha (PDF)", acao: "__anexar_meu__", destino: "" });
-    }
-    botoes.forEach(function(b){
-      var btn = document.createElement("button");
-      btn.className = "key";
-      btn.type = "button";
-      btn.textContent = b.rotulo;
-      if (b.acao === "__anexar_pdf__" || b.acao === "__anexar_meu__") btn.classList.add("anexo");
-      if (b.acao === "__anexar_meu__"){
-        btn.addEventListener("click", function(){ entradaArquivo().click(); });
-        keys.appendChild(btn);
-        return;
+    if (id === "inicio"){
+      inicio();
+      titulo.textContent = "Apetit";
+      // A data ja abre a tela, em cima do "Ola, Mariana". Repetir aqui embaixo
+      // gastaria a linha da barra dizendo o que a tela ja diz maior.
+      sub.textContent = DADOS ? "Refeitório " + DADOS.pessoa.refeitorio : "";
+    } else if (t.grupo === "administracao"){
+      tela.appendChild(el("p", "nota", "Visão da operação: número agregado, nunca pessoa."));
+      tela.appendChild(el("div", "tabela", inline(t.texto)));
+      titulo.textContent = "Visão da Apetit";
+      sub.textContent = "agregado · sem nomes";
+    } else {
+      var anexo = t.arquivo || (t.caminho || []).slice(-1)[0] === "__anexar_pdf__";
+      if (anexo){
+        var faixa = el("div", "aviso okk");
+        faixa.appendChild(el("span", "glifo", "\u{1F4C4}"));
+        faixa.appendChild(el("span", "", "<b>" +
+          escapar(t.arquivo || "ficha_nutricionista.pdf") + "</b> — enviado"));
+        tela.appendChild(faixa);
       }
-      if (b.destino && TELAS[b.destino]){
-        btn.addEventListener("click", function(){ mostrar(b.destino); });
+
+      var bs = blocos(t.texto);
+      var grupos = classificar(t.botoes);
+
+      // Cada escolha entra indexada pelo nome do prato, para o `desenhar`
+      // casar texto com botao. O que sobrar sem par vira lista aqui embaixo.
+      var escolhas = {};
+      grupos.opcoes.forEach(function(b){ escolhas[chave(b.rotulo)] = { botao: b, usado: false }; });
+
+      desenhar(bs, tela, escolhas);
+
+      var sobraram = grupos.opcoes.filter(function(b){ return !escolhas[chave(b.rotulo)].usado; });
+      if (sobraram.length){
+        var caixa = el("div", /^aval_/.test(sobraram[0].acao || "") ? "chips" : "pilha");
+        sobraram.forEach(function(b){ caixa.appendChild(opcao(b)); });
+        tela.appendChild(caixa);
+      }
+
+      // O botao cheio e a acao principal da tela. Numa tela de escolha, a acao
+      // principal e escolher — e "Pular" pintado de amarelo estaria dizendo o
+      // contrario. Entao com escolhas na tela, nenhuma acao vira primaria.
+      var temEscolha = grupos.opcoes.length > 0;
+      grupos.acoes.forEach(function(b, n){
+        acoes.appendChild(acao(b, !temEscolha && n === 0 && vivo(b) ? "primario" : "secundario"));
+      });
+
+      var cabeca = bs.filter(function(b){ return b.tipo === "titulo"; })[0];
+      var nome = cabeca ? semTags(cabeca.texto) : "";
+      // Titulo comprido nao cabe na barra sem virar reticencias: ele fica no
+      // corpo, onde da para ler a frase inteira.
+      if (nome.length > 26){
+        tela.insertBefore(el("h1", "cabeca", inline(cabeca.texto)), tela.firstChild);
+        titulo.textContent = "Apetit";
       } else {
-        btn.disabled = true;
-        var tag = document.createElement("span");
-        tag.className = "tag";
-        tag.textContent = "só no bot";
-        btn.appendChild(tag);
+        titulo.textContent = nome || "Apetit";
       }
-      keys.appendChild(btn);
-    });
-
-    // O "Voltar" proprio de varias telas ja leva ao menu. Repetir com o voltar
-    // do historico deixaria dois botoes iguais um debaixo do outro, e a pessoa
-    // sem saber qual e qual — entao o do historico so aparece quando falta.
-    var temVoltar = (tela.botoes || []).some(function(b){
-      return /voltar/i.test(b.rotulo) && b.destino && TELAS[b.destino];
-    });
-    if (historico.length && !temVoltar){
-      var volta = document.createElement("button");
-      volta.className = "key voltar";
-      volta.type = "button";
-      volta.textContent = "← Voltar";
-      volta.addEventListener("click", function(){ mostrar(historico.pop(), false); });
-      keys.appendChild(volta);
+      // O titulo da tela ja pode ser a data (o cardapio e "segunda-feira, 1 de
+      // setembro"): repetir embaixo dele so ocupa linha.
+      sub.textContent = (DADOS && DADOS.dia_amigavel !== nome) ? DADOS.dia_amigavel : "";
     }
 
-    sub.textContent = tela.grupo === "administracao"
-      ? "visão da Apetit · agregada" : "segunda-feira, 1 de setembro";
-    chat.scrollTop = 0;
+    btnVoltar.hidden = (id === "inicio");
+    var aba = abaDe(id);
+    abas.querySelectorAll(".aba").forEach(function(a){
+      if (a.dataset.aba === aba) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+    tela.scrollTop = 0;
   }
 
-  function entradaArquivo(){ return document.getElementById("arquivo-pdf"); }
+  // Varias telas tem id com sufixo ("meu_dia___", "progresso_"): e o crawler
+  // separando estados diferentes da mesma tela. Para a aba, o tronco basta.
+  function abaDe(id){
+    var achou = "";
+    ABAS.forEach(function(a){
+      if (a.id !== "inicio" && id.indexOf(a.id) === 0) achou = a.id;
+    });
+    return id === "inicio" ? "inicio" : achou;
+  }
+
+  ABAS.forEach(function(a){
+    var b = el("button", "aba");
+    b.dataset.aba = a.id;
+    b.appendChild(el("i", "", a.icone));
+    b.appendChild(el("span", "", escapar(a.nome)));
+    b.addEventListener("click", function(){
+      var alvo = alvoDe(a);
+      if (!alvo) return;
+      historico.length = 0;
+      mostrar(alvo, a.id !== "inicio");
+    });
+    abas.appendChild(b);
+  });
+
+  btnVoltar.addEventListener("click", function(){
+    mostrar(historico.length ? historico.pop() : "inicio", false);
+  });
 
   var folha = document.getElementById("folha");
   document.getElementById("info").addEventListener("click", function(){
@@ -438,7 +961,7 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
   });
 
   // ---------- instalar na tela inicial ----------
-  var faixa = document.getElementById("faixa-instalar");
+  var faixaInstalar = document.getElementById("faixa-instalar");
   var btnInstalar = document.getElementById("btn-instalar");
   var textoInstalar = document.getElementById("instalar-texto");
   var evtInstalar = null;
@@ -454,27 +977,26 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
   window.addEventListener("beforeinstallprompt", function(e){
     e.preventDefault();
     evtInstalar = e;
-    if (!jaInstalado() && !guardou()) faixa.classList.add("on");
+    if (!jaInstalado() && !guardou()) faixaInstalar.classList.add("on");
   });
 
   btnInstalar.addEventListener("click", function(){
     if (evtInstalar){
       evtInstalar.prompt();
-      evtInstalar.userChoice.then(function(){ evtInstalar = null; faixa.classList.remove("on"); });
+      evtInstalar.userChoice.then(function(){ evtInstalar = null; faixaInstalar.classList.remove("on"); });
     }
   });
   document.getElementById("btn-depois").addEventListener("click", function(){
-    faixa.classList.remove("on");
+    faixaInstalar.classList.remove("on");
     try { localStorage.setItem("apetit-instalar", "nao"); } catch (e) {}
   });
 
   // O iPhone nao dispara beforeinstallprompt: la a instalacao e manual, e a
   // unica coisa util que o app pode fazer e dizer onde fica o botao.
-  var ehIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  if (ehIOS && !jaInstalado() && !guardou()){
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !jaInstalado() && !guardou()){
     textoInstalar.innerHTML = "Para instalar: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>.";
     btnInstalar.style.display = "none";
-    faixa.classList.add("on");
+    faixaInstalar.classList.add("on");
   }
 
   if ("serviceWorker" in navigator){
@@ -564,28 +1086,28 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
     return itens;
   }
 
-  function descreve(item){
-    if (item.medida === "a vontade") return item.nome + " — a vontade";
+  function medidaDe(item){
+    if (item.medida === "a vontade") return "à vontade";
     var partes = [];
     if (item.qtd) partes.push((item.qtd + " " + item.medida).trim());
     else if (item.medida) partes.push(item.medida);
     if (item.peso) partes.push("(" + item.peso + ")");
-    return partes.length ? item.nome + " — " + partes.join(" ") : item.nome;
+    return partes.join(" ");
   }
 
   function telaDoPlano(itens, nomeArquivo){
-    var texto = "\u{1F4CB} <b>Seu nutricionista pediu isso no almoço</b>\n" +
-      "<i>Confira antes de valer.</i>\n\n" +
-      itens.map(function(i){ return "• " + descreve(i); }).join("\n") +
-      "\n\n<i>Sua ficha é um plano alimentar: ela lista alimento e medida, não " +
-      "caloria. Vou usar essa lista para te mostrar o que mais se parece com ela " +
-      "no cardápio de hoje.</i>\n" +
-      "<i>O documento não fica guardado — só esta lista.</i>";
-    TELAS["__minha_ficha__"] = {
-      texto: texto,
-      grupo: "",
-      caminho: ["__minha_ficha__"],
-      arquivo: nomeArquivo,
+    var linhas = itens.map(function(i){
+      var medida = medidaDe(i);
+      return "• " + i.nome + (medida ? " — " + medida : "");
+    }).join("\n");
+    TELAS.__minha_ficha__ = {
+      texto: "\u{1F4CB} <b>Seu nutricionista pediu isso no almoço</b>\n" +
+        "<i>Confira antes de valer.</i>\n\n" + linhas + "\n\n" +
+        "<i>Sua ficha é um plano alimentar: ela lista alimento e medida, não " +
+        "caloria. Vou usar essa lista para te mostrar o que mais se parece com " +
+        "ela no cardápio de hoje.</i>\n" +
+        "<i>O documento não fica guardado — só esta lista.</i>",
+      grupo: "", caminho: ["__minha_ficha__"], arquivo: nomeArquivo,
       botoes: [
         { rotulo: "✅ É isso, pode guardar", acao: "ficha_ok", destino: "ficha_ok" },
         { rotulo: "\u{1F4CE} Anexar outra ficha", acao: "__anexar_meu__", destino: "" },
@@ -595,9 +1117,9 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
     mostrar("__minha_ficha__");
   }
 
-  function telaDeAviso(titulo, corpo){
-    TELAS["__aviso_ficha__"] = {
-      texto: "<b>" + titulo + "</b>\n\n" + corpo,
+  function telaDeAviso(tituloAviso, corpo){
+    TELAS.__aviso_ficha__ = {
+      texto: "<b>" + tituloAviso + "</b>\n\n" + corpo,
       grupo: "", caminho: ["__aviso_ficha__"],
       botoes: [
         { rotulo: "\u{1F4CE} Tentar outro arquivo", acao: "__anexar_meu__", destino: "" },
@@ -640,17 +1162,18 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
   });
 
   // ---------- carga ----------
-  fetch("telas.json")
-    .then(function(r){ return r.json(); })
-    .then(function(dados){
-      TELAS = dados;
-      mostrar("inicio", false);
-    })
-    .catch(function(){
-      chat.innerHTML = '<div class="bubble">Não consegui carregar as telas.' +
-        '\n\nSe você abriu o arquivo direto do disco, use um servidor: ' +
-        '<code>python -m http.server</code> na pasta <code>demo/</code>.</div>';
-    });
+  Promise.all([
+    fetch("telas.json").then(function(r){ return r.json(); }),
+    fetch("dados.json").then(function(r){ return r.json(); }).catch(function(){ return null; })
+  ]).then(function(par){
+    TELAS = par[0];
+    DADOS = par[1];
+    mostrar("inicio", false);
+  }).catch(function(){
+    tela.innerHTML = '<p class="paragrafo">Não consegui carregar as telas.</p>' +
+      '<p class="nota">Se você abriu o arquivo direto do disco, use um servidor: ' +
+      '<code>python -m http.server</code> na pasta <code>demo/</code>.</p>';
+  });
 })();
 </script>
 </body>

@@ -1,0 +1,189 @@
+{
+ "dia": "2025-09-01",
+ "dia_amigavel": "segunda-feira, 1 de setembro",
+ "pessoa": {
+  "nome": "Mariana",
+  "refeitorio": "SM",
+  "empresa": "Industria Exemplo",
+  "setor": "Producao",
+  "objetivo": "Manter o equilibrio",
+  "restricoes": "Leite e derivados, Ovos"
+ },
+ "cardapio": [
+  {
+   "categoria": "Prato principal",
+   "codigo": "PRATO PRINCIPAL",
+   "itens": [
+    {
+     "nome": "Carne assada ao molho",
+     "veredito": "atencao",
+     "etiqueta": "sem declaracao de leite e derivados, ovos",
+     "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
+     "peso": "moderado",
+     "dica": "moderado",
+     "kcal": 134.0,
+     "ptn": 12.0
+    }
+   ]
+  },
+  {
+   "categoria": "Opcao ao prato principal",
+   "codigo": "OPCAO AO PP",
+   "itens": [
+    {
+     "nome": "Ovo cozido",
+     "veredito": "bloqueio",
+     "etiqueta": "contem ovos",
+     "motivo": "Este prato contem Ovos, que voce evita. Nao recomendo pedir.",
+     "peso": "leve",
+     "dica": "leve",
+     "kcal": 78.0,
+     "ptn": 6.3
+    }
+   ]
+  },
+  {
+   "categoria": "Guarnicao",
+   "codigo": "GUARNICAO",
+   "itens": [
+    {
+     "nome": "Macarrao alho e oleo",
+     "veredito": "atencao",
+     "etiqueta": "sem declaracao de leite e derivados, ovos",
+     "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
+     "peso": "moderado",
+     "dica": "moderado",
+     "kcal": 126.0,
+     "ptn": 2.0
+    }
+   ]
+  },
+  {
+   "categoria": "Arroz",
+   "codigo": "ARROZ",
+   "itens": [
+    {
+     "nome": "Arroz parboilizado",
+     "veredito": "atencao",
+     "etiqueta": "sem declaracao de leite e derivados, ovos",
+     "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
+     "peso": "moderado",
+     "dica": "moderado",
+     "kcal": 138.0,
+     "ptn": 2.0
+    }
+   ]
+  },
+  {
+   "categoria": "Feijao",
+   "codigo": "FEIJAO",
+   "itens": [
+    {
+     "nome": "Feijao preto",
+     "veredito": "atencao",
+     "etiqueta": "sem declaracao de leite e derivados, ovos",
+     "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
+     "peso": "leve",
+     "dica": "leve",
+     "kcal": 29.0,
+     "ptn": 2.0
+    }
+   ]
+  },
+  {
+   "categoria": "Salada",
+   "codigo": "SALADA",
+   "itens": [
+    {
+     "nome": "Mix de alface",
+     "veredito": "liberado",
+     "etiqueta": "conferido para a sua ficha",
+     "motivo": "Nenhum alergenico da sua ficha aparece neste prato.",
+     "peso": "leve",
+     "dica": "leve",
+     "kcal": 4.0,
+     "ptn": 0.6
+    }
+   ]
+  }
+ ],
+ "contagem": {
+  "total": 6,
+  "bloqueio": 1,
+  "atencao": 4,
+  "liberado": 1
+ },
+ "porcoes": {
+  "itens": [
+   {
+    "nome": "Carne assada ao molho",
+    "medida": "2 porcoes",
+    "categoria": "Prato principal",
+    "kcal": 268,
+    "ptn": 24
+   },
+   {
+    "nome": "Macarrao alho e oleo",
+    "medida": "1 colher",
+    "categoria": "Guarnicao",
+    "kcal": 126,
+    "ptn": 2
+   },
+   {
+    "nome": "Arroz parboilizado",
+    "medida": "2 colheres",
+    "categoria": "Arroz",
+    "kcal": 276,
+    "ptn": 4
+   },
+   {
+    "nome": "Feijao preto",
+    "medida": "1 concha",
+    "categoria": "Feijao",
+    "kcal": 29,
+    "ptn": 2
+   },
+   {
+    "nome": "Mix de alface",
+    "medida": "a vontade",
+    "categoria": "Salada",
+    "kcal": 4,
+    "ptn": 1
+   }
+  ],
+  "kcal": 703,
+  "ptn": 33,
+  "alvo_kcal": 700,
+  "alvo_ptn": 30,
+  "resumo": "Isso da 703 kcal e 33 g de proteina. E a sua meta do dia.",
+  "avisos": []
+ },
+ "meu_dia": {
+  "dias": [
+   {
+    "data": "2025-08-29",
+    "data_amigavel": "sexta-feira, 29 de agosto",
+    "kcal": 288,
+    "ptn": 34,
+    "incompleto": false,
+    "itens": [
+     {
+      "nome": "Arroz parboilizado",
+      "quantidade": 1
+     },
+     {
+      "nome": "File de frango grelhado",
+      "quantidade": 1
+     }
+    ]
+   }
+  ]
+ },
+ "progresso": {
+  "pontos": 0,
+  "dias_na_semana": 0,
+  "resumo_semana": "Voce ainda nao registrou nenhuma refeicao esta semana.",
+  "conquistas": []
+ },
+ "plano_exemplo": []
+}

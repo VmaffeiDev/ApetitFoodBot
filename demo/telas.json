@@ -112,7 +112,7 @@
   ]
  },
  "cardapio": {
-  "texto": "📅 <b>segunda-feira, 1 de setembro</b>\n\n<b>Prato principal</b>\n⚠️ CARNE ASSADA AO MOLHO — <i>moderado</i>\n\n<b>Opcao ao prato principal</b>\n⛔ OVO COZIDO — <i>leve</i>\n    <b>Nao pode: Ovos</b>\n\n<b>Guarnicao</b>\n⚠️ MACARRAO ALHO E OLEO — <i>moderado</i>\n\n<b>Arroz</b>\n⚠️ ARROZ PARBOILIZADO — <i>moderado</i>\n\n<b>Feijao</b>\n⚠️ FEIJAO PRETO — <i>leve</i>\n\n<b>Salada</b>\n⚠️ SAL. MIX DE ALFACE — <i>leve</i>\n\n⚠️ <b>5 prato(s) sem informacao de alergenico.</b> Nao consigo garantir que sao seguros para voce — pergunte no balcao antes de se servir.",
+  "texto": "📅 <b>segunda-feira, 1 de setembro</b>\n\n<b>Prato principal</b>\n⚠️ CARNE ASSADA AO MOLHO — <i>moderado</i>\n\n<b>Opcao ao prato principal</b>\n⛔ OVO COZIDO — <i>leve</i>\n    <b>Nao pode: Ovos</b>\n\n<b>Guarnicao</b>\n⚠️ MACARRAO ALHO E OLEO — <i>moderado</i>\n\n<b>Arroz</b>\n⚠️ ARROZ PARBOILIZADO — <i>moderado</i>\n\n<b>Feijao</b>\n⚠️ FEIJAO PRETO — <i>leve</i>\n\n<b>Salada</b>\n✅ SAL. MIX DE ALFACE — <i>leve</i>\n\n⚠️ <b>4 prato(s) sem informacao de alergenico.</b> Nao consigo garantir que sao seguros para voce — pergunte no balcao antes de se servir.",
   "botoes": [
    {
     "rotulo": "🍽️ Montar meu prato",
@@ -704,7 +704,7 @@
   ]
  },
  "meus_dados": {
-  "texto": "🔒 <b>Tudo o que eu guardo sobre voce</b>\n\n<b>Nome:</b> Mariana\n<b>Refeitorio:</b> SM\n<b>Empresa:</b> Industria Exemplo\n<b>Setor:</b> Producao\n<b>Objetivo:</b> Manter o equilibrio\n<b>Restricoes:</b> Leite e derivados, Ovos\n<b>Aceite:</b> 2026-09-12T14:54:17+00:00\n\n<b>Dias com refeicao registrada:</b> 2\n<b>Pratos guardados:</b> 0\n<b>Pontos:</b> 25\n<b>Avaliacoes do refeitorio:</b> 0\n\n<b>Sua empresa nao ve nada disso sobre voce.</b>\nA unica coisa que sai daqui e a avaliacao do refeitorio — e ela vai sem o seu nome, sem a sua empresa e sem o seu setor, junto com a de todo mundo. A Apetit ve como o refeitorio esta indo, nunca quem disse o que.\n\nPara apagar tudo: /excluir_dados",
+  "texto": "🔒 <b>Tudo o que eu guardo sobre voce</b>\n\n<b>Nome:</b> Mariana\n<b>Refeitorio:</b> SM\n<b>Empresa:</b> Industria Exemplo\n<b>Setor:</b> Producao\n<b>Objetivo:</b> Manter o equilibrio\n<b>Restricoes:</b> Leite e derivados, Ovos\n<b>Aceite:</b> 2026-09-12T16:53:14+00:00\n\n<b>Dias com refeicao registrada:</b> 2\n<b>Pratos guardados:</b> 0\n<b>Pontos:</b> 25\n<b>Avaliacoes do refeitorio:</b> 0\n\n<b>Sua empresa nao ve nada disso sobre voce.</b>\nA unica coisa que sai daqui e a avaliacao do refeitorio — e ela vai sem o seu nome, sem a sua empresa e sem o seu setor, junto com a de todo mundo. A Apetit ve como o refeitorio esta indo, nunca quem disse o que.\n\nPara apagar tudo: /excluir_dados",
   "botoes": [
    {
     "rotulo": "🔙 Voltar",
@@ -1927,7 +1927,7 @@
   ]
  },
  "flow_next____": {
-  "texto": "<b>Passo 6 de 6</b> · Salada\n\nToque no que voce pegou:\n⬜ SAL. MIX DE ALFACE — <i>leve</i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.",
+  "texto": "<b>Passo 6 de 6</b> · Salada\n\nToque no que voce pegou:\n⬜ SAL. MIX DE ALFACE — <i>leve</i>",
   "botoes": [
    {
     "rotulo": "⬜ SAL. MIX DE ALFACE",
@@ -2202,7 +2202,7 @@
   ]
  },
  "piloto": {
-  "texto": "📊 RELATORIO DO PILOTO\n2025-09-01 a 2025-09-30\n\nADESAO\n  Convidados:        16\n  Cadastrados:       16  (100% dos convidados)\n  Usaram de fato:    12  (75% de quem se cadastrou)\n  Voltaram outro dia:  8  (67% de quem usou)\n\nUSO\n  Refeicoes registradas: 20\n  Dias por pessoa:       1.7\n\nO QUE AS PESSOAS USAM\n  Registrar a refeicao         12 pessoa(s), 24 vez(es)\n  Avaliar o refeitorio         10 pessoa(s), 10 vez(es)\n  Seguir a sugestao de porcao  1 pessoa(s), 5 vez(es)\n  Guardar favorito             1 pessoa(s), 1 vez(es)\n  Ficha nutricional            1 pessoa(s), 1 vez(es)\n\nOBJETIVO DECLARADO (agregado)\n  Comer mais leve              10 pessoa(s)\n  Manter o equilibrio          6 pessoa(s)\n\nAVALIACAO DO REFEITORIO\n  Avaliacoes:        10\n  Comida boa:        70%\n  Atendimento bom:   80%\n\nQUALIDADE DO DADO DO CARDAPIO\n  Itens no cardapio:      16\n  Com informacao nutricional: 94%\n  Com alergenico declarado:   44%\n  Pessoas com restricao declarada: 1\n\nO QUE NAO ENTRA NESTE RELATORIO\n  O que cada pessoa comeu, a meta de cada pessoa e se ela bateu a meta.\n  Dado alimentar e dado de saude dentro de relacao de emprego, e o\n  funcionario aceitou o termo porque o app promete que a empresa nao ve\n  isso sobre ele. Num grupo pequeno, qualquer recorte aponta para alguem.\n\nPESSOAS POR DIA\n  2025-09-01  ▇▇▇▇▇▇▇▇▇▇▇▇ 12\n  2025-09-02  ▇▇▇▇▇▇▇▇ 8\n",
+  "texto": "📊 RELATORIO DO PILOTO\n2025-09-01 a 2025-09-30\n\nADESAO\n  Convidados:        16\n  Cadastrados:       16  (100% dos convidados)\n  Usaram de fato:    12  (75% de quem se cadastrou)\n  Voltaram outro dia:  8  (67% de quem usou)\n\nUSO\n  Refeicoes registradas: 20\n  Dias por pessoa:       1.7\n\nO QUE AS PESSOAS USAM\n  Registrar a refeicao         12 pessoa(s), 24 vez(es)\n  Avaliar o refeitorio         10 pessoa(s), 10 vez(es)\n  Seguir a sugestao de porcao  1 pessoa(s), 5 vez(es)\n  Guardar favorito             1 pessoa(s), 1 vez(es)\n  Ficha nutricional            1 pessoa(s), 1 vez(es)\n\nOBJETIVO DECLARADO (agregado)\n  Comer mais leve              10 pessoa(s)\n  Manter o equilibrio          6 pessoa(s)\n\nAVALIACAO DO REFEITORIO\n  Avaliacoes:        10\n  Comida boa:        70%\n  Atendimento bom:   80%\n\nQUALIDADE DO DADO DO CARDAPIO\n  Itens no cardapio:      16\n  Com informacao nutricional: 94%\n  Com alergenico declarado:   38%\n  Pessoas com restricao declarada: 1\n\nO QUE NAO ENTRA NESTE RELATORIO\n  O que cada pessoa comeu, a meta de cada pessoa e se ela bateu a meta.\n  Dado alimentar e dado de saude dentro de relacao de emprego, e o\n  funcionario aceitou o termo porque o app promete que a empresa nao ve\n  isso sobre ele. Num grupo pequeno, qualquer recorte aponta para alguem.\n\nPESSOAS POR DIA\n  2025-09-01  ▇▇▇▇▇▇▇▇▇▇▇▇ 12\n  2025-09-02  ▇▇▇▇▇▇▇▇ 8\n",
   "botoes": [],
   "caminho": [
    "piloto"
@@ -2211,7 +2211,7 @@
   "grupo": "administracao"
  },
  "cobertura": {
-  "texto": "🧪 <b>Cobertura de alergenicos</b>\n\n0 de 16 fichas com todos os alergenicos declarados (0%).\n7 parcialmente declaradas, 9 sem nenhuma declaracao.\nEnquanto a ficha nao estiver completa, o app avisa o funcionario que nao consegue confirmar — nunca que o prato e seguro.\n\n<b>Declarar primeiro (aparecem mais no cardapio):</b>\n• ARROZ PARBOILIZADO\n• FEIJAO PRETO\n• ARROZ INTEGRAL\n• CARNE ASSADA AO MOLHO\n• FEIJAO CARIOCA\n• FEIJOADA\n• FILE DE FRANGO GRELHADO\n• MACARRAO ALHO E OLEO\n• OMELETE DE LEGUMES\n• OVO COZIDO\n\n<i>Para declarar em lote: scripts/alergenicos.py --exportar, preencher no Excel e --importar.</i>",
+  "texto": "🧪 <b>Cobertura de alergenicos</b>\n\n0 de 16 fichas com todos os alergenicos declarados (0%).\n6 parcialmente declaradas, 10 sem nenhuma declaracao.\nEnquanto a ficha nao estiver completa, o app avisa o funcionario que nao consegue confirmar — nunca que o prato e seguro.\n\n<b>Declarar primeiro (aparecem mais no cardapio):</b>\n• ARROZ PARBOILIZADO\n• FEIJAO PRETO\n• ARROZ INTEGRAL\n• CARNE ASSADA AO MOLHO\n• FEIJAO CARIOCA\n• FEIJOADA\n• FILE DE FRANGO GRELHADO\n• MACARRAO ALHO E OLEO\n• OMELETE DE LEGUMES\n• OVO COZIDO\n\n<i>Para declarar em lote: scripts/alergenicos.py --exportar, preencher no Excel e --importar.</i>",
   "botoes": [],
   "caminho": [
    "cobertura"
