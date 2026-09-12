@@ -163,8 +163,8 @@
    {
     "data": "2025-08-29",
     "data_amigavel": "sexta-feira, 29 de agosto",
-    "kcal": 288,
-    "ptn": 34,
+    "kcal": 292,
+    "ptn": 35,
     "incompleto": false,
     "itens": [
      {
@@ -174,16 +174,33 @@
      {
       "nome": "File de frango grelhado",
       "quantidade": 1
+     },
+     {
+      "nome": "Mix de alface",
+      "quantidade": 1
      }
     ]
    }
   ]
  },
  "progresso": {
-  "pontos": 0,
+  "pontos": 25,
   "dias_na_semana": 0,
   "resumo_semana": "Voce ainda nao registrou nenhuma refeicao esta semana.",
-  "conquistas": []
+  "conquistas": [
+   {
+    "nome": "Atingiu a meta de proteina do dia",
+    "vezes": 1
+   },
+   {
+    "nome": "Registrou a refeicao",
+    "vezes": 1
+   },
+   {
+    "nome": "Incluiu salada ou fruta no prato",
+    "vezes": 1
+   }
+  ]
  },
  "plano_exemplo": []
 }

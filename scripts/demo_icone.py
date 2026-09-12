@@ -17,8 +17,8 @@ from pathlib import Path
 
 # As cores da marca Apetit, tiradas do site: vermelho da faixa e amarelo dos
 # botoes. O talher sai branco, como o logo.
-VERMELHO = (222, 1, 59)      # #DE013B
-AMARELO = (240, 222, 77)     # #F0DE4D
+VERMELHO = (236, 0, 63)      # #EC003F
+AMARELO = (245, 217, 78)     # #F5D94E
 BRANCO = (255, 255, 255)
 
 

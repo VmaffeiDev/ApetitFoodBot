@@ -175,6 +175,34 @@ class CadastroTest(BancoBase):
         self.assertEqual(total_points(self.conn, self.user), 0)
 
 
+class CategoriaNoRegistroTest(BancoBase):
+    """A categoria do prato sobrevive a um dia sem cardapio importado.
+
+    Ela e propriedade do prato, nao do dia: salada e salada em qualquer data.
+    Prende-la ao dia do registro tinha um efeito silencioso e ruim — registrar
+    num dia fora do cardapio gravava categoria vazia, e a regra de "incluiu
+    salada ou fruta" parava de premiar sem a pessoa entender por que.
+    """
+
+    def test_category_falls_back_to_the_last_day_the_dish_was_served(self):
+        # 2025-08-29 nao esta no cardapio de exemplo, que comeca em 01/09.
+        log_consumption(self.conn, self.user, "2025-08-29", ["sal_mix_de_alface"])
+
+        linha = self.conn.execute(
+            "SELECT category FROM consumption WHERE telegram_id = ? AND service_date = ?",
+            (self.user, "2025-08-29"),
+        ).fetchone()
+
+        self.assertEqual(linha["category"], "SALADA")
+
+    def test_the_salad_rule_still_awards_on_a_day_outside_the_menu(self):
+        log_consumption(self.conn, self.user, "2025-08-29", ["sal_mix_de_alface"])
+
+        concedidas = score_day(self.conn, self.user, "2025-08-29")
+
+        self.assertIn("composicao", {regra.code for regra in concedidas})
+
+
 class AvisoNoCardapioTest(BancoBase):
     def test_menu_flags_the_dish_that_contains_the_allergen(self):
         set_item_allergens(self.conn, "carne_assada_ao_molho", {"leite": "contem"})

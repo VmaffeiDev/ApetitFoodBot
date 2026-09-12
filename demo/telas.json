@@ -158,7 +158,7 @@
   ]
  },
  "progresso": {
-  "texto": "📈 <b>Meu progresso</b>\n\nVoce ainda nao registrou nenhuma refeicao esta semana.\n\nRegistre um almoco para comecar a acompanhar.\n\n<i>Isso e so seu. Nao existe ranking, e ninguem compara voce com colega nenhum.</i>",
+  "texto": "📈 <b>Meu progresso</b>\n\nVoce ainda nao registrou nenhuma refeicao esta semana.\n\n<b>Minhas conquistas:</b>\n• Atingiu a meta de proteina do dia — 1x\n• Registrou a refeicao — 1x\n• Incluiu salada ou fruta no prato — 1x\n\n<b>25 pontos</b> acumulados.\n\n<i>Isso e so seu. Nao existe ranking, e ninguem compara voce com colega nenhum.</i>",
   "botoes": [
    {
     "rotulo": "🥗 Quanto pegar hoje",
@@ -244,7 +244,7 @@
   ]
  },
  "meu_dia": {
-  "texto": "📊 <b>Meu dia</b>\n\nVoce ainda nao registrou o almoco de hoje.\n\nToque em <b>Quanto pegar hoje</b> e depois em <b>Vou pegar isso</b> — assim fica guardado no seu historico.\n\n📆 <b>Seu historico</b>\n\n<i>sexta-feira, 29 de agosto</i> — 288 kcal · 34 g ptn\n• Arroz parboilizado\n• File de frango grelhado",
+  "texto": "📊 <b>Meu dia</b>\n\nVoce ainda nao registrou o almoco de hoje.\n\nToque em <b>Quanto pegar hoje</b> e depois em <b>Vou pegar isso</b> — assim fica guardado no seu historico.\n\n📆 <b>Seu historico</b>\n\n<i>sexta-feira, 29 de agosto</i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador",
   "botoes": [
    {
     "rotulo": "🍽️ Quanto pegar hoje",
@@ -573,7 +573,7 @@
   ]
  },
  "progresso_": {
-  "texto": "📈 <b>Meu progresso</b>\n\nVoce registrou 1 de 5 dias desta semana.\n\n<b>Minhas conquistas:</b>\n• Atingiu a meta de proteina do dia — 1x\n• Registrou a refeicao — 1x\n• Incluiu salada ou fruta no prato — 1x\n\n<b>25 pontos</b> acumulados.\n\n<i>Isso e so seu. Nao existe ranking, e ninguem compara voce com colega nenhum.</i>",
+  "texto": "📈 <b>Meu progresso</b>\n\nVoce registrou 1 de 5 dias desta semana.\n\n<b>Minhas conquistas:</b>\n• Atingiu a meta de proteina do dia — 2x\n• Registrou a refeicao — 2x\n• Incluiu salada ou fruta no prato — 2x\n\n<b>50 pontos</b> acumulados.\n\n<i>Isso e so seu. Nao existe ranking, e ninguem compara voce com colega nenhum.</i>",
   "botoes": [
    {
     "rotulo": "🥗 Quanto pegar hoje",
@@ -637,7 +637,7 @@
   ]
  },
  "meu_dia_": {
-  "texto": "📊 <b>Meu dia</b>\n\nPrato alinhado com o seu objetivo de hoje.\nProteina do dia atingida: 33 g.\n\n• Arroz parboilizado — 2 colheres\n• Carne assada ao molho — 2 porcoes\n• Feijao preto — 1 concha\n• Macarrao alho e oleo — 1 colher\n• Mix de alface — 1 pegador\n\n<i>703 kcal · 33 g de proteina</i>\n\n📆 <b>Seu historico</b>\n\n<i>sexta-feira, 29 de agosto</i> — 288 kcal · 34 g ptn\n• Arroz parboilizado\n• File de frango grelhado",
+  "texto": "📊 <b>Meu dia</b>\n\nPrato alinhado com o seu objetivo de hoje.\nProteina do dia atingida: 33 g.\n\n• Arroz parboilizado — 2 colheres\n• Carne assada ao molho — 2 porcoes\n• Feijao preto — 1 concha\n• Macarrao alho e oleo — 1 colher\n• Mix de alface — 1 pegador\n\n<i>703 kcal · 33 g de proteina</i>\n\n📆 <b>Seu historico</b>\n\n<i>sexta-feira, 29 de agosto</i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador",
   "botoes": [
    {
     "rotulo": "✏️ Corrigir o de hoje",
@@ -704,7 +704,7 @@
   ]
  },
  "meus_dados": {
-  "texto": "🔒 <b>Tudo o que eu guardo sobre voce</b>\n\n<b>Nome:</b> Mariana\n<b>Refeitorio:</b> SM\n<b>Empresa:</b> Industria Exemplo\n<b>Setor:</b> Producao\n<b>Objetivo:</b> Manter o equilibrio\n<b>Restricoes:</b> Leite e derivados, Ovos\n<b>Aceite:</b> 2026-09-12T16:53:14+00:00\n\n<b>Dias com refeicao registrada:</b> 2\n<b>Pratos guardados:</b> 0\n<b>Pontos:</b> 25\n<b>Avaliacoes do refeitorio:</b> 0\n\n<b>Sua empresa nao ve nada disso sobre voce.</b>\nA unica coisa que sai daqui e a avaliacao do refeitorio — e ela vai sem o seu nome, sem a sua empresa e sem o seu setor, junto com a de todo mundo. A Apetit ve como o refeitorio esta indo, nunca quem disse o que.\n\nPara apagar tudo: /excluir_dados",
+  "texto": "🔒 <b>Tudo o que eu guardo sobre voce</b>\n\n<b>Nome:</b> Mariana\n<b>Refeitorio:</b> SM\n<b>Empresa:</b> Industria Exemplo\n<b>Setor:</b> Producao\n<b>Objetivo:</b> Manter o equilibrio\n<b>Restricoes:</b> Leite e derivados, Ovos\n<b>Aceite:</b> 2026-09-12T20:25:58+00:00\n\n<b>Dias com refeicao registrada:</b> 2\n<b>Pratos guardados:</b> 0\n<b>Pontos:</b> 50\n<b>Avaliacoes do refeitorio:</b> 0\n\n<b>Sua empresa nao ve nada disso sobre voce.</b>\nA unica coisa que sai daqui e a avaliacao do refeitorio — e ela vai sem o seu nome, sem a sua empresa e sem o seu setor, junto com a de todo mundo. A Apetit ve como o refeitorio esta indo, nunca quem disse o que.\n\nPara apagar tudo: /excluir_dados",
   "botoes": [
    {
     "rotulo": "🔙 Voltar",
@@ -1272,7 +1272,7 @@
   ]
  },
  "meu_dia__": {
-  "texto": "📊 <b>Meu dia</b>\n\nPrato leve para o seu objetivo de hoje.\nProteina do dia atingida: 12 g.\nSem salada nem fruta no prato — vale somar uma.\n\n• Carne assada ao molho — 1 porcao\n\n<i>134 kcal · 12 g de proteina</i>\n\n📆 <b>Seu historico</b>\n\n<i>sexta-feira, 29 de agosto</i> — 288 kcal · 34 g ptn\n• Arroz parboilizado\n• File de frango grelhado",
+  "texto": "📊 <b>Meu dia</b>\n\nPrato leve para o seu objetivo de hoje.\nProteina do dia atingida: 12 g.\nSem salada nem fruta no prato — vale somar uma.\n\n• Carne assada ao molho — 1 porcao\n\n<i>134 kcal · 12 g de proteina</i>\n\n📆 <b>Seu historico</b>\n\n<i>sexta-feira, 29 de agosto</i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador",
   "botoes": [
    {
     "rotulo": "✏️ Corrigir o de hoje",
@@ -1960,7 +1960,7 @@
   ]
  },
  "meu_dia___": {
-  "texto": "📊 <b>Meu dia</b>\n\nPrato leve para o seu objetivo de hoje.\nFaltam 10 g de proteina para o seu alvo.\nSem salada nem fruta no prato — vale somar uma.\n\n• Macarrao alho e oleo — 1 colher\n\n<i>126 kcal · 2 g de proteina</i>\n\n📆 <b>Seu historico</b>\n\n<i>sexta-feira, 29 de agosto</i> — 288 kcal · 34 g ptn\n• Arroz parboilizado\n• File de frango grelhado",
+  "texto": "📊 <b>Meu dia</b>\n\nPrato leve para o seu objetivo de hoje.\nFaltam 10 g de proteina para o seu alvo.\nSem salada nem fruta no prato — vale somar uma.\n\n• Macarrao alho e oleo — 1 colher\n\n<i>126 kcal · 2 g de proteina</i>\n\n📆 <b>Seu historico</b>\n\n<i>sexta-feira, 29 de agosto</i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador",
   "botoes": [
    {
     "rotulo": "✏️ Corrigir o de hoje",

@@ -33,7 +33,7 @@ from apetit.csv_import import slugify  # noqa: E402
 from apetit.profile import Employee, save_employee  # noqa: E402
 from apetit.recipes import declarations_by_item, read_recipe_rows  # noqa: E402
 from apetit.spreadsheet import read_spreadsheet_rows  # noqa: E402
-from apetit.tracking import log_consumption  # noqa: E402
+from apetit.tracking import log_consumption, score_day  # noqa: E402
 from tests.test_bot import FakeContext, FakeDocument, FakeUpdate  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
@@ -110,7 +110,17 @@ def preparar_banco(caminho: Path, receitas: Path | None) -> None:
         restrictions=[Restriction("ovos"), Restriction("leite")],
     ))
     # Um dia ja registrado, para "Meu dia" e "Meu progresso" terem conteudo.
-    log_consumption(conn, USUARIO, "2025-08-29", ["file_de_frango_grelhado", "arroz_parboilizado"])
+    #
+    # O `score_day` entra junto porque e o que o bot faz quando alguem registra:
+    # sem ele a pessoa aparece com zero ponto tendo almocado, e a tela inicial
+    # nasceria vazia. Os 25 pontos que ela mostra saem daqui — das regras de
+    # `apetit/tracking.py` somando 10 + 5 + 10 —, nao de um numero escrito na
+    # interface. A salada esta na lista para a regra de composicao ter o que
+    # premiar; sem ela sao duas conquistas, e continuaria correto.
+    log_consumption(conn, USUARIO, "2025-08-29",
+                    ["file_de_frango_grelhado", "arroz_parboilizado", "sal_mix_de_alface"])
+    score_day(conn, USUARIO, "2025-08-29",
+              protein_target_g=bot.TARGETS["Manter o equilibrio"]["ptn"])
 
     # Um piloto de 15 pessoas inventado, so para as telas de administracao
     # terem numero em vez de tabela vazia. Nenhuma dessas pessoas aparece nas

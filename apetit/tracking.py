@@ -54,13 +54,27 @@ def _snapshot(conn: sqlite3.Connection, service_date: str, code: str) -> dict:
     Nome, categoria e macros saem daqui e vao gravados junto do consumo. Sem
     isso, corrigir uma ficha tecnica em novembro mudaria retroativamente o que
     a pessoa comeu em setembro — e historico que muda sozinho nao e historico.
+
+    A categoria procura primeiro o dia do registro e, se aquele dia nao estiver
+    na base, cai na vez mais recente em que o prato saiu. Ela e propriedade do
+    prato — salada e salada em qualquer dia —, e prende-la ao dia tinha um
+    efeito silencioso e ruim: registrar num dia sem cardapio importado gravava
+    categoria vazia, e a regra de "incluiu salada ou fruta" deixava de premiar
+    sem ninguem entender por que o ponto nao veio.
     """
     linha = conn.execute(
         """
         SELECT i.name, i.kcal, i.cho_g, i.lip_g, i.ptn_g,
-               (SELECT e.category FROM menu_entry e
-                 WHERE e.item_code = i.code AND e.service_date = ?
-                 LIMIT 1) AS category
+               COALESCE(
+                   (SELECT e.category FROM menu_entry e
+                     WHERE e.item_code = i.code AND e.service_date = ?
+                     LIMIT 1),
+                   (SELECT e.category FROM menu_entry e
+                     WHERE e.item_code = i.code AND e.category <> ''
+                     ORDER BY e.service_date DESC
+                     LIMIT 1),
+                   ''
+               ) AS category
         FROM menu_item i
         WHERE i.code = ?
         """,
