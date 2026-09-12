@@ -58,7 +58,7 @@
     --marca:#B8022F;
     --marca-ink:#FFFFFF;
     --acao:#F0DE4D;
-    --acao-ink:#241A1C;
+    --acao-ink:#2B2118;
     --acao-soft:#2C2617;
     --acao-linha:#5A4F24;
 
@@ -84,7 +84,7 @@
   --marca:#B8022F;
   --marca-ink:#FFFFFF;
   --acao:#F0DE4D;
-  --acao-ink:#241A1C;
+  --acao-ink:#2B2118;
   --acao-soft:#2C2617;
   --acao-linha:#5A4F24;
 
@@ -194,7 +194,9 @@ button{font:inherit}
   -webkit-tap-highlight-color:transparent;
 }
 .key:active{transform:scale(.99)}
-.key:hover{background:var(--acao);border-color:var(--acao)}
+.key:hover,
+.key:focus-visible,
+.key:active{background:var(--acao);border-color:var(--acao);color:var(--acao-ink)}
 .key:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
 .key.anexo{background:var(--surface);border:1px dashed var(--marca);color:var(--marca);font-weight:600}
 .key.anexo:hover{background:var(--perigo-soft);border-style:solid}

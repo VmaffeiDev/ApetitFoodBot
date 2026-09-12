@@ -38,6 +38,13 @@ FRACAO_ALMOCO_SUGERIDA = 0.35
 ALMOCO_KCAL_MAX = 1500
 ALMOCO_PTN_MAX = 150
 
+# Piso, tao necessario quanto o teto. Numa ficha real, "Italac Whey Protein -
+# 1 Caixinha" (nome de produto numa lista de substituicao do lanche) foi lido
+# como "proteina = 1", e 1 g viraria a meta do almoco. Numero absurdamente
+# baixo nao e meta: e ruido que casou com um rotulo.
+ALMOCO_KCAL_MIN = 100
+ALMOCO_PTN_MIN = 5
+
 
 def _normaliza(texto: str) -> str:
     sem_acento = unicodedata.normalize("NFD", texto or "").encode("ascii", "ignore").decode()
@@ -56,7 +63,9 @@ def parse_number(bruto: str) -> float | None:
 # energetico total; "get", gasto energetico total.
 ROTULOS = {
     "kcal": r"(?:vet|get|valor energetico(?: total)?|energia|calorias?|kcal|kilocalorias?)",
-    "ptn_g": r"(?:ptn|proteinas?|prot\.?)",
+    # `prot` so vale como palavra inteira: sem isso casa dentro de "Protein",
+    # que aparece em nome de produto, e de "protocolo".
+    "ptn_g": r"(?:ptn|proteinas?|prot\b\.?)",
     "cho_g": r"(?:cho|carboidratos?|carbo\.?|gliciacids?)",
     "lip_g": r"(?:lip|lipideos?|lipidios?|gorduras?)",
 }
@@ -155,6 +164,10 @@ class Prescription:
             return f"{alvo['kcal']:.0f} kcal num almoco so — esse numero parece ser do dia inteiro."
         if alvo.get("ptn", 0) > ALMOCO_PTN_MAX:
             return f"{alvo['ptn']:.0f} g de proteina num almoco so — esse numero parece ser do dia inteiro."
+        if "kcal" in alvo and alvo["kcal"] < ALMOCO_KCAL_MIN:
+            return f"{alvo['kcal']:.0f} kcal e pouco demais para um almoco — devo ter lido o numero errado."
+        if "ptn" in alvo and alvo["ptn"] < ALMOCO_PTN_MIN:
+            return f"{alvo['ptn']:.0f} g de proteina e pouco demais para um almoco — devo ter lido o numero errado."
         return ""
 
 

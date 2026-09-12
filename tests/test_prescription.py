@@ -165,5 +165,42 @@ class AplicacaoTest(unittest.TestCase):
         self.assertEqual(ficha.kcal, 1800)
 
 
+class FichaRealTest(unittest.TestCase):
+    """Casos tirados de uma ficha de verdade, de plano alimentar.
+
+    A ficha que chegou da empresa nao traz kcal nem grama de macro: e um
+    **plano alimentar** por refeicao, com alimento e medida caseira. Ler ela
+    procurando "VET: 1800" nao acha nada — e o perigo nao e nao achar, e achar
+    errado.
+    """
+
+    def test_a_product_name_is_not_a_protein_target(self):
+        # "Italac Whey Protein - 1 Caixinha (250ml)", numa lista de
+        # substituicao do lanche, virava "proteina = 1". Um grama de proteina
+        # como meta do almoco.
+        leitura = extract_prescription(
+            "Natural Whey - 1 Pote (250g) - ou - Italac Whey Protein - 1 Caixinha (250ml)"
+        )
+
+        self.assertNotIn("ptn_g", leitura.campos)
+
+    def test_a_meal_plan_yields_no_macro_target(self):
+        plano = (
+            "Almoco\n"
+            "Arroz branco cozido4 Colher(es) de sopa cheia(s) (100g)Feijao cozido2 Colher servir cheia\n"
+            "(70g)Peito de frango sem pele grelhado1.5 File(s) medio(s) (150g)"
+        )
+
+        leitura = extract_prescription(plano)
+
+        self.assertEqual(leitura.campos, {})
+
+    def test_a_number_too_small_is_refused_like_one_too_big(self):
+        # O teto ja existia; sem o piso, ruido virava meta.
+        self.assertIn("pouco demais", Prescription(ptn_g=1, escopo="almoco").implausivel())
+        self.assertIn("pouco demais", Prescription(kcal=30, escopo="almoco").implausivel())
+        self.assertEqual(Prescription(kcal=600, ptn_g=35, escopo="almoco").implausivel(), "")
+
+
 if __name__ == "__main__":
     unittest.main()
