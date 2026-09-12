@@ -47,6 +47,14 @@ class Funcao:
     nome: str
     pessoas: int
     usos: int
+    # Funcao cujo uso, sozinho, revela dado de saude sobre quem usou. "Uma
+    # pessoa tem ficha nutricional" num piloto de 15 aponta para alguem tanto
+    # quanto o nome dela: a empresa sabe quem foi ao nutricionista.
+    saude: bool = False
+
+    @property
+    def suprimida(self) -> bool:
+        return self.saude and 0 < self.pessoas < MIN_AGGREGATE
 
 
 @dataclass
@@ -186,18 +194,25 @@ def _uso_por_funcao(conn: sqlite3.Connection, inicio: str, fim: str) -> list[Fun
         ("Avaliar o refeitorio",
          "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM service_rating WHERE service_date BETWEEN ? AND ?",
          (inicio, fim)),
+        # `created_at`/`updated_at` sao timestamp ISO completo; o corte usa so a
+        # data para o periodo pedido valer igual ao das consultas de cima.
         ("Guardar favorito",
-         "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM favorite", ()),
+         "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM favorite "
+         "WHERE substr(created_at, 1, 10) BETWEEN ? AND ?",
+         (inicio, fim)),
         ("Ficha nutricional",
-         "SELECT COUNT(*) p, COUNT(*) u FROM employee_prescription", ()),
+         "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM employee_prescription "
+         "WHERE substr(updated_at, 1, 10) BETWEEN ? AND ?",
+         (inicio, fim)),
     ]
+    saude = {"Ficha nutricional"}
     funcoes = []
     for nome, sql, params in consultas:
         try:
             linha = conn.execute(sql, params).fetchone()
         except sqlite3.OperationalError:  # tabela de versao mais nova
             continue
-        funcoes.append(Funcao(nome, linha["p"] or 0, linha["u"] or 0))
+        funcoes.append(Funcao(nome, linha["p"] or 0, linha["u"] or 0, saude=nome in saude))
     return sorted(funcoes, key=lambda f: f.pessoas, reverse=True)
 
 
@@ -272,7 +287,10 @@ def format_report(rel: PilotReport) -> list[str]:
         "O QUE AS PESSOAS USAM",
     ]
     for f in rel.funcoes:
-        linhas.append(f"  {f.nome:<28} {f.pessoas} pessoa(s), {f.usos} vez(es)")
+        if f.suprimida:
+            linhas.append(f"  {f.nome:<28} suprimido (grupo pequeno)")
+        else:
+            linhas.append(f"  {f.nome:<28} {f.pessoas} pessoa(s), {f.usos} vez(es)")
 
     linhas += ["", "OBJETIVO DECLARADO (agregado)"]
     for objetivo, total in rel.objetivos:

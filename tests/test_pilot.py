@@ -100,11 +100,22 @@ class AdesaoTest(PilotoBase):
 
 
 class UsoPorFuncaoTest(PilotoBase):
+    def datar(self, tabela, coluna, quando="2026-09-02T12:00:00+00:00"):
+        """Poe a linha dentro do periodo pedido.
+
+        `add_favorite` e `save_prescription` carimbam o instante de agora, que
+        nunca cai na janela de um relatorio de periodo fechado.
+        """
+        self.conn.execute(f"UPDATE {tabela} SET {coluna} = ?", (quando,))
+        self.conn.commit()
+
     def test_measures_which_features_people_actually_use(self):
         self.grupo(quantos=5, usaram=5, voltaram=0)
         add_favorite(self.conn, 100, "arroz_parboilizado")
         save_rating(self.conn, 101, Rating(apetit_unit="SM", service_date="2026-09-01", food=3))
         save_prescription(self.conn, 102, Prescription(kcal=600, escopo="almoco"))
+        self.datar("favorite", "created_at")
+        self.datar("employee_prescription", "updated_at")
 
         rel = pilot_report(self.conn, "2026-09-01", "2026-09-07")
         por_nome = {f.nome: f for f in rel.funcoes}
@@ -113,6 +124,41 @@ class UsoPorFuncaoTest(PilotoBase):
         self.assertEqual(por_nome["Guardar favorito"].pessoas, 1)
         self.assertEqual(por_nome["Avaliar o refeitorio"].pessoas, 1)
         self.assertEqual(por_nome["Ficha nutricional"].pessoas, 1)
+
+    def test_activity_outside_the_period_does_not_inflate_adoption(self):
+        # O relatorio e de um periodo. Contar favorito e ficha de sempre faria
+        # um piloto anterior aparecer como adesao deste.
+        self.grupo(quantos=5, usaram=5, voltaram=0)
+        add_favorite(self.conn, 100, "arroz_parboilizado")
+        save_prescription(self.conn, 102, Prescription(kcal=600, escopo="almoco"))
+        self.datar("favorite", "created_at", "2026-08-01T12:00:00+00:00")
+        self.datar("employee_prescription", "updated_at", "2026-08-01T12:00:00+00:00")
+
+        rel = pilot_report(self.conn, "2026-09-01", "2026-09-07")
+        por_nome = {f.nome: f for f in rel.funcoes}
+
+        self.assertEqual(por_nome["Guardar favorito"].pessoas, 0)
+        self.assertEqual(por_nome["Ficha nutricional"].pessoas, 0)
+
+    def test_a_lone_prescription_is_not_reported_to_the_employer(self):
+        """"Ficha nutricional: 1 pessoa" conta a empresa quem foi ao nutricionista.
+
+        Ter acompanhamento nutricional e dado de saude. Num piloto de 15, o
+        numero 1 aponta para alguem tanto quanto o nome — e o relatorio ja
+        suprime objetivo em grupo pequeno pelo mesmo motivo.
+        """
+        self.grupo(quantos=5, usaram=5, voltaram=0)
+        save_prescription(self.conn, 102, Prescription(kcal=600, escopo="almoco"))
+        self.datar("employee_prescription", "updated_at")
+
+        rel = pilot_report(self.conn, "2026-09-01", "2026-09-07")
+        ficha = next(f for f in rel.funcoes if f.nome == "Ficha nutricional")
+
+        self.assertTrue(ficha.suprimida)
+        texto = "\n".join(format_report(rel))
+        self.assertIn("Ficha nutricional", texto)
+        self.assertNotIn("Ficha nutricional             1 pessoa(s)", texto)
+        self.assertRegex(texto, r"Ficha nutricional\s+suprimido")
 
     def test_following_the_suggestion_is_counted_apart_from_building_by_hand(self):
         # Sao habitos diferentes: seguir a sugestao e um toque, montar e escolha.

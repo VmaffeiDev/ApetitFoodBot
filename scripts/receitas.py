@@ -103,7 +103,8 @@ def gravar(banco: str, pratos: dict, so_publicados: bool) -> int:
                 if decl is not Declaration.NAO_CONTEM
             }
             if declaracoes:
-                set_item_allergens(conn, match.item_code, declaracoes, source=FONTE)
+                set_item_allergens(conn, match.item_code, declaracoes,
+                                   source=FONTE, deduzida=True)
                 gravados += 1
         return gravados
     finally:

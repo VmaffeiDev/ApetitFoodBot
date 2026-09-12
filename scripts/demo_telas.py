@@ -88,7 +88,7 @@ def preparar_banco(caminho: Path, receitas: Path | None) -> None:
             set_item_allergens(
                 conn, match.item_code,
                 {a: d.value for a, d in match.declarations.items()},
-                source="lista de ingredientes",
+                source="lista de ingredientes", deduzida=True,
             )
 
     # O ✅ nao sai de ingrediente: ingrediente prova presenca, nunca ausencia.

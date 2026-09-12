@@ -233,6 +233,86 @@ class VarianteTest(unittest.TestCase):
         self.assertIn("gluten", match.conflicting)                        # so uma tem
 
 
+class PrecedenciaTest(unittest.TestCase):
+    """Deducao nunca passa por cima de quem conferiu o prato.
+
+    O caminho ruim e silencioso: a cozinha declara `contem leite`, alguem
+    reimporta a planilha de receitas, a heuristica so consegue `pode_conter`, e
+    o prato cai de ⛔ para ⚠️ — voltando a ser aceito pela sugestao de porcao,
+    sem ninguem ver acontecer.
+    """
+
+    def setUp(self):
+        import sqlite3
+        from apetit.catalog import init_schema
+        self.conn = sqlite3.connect(":memory:")
+        self.conn.row_factory = sqlite3.Row
+        init_schema(self.conn)
+        self.conn.execute(
+            "INSERT INTO menu_item (code, name, updated_at) VALUES ('torta', 'TORTA', '2026-01-01')"
+        )
+
+    def tearDown(self):
+        self.conn.close()
+
+    def estado(self):
+        linha = self.conn.execute(
+            "SELECT status, source FROM menu_item_allergen WHERE item_code = 'torta'"
+        ).fetchone()
+        return linha["status"], linha["source"]
+
+    def test_a_deduction_never_downgrades_a_kitchen_declaration(self):
+        from apetit.catalog import set_item_allergens
+        set_item_allergens(self.conn, "torta", {"leite": "contem"}, source="declaracao da cozinha")
+
+        set_item_allergens(self.conn, "torta", {"leite": "pode_conter"},
+                           source="lista de ingredientes", deduzida=True)
+
+        self.assertEqual(self.estado(), ("contem", "declaracao da cozinha"))
+
+    def test_a_deduction_still_refreshes_an_earlier_deduction(self):
+        # Corrigir uma regra e reimportar tem que valer.
+        from apetit.catalog import set_item_allergens
+        set_item_allergens(self.conn, "torta", {"leite": "pode_conter"},
+                           source="lista de ingredientes", deduzida=True)
+
+        set_item_allergens(self.conn, "torta", {"leite": "contem"},
+                           source="lista de ingredientes", deduzida=True)
+
+        self.assertEqual(self.estado(), ("contem", "lista de ingredientes"))
+
+    def test_a_person_can_still_correct_a_deduction_by_hand(self):
+        from apetit.catalog import set_item_allergens
+        set_item_allergens(self.conn, "torta", {"leite": "contem"},
+                           source="lista de ingredientes", deduzida=True)
+
+        set_item_allergens(self.conn, "torta", {"leite": "nao_contem"}, source="declaracao da cozinha")
+
+        self.assertEqual(self.estado(), ("nao_contem", "declaracao da cozinha"))
+
+
+class VarianteTest(unittest.TestCase):
+    def test_recipe_variants_group_under_the_published_dish(self):
+        # "OVO FRITO - 1" e "- 2" sao versoes da mesma receita; o cardapio
+        # publica "OVO FRITO". Sem tirar o sufixo, nenhuma das duas casava com
+        # o prato publicado e a declaracao das duas era descartada.
+        receitas = read_recipe_rows([
+            CABECALHO,
+            linha("01.01", "OVO FRITO - 1", "OVO DE GALINHA"),
+            linha("01.02", "OVO FRITO - 2", "OVO DE GALINHA"),
+        ])
+
+        pratos = declarations_by_item(receitas, slugify)
+
+        self.assertIn("ovo_frito", pratos)
+        self.assertEqual(pratos["ovo_frito"].declarations["ovos"], Declaration.CONTEM)
+
+    def test_a_number_that_is_part_of_the_name_survives(self):
+        from apetit.recipes import sem_variante
+        self.assertEqual(sem_variante("ARROZ 7 GRAOS"), "ARROZ 7 GRAOS")
+        self.assertEqual(sem_variante("OVO FRITO - 3"), "OVO FRITO")
+
+
 class FichaDeExemploTest(unittest.TestCase):
     """A demonstracao mostra os tres estados. Isso tem que continuar verdade.
 

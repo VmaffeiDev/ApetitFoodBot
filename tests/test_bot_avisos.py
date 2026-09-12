@@ -9,6 +9,7 @@ render uma tentativa por semana para sempre.
 import os
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-token")
@@ -207,7 +208,20 @@ class AgendaTest(AvisoBase):
         self.assertEqual(bot.HORA_LEMBRETE.utcoffset().total_seconds(), -3 * 3600)
 
     async def test_the_weekly_summary_goes_out_on_friday(self):
-        self.assertEqual(bot.DIA_DO_RESUMO, (4,))
+        """Sexta no calendario do JobQueue, que nao e o do `date.weekday()`.
+
+        O `run_daily` do python-telegram-bot conta **domingo como 0** desde a
+        v20; o `weekday()` do Python conta segunda como 0. A versao anterior
+        deste teste repetia o literal `(4,)` e por isso nao viu que o resumo
+        estava saindo na quinta. Aqui a sexta e derivada de uma sexta de
+        verdade, entao trocar a constante de volta quebra o teste.
+        """
+        sexta = date(2025, 9, 5)
+        self.assertEqual(sexta.strftime("%A"), "Friday")
+
+        ptb = sexta.isoweekday() % 7          # domingo=0 ... sabado=6
+        self.assertEqual(bot.DIA_DO_RESUMO, (ptb,))
+        self.assertNotEqual(bot.DIA_DO_RESUMO, (sexta.weekday(),))
 
     async def test_without_a_job_queue_the_bot_still_starts(self):
         class AppSemFila:

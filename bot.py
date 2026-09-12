@@ -1664,6 +1664,11 @@ async def save_plan_confirmed(update: Update, context: ContextTypes.DEFAULT_TYPE
     conn = db()
     try:
         save_plan_lunch(conn, pessoa.telegram_id, plano)
+        # A ficha numerica anterior sai junto. As duas formas descrevem a mesma
+        # prescricao, e `target_for` le a numerica primeiro: deixar a velha no
+        # banco faria o app seguir kcal de um documento que a pessoa acabou de
+        # substituir — orientacao clinica vencida continuando no ar sem aviso.
+        delete_prescription(conn, pessoa.telegram_id)
     finally:
         conn.close()
     context.user_data.pop(FICHA, None)
@@ -1783,6 +1788,10 @@ async def save_prescription_confirmed(update: Update, context: ContextTypes.DEFA
     conn = db()
     try:
         save_prescription(conn, pessoa.telegram_id, ficha)
+        # Pelo mesmo motivo do caminho oposto: o plano alimentar anterior sai,
+        # para a tela nao mostrar o almoco de uma ficha ao lado dos numeros de
+        # outra.
+        delete_plan_lunch(conn, pessoa.telegram_id)
     finally:
         conn.close()
     context.user_data.pop(FICHA, None)
@@ -1889,7 +1898,10 @@ async def remove_prescription(update: Update, context: ContextTypes.DEFAULT_TYPE
 FUSO_BRASILIA = timezone(timedelta(hours=-3))
 HORA_LEMBRETE = time(11, 0, tzinfo=FUSO_BRASILIA)
 HORA_RESUMO = time(16, 0, tzinfo=FUSO_BRASILIA)
-DIA_DO_RESUMO = (4,)  # sexta: a semana ja aconteceu e ninguem comeca segunda cobrado
+# Sexta-feira. O `run_daily` do python-telegram-bot conta os dias com **domingo
+# como 0** (mudou na v20), e nao como o `date.weekday()` do Python, onde segunda
+# e 0. Com 4 aqui, o resumo da semana saia na quinta.
+DIA_DO_RESUMO = (5,)
 
 ROTULO_AVISO = {
     RESUMO_SEMANAL: "Resumo da minha semana (sexta)",

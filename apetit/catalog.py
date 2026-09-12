@@ -494,21 +494,38 @@ def set_item_allergens(
     item_code: str,
     declarations: dict[str, str],
     source: str = "ficha tecnica",
+    deduzida: bool = False,
 ) -> None:
-    """Grava a declaracao de alergenicos de um prato."""
+    """Grava a declaracao de alergenicos de um prato.
+
+    `deduzida` marca o que saiu de inferencia — hoje, a leitura da lista de
+    ingredientes. Deducao **nunca rebaixa declaracao**: se a cozinha ou a
+    nutricionista ja disse `contem leite` sobre um prato, uma releitura da
+    receita que so consegue concluir `pode_conter` nao pode substituir aquela
+    linha. O efeito seria o pior possivel — o prato cairia de ⛔ para ⚠️, a
+    sugestao de porcao voltaria a aceita-lo, e ninguem veria acontecer.
+
+    Uma deducao continua atualizando outra deducao: reimportar a planilha
+    depois de corrigir uma regra tem que valer. O que ela nao faz e passar por
+    cima de quem conferiu o prato.
+    """
     timestamp = now_iso()
+    # So atualiza a linha que veio da mesma fonte. Linha declarada por gente
+    # tem fonte diferente, entao o UPDATE simplesmente nao acontece.
+    guarda = " WHERE menu_item_allergen.source = excluded.source" if deduzida else ""
     for allergen_code, status in declarations.items():
         if allergen_code not in ALLERGENS:
             raise ValueError(f"Alergenico desconhecido: {allergen_code}")
         Declaration(status)  # valida o estado
         conn.execute(
-            """
+            f"""
             INSERT INTO menu_item_allergen (item_code, allergen_code, status, source, updated_at)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(item_code, allergen_code) DO UPDATE SET
                 status = excluded.status,
                 source = excluded.source,
                 updated_at = excluded.updated_at
+            {guarda}
             """,
             (item_code, allergen_code, Declaration(status).value, source, timestamp),
         )

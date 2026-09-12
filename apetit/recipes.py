@@ -131,6 +131,18 @@ INDUSTRIALIZADO = re.compile(r"\bEM PO\b|\bDESIDRATAD|\bINSTANTANE")
 REGRA_MOLHO = r"\bMOLHO\b"
 
 
+# Sufixo que a cozinha usa para separar versoes da mesma receita: "OVO FRITO -
+# 1", "- 2", "- 3". Ele nao existe no cardapio, que publica "OVO FRITO" — e sem
+# tirar o sufixo cada variante virava um prato diferente, nenhuma casava com o
+# prato publicado, e a declaracao das tres era descartada em silencio.
+VARIANTE = re.compile(r"\s*[-–]\s*\d+\s*$")
+
+
+def sem_variante(nome: str) -> str:
+    """"OVO FRITO - 2" -> "OVO FRITO". Nome sem sufixo passa intacto."""
+    return VARIANTE.sub("", nome or "").strip()
+
+
 @dataclass
 class Recipe:
     """Uma receita da planilha: o prato e o que entra nele."""
@@ -234,7 +246,7 @@ def declarations_by_item(
     por_slug: dict[str, list[Recipe]] = defaultdict(list)
     for receita in receitas.values():
         if receita.name:
-            por_slug[slugify(receita.name)].append(receita)
+            por_slug[slugify(sem_variante(receita.name))].append(receita)
 
     resultado: dict[str, Match] = {}
     for slug, grupo in por_slug.items():
