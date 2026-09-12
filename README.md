@@ -725,15 +725,31 @@ folgada porque o Android recorta o icone na forma do lancador.
 
 ### As cores, e por que o vermelho nao vai para todo lado
 
-A identidade da Apetit e **vermelho `#DE013B`** com **amarelo `#F0DE4D`**. O
-vermelho fica **so na identidade**: barra do app, icone, splash.
+A interface usa o **vermelho `#EC003F`** e o **amarelo `#F5D94E`** já presentes
+no app. O destaque da refeição usa vermelho; o amarelo identifica a ação
+principal. Os demais cartões usam superfícies de grafite, com textos de apoio
+mais claros e navegação inferior persistente.
 
-Dentro da conversa ele nao entra, e a razao e a mesma que move o resto do app.
-O aviso mais importante de todos e o **⛔ "nao pode"**, que tambem e vermelho.
-Se o vermelho da marca estivesse por toda parte, o alerta de alergia viraria
-decoracao — e o custo disso nao e estetico. Por isso o perigo usa um vermelho
-mais fechado (`#9B1B14`) e e o unico vermelho no corpo das mensagens; o amarelo
-da marca fica com os botoes, que e o papel que ele ja tem no site da empresa.
+Os avisos de alergênicos mantêm cores próprias: coral para bloqueio, âmbar para
+confirmação e verde para liberação. Cor, ícone e texto aparecem juntos. A
+reorganização visual não muda os vereditos nem as regras de pontuação.
+
+### Prévia do visual, sem servidor
+
+Baixe e abra [Apetit-previa-visual.html](preview/Apetit-previa-visual.html) no
+navegador. É uma demonstração interativa com os mesmos dados de exemplo do
+`demo/`; refeições e avaliações não são persistidas. Essa versão não instala
+como PWA. Fontes e leitor de PDF dependem de conexão; a navegação usa os dados
+embutidos no arquivo.
+
+O arquivo é gerado, não deve ser editado diretamente. Depois de alterar a
+interface ou os dados de exemplo, atualize-o a partir da raiz do repositório:
+
+```bash
+python scripts/demo_pagina.py --documento preview/Apetit-previa-visual.html
+```
+
+Sem `--documento`, o script mantém o formato de fragmento para incorporação.
 
 ## O relatorio do piloto (`/piloto`)
 

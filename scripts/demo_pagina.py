@@ -1,6 +1,7 @@
 """Empacota a demonstracao numa pagina unica, para virar um link.
 
     python scripts/demo_pagina.py saida.html
+    python scripts/demo_pagina.py --documento preview/Apetit-previa-visual.html
 
 O `demo/` e um PWA de varios arquivos: instala na tela inicial, guarda o
 shell em cache e busca `telas.json` e `dados.json` por HTTP. Isso exige um
@@ -18,9 +19,9 @@ as duas versoes nao divergirem: o que muda e a forma de entregar os dados,
 que o proprio app ja sabe receber por `window.__APETIT__`.
 """
 
+import argparse
 import json
 import re
-import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -53,7 +54,7 @@ def escapar_json(valor) -> str:
     return json.dumps(valor, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
 
 
-def empacotar() -> str:
+def empacotar(documento: bool = False) -> str:
     html = (DEMO / "index.html").read_text(encoding="utf-8")
 
     titulo = re.search(r"<title>(.*?)</title>", html, re.S)
@@ -95,18 +96,38 @@ def empacotar() -> str:
         "regras": json.loads((DEMO / "regras.json").read_text(encoding="utf-8")),
     }
 
-    return (
+    cabeca_final = (
         f"<title>{titulo.group(1)}</title>\n"
         f"{externos}\n"
         f"<style>{estilo.group(1)}</style>\n"
+    )
+    corpo_final = (
         f"<script>window.__APETIT__ = {escapar_json(dados)};</script>\n"
         f"{miolo}\n"
     )
+    if documento:
+        corpo_final = corpo_final.replace(AVISO, (
+            '<div class="instalar on" id="faixa-instalar">'
+            '<p id="instalar-texto">Prévia interativa · Cardápio e perfil de exemplo</p>'
+            '</div>'
+        ))
+        return (
+            '<!doctype html>\n<html lang="pt-BR">\n<head>\n'
+            '<meta charset="utf-8">\n'
+            '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
+            f'{cabeca_final}</head>\n<body>\n{corpo_final}</body>\n</html>\n'
+        )
+    return cabeca_final + corpo_final
 
 
 def main() -> int:
-    saida = Path(sys.argv[1] if len(sys.argv) > 1 else "apetit.html")
-    pagina = empacotar()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("saida", nargs="?", default="apetit.html")
+    parser.add_argument("--documento", action="store_true",
+                        help="Gera um HTML completo para abrir diretamente no navegador.")
+    args = parser.parse_args()
+    saida = Path(args.saida)
+    pagina = empacotar(documento=args.documento)
     saida.write_text(pagina, encoding="utf-8")
     print(f"{saida}: {len(pagina) / 1024:.0f} KB numa pagina so")
     return 0
