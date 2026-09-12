@@ -723,6 +723,18 @@ Os icones sao desenhados em codigo (`scripts/demo_icone.py`) em vez de virarem
 binario solto: da para mudar a cor numa linha, e o `maskable` sai com margem
 folgada porque o Android recorta o icone na forma do lancador.
 
+### As cores, e por que o vermelho nao vai para todo lado
+
+A identidade da Apetit e **vermelho `#DE013B`** com **amarelo `#F0DE4D`**. O
+vermelho fica **so na identidade**: barra do app, icone, splash.
+
+Dentro da conversa ele nao entra, e a razao e a mesma que move o resto do app.
+O aviso mais importante de todos e o **⛔ "nao pode"**, que tambem e vermelho.
+Se o vermelho da marca estivesse por toda parte, o alerta de alergia viraria
+decoracao — e o custo disso nao e estetico. Por isso o perigo usa um vermelho
+mais fechado (`#9B1B14`) e e o unico vermelho no corpo das mensagens; o amarelo
+da marca fica com os botoes, que e o papel que ele ja tem no site da empresa.
+
 ## O relatorio do piloto (`/piloto`)
 
 O piloto responde uma pergunta: **isso funciona na vida real do refeitorio?**

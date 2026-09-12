@@ -15,8 +15,11 @@ borda perde pedaco.
 import sys
 from pathlib import Path
 
-VERDE = (46, 107, 67)
-CREME = (241, 243, 239)
+# As cores da marca Apetit, tiradas do site: vermelho da faixa e amarelo dos
+# botoes. O talher sai branco, como o logo.
+VERMELHO = (222, 1, 59)      # #DE013B
+AMARELO = (240, 222, 77)     # #F0DE4D
+BRANCO = (255, 255, 255)
 
 
 def desenha(tamanho: int, margem: float = 0.0):
@@ -30,7 +33,7 @@ def desenha(tamanho: int, margem: float = 0.0):
     d = ImageDraw.Draw(img)
 
     raio = int(lado * 0.22)
-    d.rounded_rectangle([0, 0, lado - 1, lado - 1], radius=raio, fill=VERDE)
+    d.rounded_rectangle([0, 0, lado - 1, lado - 1], radius=raio, fill=VERMELHO)
 
     # Area util: o maskable reserva margem para o recorte do lancador.
     centro = lado / 2
@@ -41,12 +44,12 @@ def desenha(tamanho: int, margem: float = 0.0):
     largura = max(1, int(util * 0.035))
     d.ellipse(
         [centro - r_prato, centro - r_prato, centro + r_prato, centro + r_prato],
-        outline=CREME, width=largura,
+        outline=BRANCO, width=largura,
     )
     r_fundo = util * 0.175
     d.ellipse(
         [centro - r_fundo, centro - r_fundo, centro + r_fundo, centro + r_fundo],
-        fill=CREME,
+        fill=AMARELO,
     )
 
     # Garfo a esquerda: tres dentes, cabo. Some no tamanho pequeno, mas da a
@@ -57,13 +60,13 @@ def desenha(tamanho: int, margem: float = 0.0):
     esp = max(1, int(util * 0.028))
     for i in (-1, 0, 1):
         dx = x + i * util * 0.055
-        d.line([(dx, topo), (dx, topo + dente_h)], fill=CREME, width=esp)
-    d.line([(x, topo + dente_h), (x, centro + util * 0.28)], fill=CREME, width=int(esp * 1.6))
+        d.line([(dx, topo), (dx, topo + dente_h)], fill=BRANCO, width=esp)
+    d.line([(x, topo + dente_h), (x, centro + util * 0.28)], fill=BRANCO, width=int(esp * 1.6))
 
     # Faca a direita: lamina e cabo.
     xf = centro + util * 0.40
-    d.line([(xf, topo), (xf, topo + dente_h * 1.5)], fill=CREME, width=int(esp * 2.2))
-    d.line([(xf, topo + dente_h * 1.5), (xf, centro + util * 0.28)], fill=CREME, width=int(esp * 1.6))
+    d.line([(xf, topo), (xf, topo + dente_h * 1.5)], fill=BRANCO, width=int(esp * 2.2))
+    d.line([(xf, topo + dente_h * 1.5), (xf, centro + util * 0.28)], fill=BRANCO, width=int(esp * 1.6))
 
     return img.resize((tamanho, tamanho), 1)  # LANCZOS
 

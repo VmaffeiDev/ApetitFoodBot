@@ -7,8 +7,8 @@
 <meta name="description" content="Demonstração do acompanhamento nutricional do refeitório Apetit.">
 
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#2E6B43" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0E1310" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#DE013B" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#B8022F" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -22,54 +22,88 @@
 
 <style>
 :root{
-  --ground:#F1F3EF;
+  /* Cores da Apetit: vermelho #DE013B e amarelo #F0DE4D, do site da empresa.
+     O vermelho da marca fica **so na identidade** — barra do app, icone,
+     splash. Dentro da conversa ele nao aparece, e por um motivo: o aviso mais
+     importante do app e o ⛔ "nao pode", que tambem e vermelho. Se o vermelho
+     da marca estivesse por toda parte, o alerta de alergia viraria decoracao.
+     Por isso o perigo usa um vermelho mais fechado (--perigo), e e o unico
+     vermelho que aparece no corpo das mensagens. */
+  --marca:#DE013B;
+  --marca-ink:#FFFFFF;
+  --acao:#F0DE4D;
+  --acao-ink:#2B2118;
+  --acao-soft:#FDF7D6;
+  --acao-linha:#E6D585;
+
+  --ground:#F5F2F0;
   --surface:#FFFFFF;
-  --chat:#E4EAE1;
+  --chat:#EDE6E5;
   --bubble:#FFFFFF;
-  --ink:#161F19;
-  --muted:#5C6B61;
-  --faint:#7E8C82;
-  --line:#D6DCD2;
-  --line-soft:#E4E9E0;
-  --accent:#2E6B43;
-  --accent-ink:#FFFFFF;
-  --accent-soft:#E3EFE6;
-  --barra:#2E6B43;
-  --barra-ink:#FFFFFF;
+  --ink:#241A1C;
+  --muted:#6B5B5E;
+  --faint:#8C7C7F;
+  --line:#DFD5D5;
+  --line-soft:#EBE3E2;
+
+  --perigo:#9B1B14;
+  --perigo-soft:#F8E6E4;
+  --atencao:#875E00;
+  --atencao-soft:#F7ECD7;
+  --ok:#1F6B3F;
+  --ok-soft:#E4EFE8;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --ground:#0E1310;
-    --surface:#161D18;
-    --chat:#121814;
-    --bubble:#1C2520;
-    --ink:#E5ECE6;
-    --muted:#9AAA9E;
-    --faint:#7F8F84;
-    --line:#27312B;
-    --line-soft:#1F2822;
-    --accent:#74C28A;
-    --accent-ink:#0E1310;
-    --accent-soft:#182B1E;
-    --barra:#161D18;
-    --barra-ink:#E5ECE6;
+    --marca:#B8022F;
+    --marca-ink:#FFFFFF;
+    --acao:#F0DE4D;
+    --acao-ink:#241A1C;
+    --acao-soft:#2C2617;
+    --acao-linha:#5A4F24;
+
+    --ground:#141011;
+    --surface:#1C1718;
+    --chat:#171213;
+    --bubble:#221C1D;
+    --ink:#EDE6E6;
+    --muted:#A99B9D;
+    --faint:#8C7E80;
+    --line:#2E2627;
+    --line-soft:#241E1F;
+
+    --perigo:#F0918A;
+    --perigo-soft:#35191A;
+    --atencao:#DCA745;
+    --atencao-soft:#2E2513;
+    --ok:#6FBF85;
+    --ok-soft:#16281C;
   }
 }
 :root[data-theme="dark"]{
-  --ground:#0E1310;
-  --surface:#161D18;
-  --chat:#121814;
-  --bubble:#1C2520;
-  --ink:#E5ECE6;
-  --muted:#9AAA9E;
-  --faint:#7F8F84;
-  --line:#27312B;
-  --line-soft:#1F2822;
-  --accent:#74C28A;
-  --accent-ink:#0E1310;
-  --accent-soft:#182B1E;
-  --barra:#161D18;
-  --barra-ink:#E5ECE6;
+  --marca:#B8022F;
+  --marca-ink:#FFFFFF;
+  --acao:#F0DE4D;
+  --acao-ink:#241A1C;
+  --acao-soft:#2C2617;
+  --acao-linha:#5A4F24;
+
+  --ground:#141011;
+  --surface:#1C1718;
+  --chat:#171213;
+  --bubble:#221C1D;
+  --ink:#EDE6E6;
+  --muted:#A99B9D;
+  --faint:#8C7E80;
+  --line:#2E2627;
+  --line-soft:#241E1F;
+
+  --perigo:#F0918A;
+  --perigo-soft:#35191A;
+  --atencao:#DCA745;
+  --atencao-soft:#2E2513;
+  --ok:#6FBF85;
+  --ok-soft:#16281C;
 }
 
 *{box-sizing:border-box}
@@ -91,18 +125,18 @@ button{font:inherit}
 /* ---------- barra do app ---------- */
 .barra{
   flex:none;display:flex;align-items:center;gap:11px;
-  background:var(--barra);color:var(--barra-ink);
+  background:var(--marca);color:var(--marca-ink);
   padding:10px 14px;
   padding-top:calc(10px + env(safe-area-inset-top));
   box-shadow:0 1px 0 rgba(0,0,0,.06);
 }
 .marca{
   width:36px;height:36px;border-radius:10px;flex:none;
-  display:grid;place-items:center;background:rgba(255,255,255,.16);
+  display:grid;place-items:center;background:rgba(255,255,255,.18);
   font-size:1.05rem;
 }
-:root[data-theme="dark"] .marca{background:var(--accent-soft)}
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .marca{background:var(--accent-soft)} }
+
+
 .titulo{display:flex;flex-direction:column;line-height:1.25;min-width:0;flex:1}
 .titulo b{font-family:Archivo,sans-serif;font-size:1rem;font-weight:600;letter-spacing:-.01em}
 .titulo span{font-size:.735rem;opacity:.82}
@@ -111,8 +145,8 @@ button{font:inherit}
   width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:.95rem;
   display:grid;place-items:center;flex:none;
 }
-:root[data-theme="dark"] .barra button{background:var(--accent-soft)}
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .barra button{background:var(--accent-soft)} }
+
+
 .barra button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 
 /* ---------- conversa ---------- */
@@ -121,7 +155,7 @@ button{font:inherit}
   padding:15px;display:flex;flex-direction:column;gap:10px;
 }
 .cmd{
-  align-self:flex-end;background:var(--accent);color:var(--accent-ink);
+  align-self:flex-end;background:var(--marca);color:var(--marca-ink);
   font-family:"IBM Plex Mono",monospace;font-size:.78rem;
   padding:6px 11px;border-radius:13px 13px 3px 13px;
 }
@@ -154,24 +188,24 @@ button{font:inherit}
 }
 .key{
   font-size:.875rem;font-weight:500;text-align:left;width:100%;
-  background:var(--accent-soft);color:var(--accent);
-  border:1px solid transparent;border-radius:10px;padding:12px 14px;
+  background:var(--acao-soft);color:var(--ink);
+  border:1px solid var(--acao-linha);border-radius:10px;padding:12px 14px;
   cursor:pointer;transition:background .12s ease,border-color .12s ease,transform .1s ease;
   -webkit-tap-highlight-color:transparent;
 }
 .key:active{transform:scale(.99)}
-.key:hover{background:var(--surface);border-color:var(--accent)}
-.key:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.key.anexo{background:var(--surface);border:1px dashed var(--accent);font-weight:600}
-.key.anexo:hover{background:var(--accent-soft);border-style:solid}
+.key:hover{background:var(--acao);border-color:var(--acao)}
+.key:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
+.key.anexo{background:var(--surface);border:1px dashed var(--marca);color:var(--marca);font-weight:600}
+.key.anexo:hover{background:var(--perigo-soft);border-style:solid}
 .key[disabled]{opacity:.45;cursor:default}
-.key[disabled]:hover{background:var(--accent-soft);border-color:transparent}
+.key[disabled]:hover{background:var(--acao-soft);border-color:var(--acao-linha)}
 .key .tag{float:right;font-family:"IBM Plex Mono",monospace;font-size:.65rem;color:var(--faint);padding-left:8px}
 .voltar{
   background:none;color:var(--muted);border:1px solid var(--line);
   font-weight:400;font-size:.82rem;padding:9px 14px;
 }
-.voltar:hover{background:none;border-color:var(--accent);color:var(--accent)}
+.voltar:hover{background:none;border-color:var(--marca);color:var(--marca)}
 
 /* ---------- folha de contexto ---------- */
 dialog{
@@ -199,32 +233,26 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
 .folha dt{color:var(--faint)}
 .folha dd{margin:0}
 .folha .fechar{
-  width:100%;margin-top:20px;background:var(--accent);color:var(--accent-ink);
+  width:100%;margin-top:20px;background:var(--acao);color:var(--acao-ink);
   border:0;border-radius:10px;padding:13px;font-weight:600;cursor:pointer;
 }
 .estados{display:flex;flex-direction:column;gap:7px;margin-top:4px}
 .estado{display:flex;gap:10px;align-items:baseline;font-size:.845rem;padding:9px 12px;border-radius:9px}
 .estado b{white-space:nowrap;font-weight:600}
-.blk{background:#F6E4E2;color:#A3261C}
-.wrn{background:#F7ECD7;color:#875E00}
-.okk{background:var(--accent-soft);color:var(--accent)}
-:root[data-theme="dark"] .blk{background:#331C19;color:#F09287}
-:root[data-theme="dark"] .wrn{background:#2E2513;color:#DCA745}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]) .blk{background:#331C19;color:#F09287}
-  :root:not([data-theme="light"]) .wrn{background:#2E2513;color:#DCA745}
-}
+.blk{background:var(--perigo-soft);color:var(--perigo)}
+.wrn{background:var(--atencao-soft);color:var(--atencao)}
+.okk{background:var(--ok-soft);color:var(--ok)}
 
 /* ---------- convite para instalar ---------- */
 .instalar{
   flex:none;display:none;align-items:center;gap:11px;
-  background:var(--accent-soft);color:var(--ink);
-  padding:11px 14px;border-bottom:1px solid var(--line-soft);font-size:.845rem;
+  background:var(--acao-soft);color:var(--ink);
+  padding:11px 14px;border-bottom:1px solid var(--acao-linha);font-size:.845rem;
 }
 .instalar.on{display:flex}
 .instalar p{margin:0;flex:1}
 .instalar button{
-  background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;
+  background:var(--marca);color:var(--marca-ink);border:0;border-radius:8px;
   padding:8px 13px;font-size:.82rem;font-weight:600;cursor:pointer;flex:none;
 }
 .instalar .nao{background:none;color:var(--faint);font-weight:400;padding:8px 4px}
