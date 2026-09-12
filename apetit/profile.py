@@ -172,7 +172,7 @@ def delete_employee_data(conn: sqlite3.Connection, telegram_id: int) -> None:
     )
     for tabela in (
         "service_rating", "points_event", "favorite", "consumption",
-        "notification_sent", "employee_notification",
+        "notification_sent", "employee_notification", "employee_plan_item",
         "employee_prescription_term", "employee_prescription",
         "employee_free_restriction", "employee_restriction", "employee",
     ):

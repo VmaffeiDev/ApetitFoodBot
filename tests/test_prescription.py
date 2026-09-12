@@ -5,9 +5,16 @@ alguem comer isso". A ficha e documento clinico: ler errado aqui nao e um bug
 de formatacao, e orientacao errada em cima de prescricao de nutricionista.
 """
 
+import sqlite3
 import unittest
 
+from apetit.catalog import init_schema
 from apetit.prescription import (
+    ItemPlano,
+    extract_meal_plan,
+    load_plan_lunch,
+    lunch_from_plan,
+    save_plan_lunch,
     ALMOCO_KCAL_MAX,
     FRACAO_ALMOCO_SUGERIDA,
     Prescription,
@@ -204,3 +211,125 @@ class FichaRealTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PlanoAlimentarTest(unittest.TestCase):
+    """O formato que apareceu no mundo real.
+
+    A ficha da empresa nao traz caloria nenhuma: e um plano alimentar por
+    refeicao, com alimento e medida caseira. Este bloco usa o texto exato que
+    saiu do PDF de verdade.
+    """
+
+    ALMOCO = (
+        "Almoço\n"
+        "Arroz branco cozido4 Colher(es) de sopa cheia(s) (100g)Feijão cozido2 Colher servir cheia\n"
+        "(70g)Peito de frango sem pele grelhado1.5 Filé(s) médio(s) (150g)Salada crua ou\n"
+        "cozida/refogadaÀ vontadeLaranja1 Unidade(s) pequena(s) (90g)\n"
+        "• Opções de substituição para Arroz branco cozido:\n"
+        "Purê de batata inglesa - 5 Colher(es) sopa cheia(s) (175g)\n"
+    )
+
+    def test_it_reads_the_foods_of_the_lunch(self):
+        almoco = lunch_from_plan(extract_meal_plan(self.ALMOCO))
+
+        self.assertEqual(len(almoco), 5)
+        self.assertEqual(almoco[0].nome, "Arroz branco cozido")
+        self.assertEqual(almoco[0].quantidade, 4)
+        self.assertEqual(almoco[0].peso, "100 g")
+
+    def test_a_food_without_a_measure_is_kept_as_a_vontade(self):
+        almoco = lunch_from_plan(extract_meal_plan(self.ALMOCO))
+        salada = [i for i in almoco if "Salada" in i.nome][0]
+
+        self.assertTrue(salada.a_vontade)
+        self.assertIsNone(salada.quantidade)
+        self.assertIn("a vontade", salada.descreve())
+
+    def test_the_substitution_list_does_not_become_lunch(self):
+        # "No lugar do arroz: pure, batata, mandioca" multiplicaria o almoco por
+        # cinco, e o app nao saberia qual foi para o prato.
+        almoco = lunch_from_plan(extract_meal_plan(self.ALMOCO))
+
+        self.assertFalse([i for i in almoco if "Purê" in i.nome])
+
+    def test_decimal_quantities_survive(self):
+        almoco = lunch_from_plan(extract_meal_plan(self.ALMOCO))
+        frango = [i for i in almoco if "frango" in i.nome][0]
+
+        self.assertEqual(frango.quantidade, 1.5)
+        self.assertIn("1.5", frango.descreve())
+
+    def test_meals_are_kept_apart(self):
+        texto = (
+            "Café da manhã\nPão de forma integral2 Fatia(s) (50g)\n"
+            "Almoço\nArroz branco cozido4 Colher(es) de sopa cheia(s) (100g)\n"
+            "Jantar\nOvo de galinha1 Unidade(s) (50g)\n"
+        )
+
+        plano = extract_meal_plan(texto)
+
+        self.assertEqual(set(plano), {"Café da manhã", "Almoço", "Jantar"})
+        self.assertEqual(lunch_from_plan(plano)[0].nome, "Arroz branco cozido")
+
+    def test_a_volume_without_parentheses_does_not_swallow_the_next_food(self):
+        # "Café150mlBanana1 Unidade (45g)" — sem separador, o café engolia a
+        # banana e virava um item so.
+        plano = extract_meal_plan("Café da manhã\nCafé150mlBanana1 Unidade(s) (45g)\n")
+        itens = plano["Café da manhã"]
+
+        self.assertEqual([i.nome for i in itens], ["Café", "Banana"])
+
+    def test_the_signature_footer_is_not_a_food(self):
+        texto = (
+            "Almoço\nArroz branco cozido4 Colher(es) de sopa cheia(s) (100g)\n"
+            "Digitally signed by ANA ENDRICA LIMA BARRETO:609.892.653-07-\n"
+            "12/03/2026\nNUTRIÇÃO\n"
+        )
+
+        almoco = lunch_from_plan(extract_meal_plan(texto))
+
+        self.assertEqual([i.nome for i in almoco], ["Arroz branco cozido"])
+
+    def test_a_sheet_with_no_meals_yields_nothing(self):
+        self.assertEqual(extract_meal_plan("VET: 1800 kcal/dia"), {})
+        self.assertEqual(extract_meal_plan(""), {})
+
+
+class PlanoGuardadoTest(unittest.TestCase):
+    def setUp(self):
+        self.conn = sqlite3.connect(":memory:")
+        self.conn.row_factory = sqlite3.Row
+        init_schema(self.conn)
+
+    def tearDown(self):
+        self.conn.close()
+
+    def test_the_lunch_survives_a_round_trip(self):
+        itens = [
+            ItemPlano("Arroz branco cozido", 4, "Colher(es) de sopa cheia(s)", "100 g"),
+            ItemPlano("Salada", None, "a vontade", ""),
+        ]
+
+        save_plan_lunch(self.conn, 1, itens)
+        voltou = load_plan_lunch(self.conn, 1)
+
+        self.assertEqual([i.nome for i in voltou], [i.nome for i in itens])
+        self.assertTrue(voltou[1].a_vontade)
+
+    def test_saving_again_replaces_instead_of_stacking(self):
+        save_plan_lunch(self.conn, 1, [ItemPlano("Arroz", 4, "colheres")])
+        save_plan_lunch(self.conn, 1, [ItemPlano("Macarrao", 2, "colheres")])
+
+        self.assertEqual([i.nome for i in load_plan_lunch(self.conn, 1)], ["Macarrao"])
+
+    def test_deleting_my_data_takes_the_plan_with_it(self):
+        from apetit.profile import Employee, delete_employee_data, save_employee
+
+        save_employee(self.conn, Employee(telegram_id=1, name="M", apetit_unit="SM",
+                                          client_company="I", sector="P", consent_accepted=True))
+        save_plan_lunch(self.conn, 1, [ItemPlano("Arroz", 4, "colheres")])
+
+        delete_employee_data(self.conn, 1)
+
+        self.assertEqual(load_plan_lunch(self.conn, 1), [])

@@ -184,6 +184,19 @@ CREATE TABLE IF NOT EXISTS favorite (
     PRIMARY KEY (telegram_id, item_code)
 );
 
+-- O almoco que o nutricionista prescreveu, alimento por alimento, na medida
+-- que ele escreveu. Fica separado de employee_prescription porque e outra
+-- natureza de ficha: aquela da alvo numerico, esta da lista de alimentos.
+CREATE TABLE IF NOT EXISTS employee_plan_item (
+    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    posicao INTEGER NOT NULL,
+    nome TEXT NOT NULL,
+    quantidade REAL,
+    medida TEXT NOT NULL DEFAULT '',
+    peso TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (telegram_id, posicao)
+);
+
 -- Quais avisos a pessoa aceita receber. A ausencia de linha vale como o
 -- padrao de apetit/nudges.py, entao quem nunca abriu /avisos nao fica sem
 -- resumo nem passa a receber lembrete que nao pediu.

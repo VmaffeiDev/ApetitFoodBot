@@ -18,6 +18,16 @@ Tres regras seguram o resto:
    ficha de 1.800 kcal/dia aplicada ao almoco mandaria a pessoa comer o dia
    inteiro num prato so. Valor diario fica marcado como diario e exige uma
    segunda pergunta.
+Duas formas de ficha chegam, e elas nao se parecem:
+
+- **ficha de meta**: "VET: 1800 kcal/dia, PTN: 90 g". Da um alvo numerico.
+- **plano alimentar**: "Almoco — arroz 4 colheres de sopa, feijao 2 conchas,
+  frango 150 g, salada a vontade". Nao traz caloria nenhuma.
+
+A segunda e a que apareceu no mundo real, e para este app ela e melhor: ja fala
+em concha e colher, que e a lingua da tela "quanto pegar". `extract_meal_plan`
+le esse formato; `extract_prescription` le o outro.
+
 3. **O arquivo nao fica guardado.** Ficha de nutricionista costuma carregar
    peso, diagnostico e historico — dado de saude bem mais sensivel que "objetivo:
    emagrecer". O app extrai os numeros, confirma, guarda os numeros e descarta
@@ -251,6 +261,148 @@ def extract_prescription(texto: str) -> Leitura:
                 leitura.profissional = linha_original.strip()[:80]
 
     return leitura
+
+
+# ---------------------------------------------------------------------------
+# Plano alimentar: a ficha que lista alimento e medida caseira por refeicao
+# ---------------------------------------------------------------------------
+
+REFEICOES = r"(Caf[eé] da manh[ãa]|Cola[çc][ãa]o|Almo[çc]o|Lanche(?:\s*-\s*Op[çc][ãa]o\s*\d+)?|Jantar|Ceia)"
+
+# O rodape de assinatura digital se repete em toda pagina e cairia no meio dos
+# alimentos.
+RODAPE = re.compile(r"Digitally signed by.*?NUTRI[ÇC][ÃA]O", re.S)
+
+# No PDF os itens vem colados: "Arroz branco cozido4 Colher(es) de sopa cheia(s)
+# (100g)Feijao cozido2 Colher servir cheia(70g)". Nao ha separador — o que
+# marca o fim de um item e o peso entre parenteses, o "a vontade" ou um volume
+# solto. Entao a leitura acha essas ancoras e corta entre elas.
+ANCORA = re.compile(
+    r"\((\d+(?:[.,]\d+)?)\s*(g|ml)\)"      # (100g) / (250ml)
+    r"|(À\s*vontade|A\s*vontade)"           # salada a vontade
+    r"|(\d+(?:[.,]\d+)?)\s*ml",             # 150ml solto
+    re.I,
+)
+QUANTIDADE = re.compile(r"^(?P<nome>.*?)\s*(?P<qtd>\d+(?:[.,]\d+)?)\s*(?P<medida>.*)$", re.S)
+
+
+@dataclass
+class ItemPlano:
+    """Um alimento do plano, na medida que o nutricionista escreveu."""
+
+    nome: str
+    quantidade: float | None = None
+    medida: str = ""
+    peso: str = ""
+
+    @property
+    def a_vontade(self) -> bool:
+        return self.medida == "a vontade"
+
+    def descreve(self) -> str:
+        if self.a_vontade:
+            return f"{self.nome} — a vontade"
+        partes = []
+        if self.quantidade is not None:
+            numero = f"{self.quantidade:g}"
+            partes.append(f"{numero} {self.medida}".strip())
+        elif self.medida:
+            partes.append(self.medida)
+        if self.peso:
+            partes.append(f"({self.peso})")
+        return f"{self.nome} — {' '.join(partes)}" if partes else self.nome
+
+
+def extract_meal_plan(texto: str) -> dict[str, list[ItemPlano]]:
+    """Le um plano alimentar e devolve os alimentos de cada refeicao.
+
+    So o que o nutricionista pediu entra: as listas de substituicao ("no lugar
+    do arroz, pure ou batata") ficam de fora, porque elas multiplicariam o
+    almoco por cinco e o app nao saberia qual foi para o prato.
+    """
+    if not texto:
+        return {}
+    texto = RODAPE.sub("\n", texto)
+    cabecalhos = list(re.finditer(rf"^\s*{REFEICOES}\s*$", texto, re.M | re.I))
+
+    plano: dict[str, list[ItemPlano]] = {}
+    for i, cabecalho in enumerate(cabecalhos):
+        fim = cabecalhos[i + 1].start() if i + 1 < len(cabecalhos) else len(texto)
+        corpo = texto[cabecalho.end():fim]
+        corte = corpo.find("•")          # dali para baixo sao as substituicoes
+        itens = _itens_do_bloco(corpo[:corte] if corte > 0 else corpo)
+        if itens:
+            plano[cabecalho.group(1).strip()] = itens
+    return plano
+
+
+def _itens_do_bloco(bloco: str) -> list[ItemPlano]:
+    bloco = re.sub(r"\s*\n\s*", " ", bloco).strip()
+    itens: list[ItemPlano] = []
+    pos = 0
+    for ancora in ANCORA.finditer(bloco):
+        trecho = bloco[pos:ancora.start()].strip()
+        pos = ancora.end()
+        if not trecho:
+            continue
+
+        partido = QUANTIDADE.match(trecho)
+        if partido and partido.group("nome").strip():
+            nome = partido.group("nome").strip()
+            quantidade = parse_number(partido.group("qtd"))
+            medida = partido.group("medida").strip()
+        else:
+            nome, quantidade, medida = trecho, None, ""
+
+        if ancora.group(3):              # "a vontade" nao tem quantidade
+            medida, quantidade = "a vontade", None
+            peso = ""
+        elif ancora.group(1):
+            peso = f"{ancora.group(1)} {ancora.group(2).lower()}"
+        else:
+            peso = f"{ancora.group(4)} ml"
+
+        nome = nome.strip(" -•\t")
+        if nome:
+            itens.append(ItemPlano(nome=nome, quantidade=quantidade, medida=medida, peso=peso))
+    return itens
+
+
+def lunch_from_plan(plano: dict[str, list[ItemPlano]]) -> list[ItemPlano]:
+    """O almoco do plano, que e a refeicao que este app acompanha."""
+    for nome, itens in plano.items():
+        if re.search(r"almo[çc]o", nome, re.I):
+            return itens
+    return []
+
+
+def save_plan_lunch(conn, telegram_id: int, itens: list[ItemPlano]) -> None:
+    """Guarda o almoco prescrito. Como sempre, o documento nao entra."""
+    conn.execute("DELETE FROM employee_plan_item WHERE telegram_id = ?", (telegram_id,))
+    for posicao, item in enumerate(itens):
+        conn.execute(
+            "INSERT INTO employee_plan_item (telegram_id, posicao, nome, quantidade, medida, peso) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (telegram_id, posicao, item.nome, item.quantidade, item.medida, item.peso),
+        )
+    conn.commit()
+
+
+def load_plan_lunch(conn, telegram_id: int) -> list[ItemPlano]:
+    linhas = conn.execute(
+        "SELECT nome, quantidade, medida, peso FROM employee_plan_item "
+        "WHERE telegram_id = ? ORDER BY posicao",
+        (telegram_id,),
+    ).fetchall()
+    return [
+        ItemPlano(nome=l["nome"], quantidade=l["quantidade"], medida=l["medida"], peso=l["peso"])
+        for l in linhas
+    ]
+
+
+def delete_plan_lunch(conn, telegram_id: int) -> None:
+    conn.execute("DELETE FROM employee_plan_item WHERE telegram_id = ?", (telegram_id,))
+    conn.commit()
 
 
 def save_prescription(conn, telegram_id: int, ficha: Prescription) -> None:

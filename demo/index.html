@@ -16,6 +16,9 @@
 <meta name="apple-mobile-web-app-title" content="Apetit">
 <meta name="mobile-web-app-capable" content="yes">
 
+<!-- pdf.js na build UMD, que define window.pdfjsLib. Se nao carregar, o app
+     cai no exemplo pronto em vez de quebrar: ver `lerPdf` no script. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
@@ -281,6 +284,7 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
   </div>
 
   <main class="chat" id="chat" aria-live="polite"></main>
+  <input type="file" id="arquivo-pdf" accept="application/pdf,.pdf" hidden>
   <nav class="keys" id="keys" aria-label="Opções"></nav>
 </div>
 
@@ -354,11 +358,18 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
       cmd.textContent = tela.comando;
       chat.appendChild(cmd);
     }
+    if (tela.arquivo){
+      var meu = document.createElement("div");
+      meu.className = "arquivo";
+      meu.innerHTML = '<span aria-hidden="true">\u{1F4C4}</span><b></b><em>enviado</em>';
+      meu.querySelector("b").textContent = tela.arquivo;
+      chat.appendChild(meu);
+    }
     if (tela.caminho && tela.caminho[tela.caminho.length - 1] === "__anexar_pdf__"){
       var arq = document.createElement("div");
       arq.className = "arquivo";
       arq.innerHTML = '<span aria-hidden="true">\u{1F4C4}</span>' +
-        '<b>ficha_nutricionista.pdf</b><em>enviado</em>';
+        '<b>ficha_nutricionista.pdf</b><em>exemplo</em>';
       chat.appendChild(arq);
     }
 
@@ -367,12 +378,23 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
     bolha.innerHTML = render(tela.texto);
     chat.appendChild(bolha);
 
-    (tela.botoes || []).forEach(function(b){
+    // A tela que explica o clipe ganha o anexo de verdade: e ali que a pessoa
+    // procura, e mandar ela para um exemplo pronto seria responder outra coisa.
+    var botoes = (tela.botoes || []).slice();
+    if (tela.caminho && tela.caminho[tela.caminho.length - 1] === "ficha_pdf"){
+      botoes.unshift({ rotulo: "\u{1F4CE} Anexar a minha ficha (PDF)", acao: "__anexar_meu__", destino: "" });
+    }
+    botoes.forEach(function(b){
       var btn = document.createElement("button");
       btn.className = "key";
       btn.type = "button";
       btn.textContent = b.rotulo;
-      if (b.acao === "__anexar_pdf__") btn.classList.add("anexo");
+      if (b.acao === "__anexar_pdf__" || b.acao === "__anexar_meu__") btn.classList.add("anexo");
+      if (b.acao === "__anexar_meu__"){
+        btn.addEventListener("click", function(){ entradaArquivo().click(); });
+        keys.appendChild(btn);
+        return;
+      }
       if (b.destino && TELAS[b.destino]){
         btn.addEventListener("click", function(){ mostrar(b.destino); });
       } else {
@@ -404,6 +426,8 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
       ? "visão da Apetit · agregada" : "segunda-feira, 1 de setembro";
     chat.scrollTop = 0;
   }
+
+  function entradaArquivo(){ return document.getElementById("arquivo-pdf"); }
 
   var folha = document.getElementById("folha");
   document.getElementById("info").addEventListener("click", function(){
@@ -458,6 +482,162 @@ dialog::backdrop{background:rgba(10,16,12,.55)}
       navigator.serviceWorker.register("sw.js").catch(function(){ /* segue sem offline */ });
     });
   }
+
+  // ---------- ler a ficha que a pessoa anexar ----------
+  //
+  // O bot le PDF em Python. Aqui, para a pessoa poder testar com a ficha dela
+  // sem o bot no ar, a mesma leitura roda no navegador — e as regras vem de
+  // `regras.json`, gerado do proprio `apetit/prescription.py`. Duplicar regex
+  // em dois idiomas seria o caminho mais curto para as duas leituras
+  // discordarem justamente no documento de alguem.
+  var REGRAS = null;
+  fetch("regras.json").then(function(r){ return r.json(); })
+    .then(function(d){ REGRAS = d; }).catch(function(){ /* segue sem anexo */ });
+
+  function re(padrao, flags){
+    // Python nomeia grupo com (?P<x>...); JS usa (?<x>...).
+    return new RegExp(String(padrao).replace(/\(\?P</g, "(?<"), flags || "");
+  }
+
+  async function lerPdf(arquivo){
+    if (!window.pdfjsLib) throw new Error("leitor-indisponivel");
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    var buffer = await arquivo.arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    var partes = [];
+    for (var n = 1; n <= pdf.numPages; n++){
+      var pagina = await pdf.getPage(n);
+      var conteudo = await pagina.getTextContent();
+      // Um item por linha aproxima o que o pypdf devolve, que e o formato que
+      // as regras esperam.
+      partes.push(conteudo.items.map(function(i){ return i.str; }).join("\n"));
+    }
+    return partes.join("\n");
+  }
+
+  function planoDoTexto(texto){
+    if (!REGRAS) return [];
+    texto = texto.replace(re(REGRAS.rodape, "gs"), "\n");
+    var cabecalho = re("^\\s*" + REGRAS.refeicoes + "\\s*$", "gmi");
+    var marcas = [], m;
+    while ((m = cabecalho.exec(texto)) !== null){
+      marcas.push({ nome: m[1], inicio: m.index, fim: cabecalho.lastIndex });
+    }
+    var almoco = null;
+    for (var i = 0; i < marcas.length; i++){
+      if (!/almo[çc]o/i.test(marcas[i].nome)) continue;
+      var ate = (i + 1 < marcas.length) ? marcas[i+1].inicio : texto.length;
+      almoco = texto.slice(marcas[i].fim, ate);
+      break;
+    }
+    if (almoco === null) return [];
+    var corte = almoco.indexOf("•");
+    return itensDoBloco(corte > 0 ? almoco.slice(0, corte) : almoco);
+  }
+
+  function itensDoBloco(bloco){
+    bloco = bloco.replace(/\s*\n\s*/g, " ").trim();
+    var ancora = re(REGRAS.ancora, "gi");
+    var quantidade = re(REGRAS.quantidade, "s");
+    var itens = [], pos = 0, m;
+    while ((m = ancora.exec(bloco)) !== null){
+      var trecho = bloco.slice(pos, m.index).trim();
+      pos = ancora.lastIndex;
+      if (!trecho) continue;
+
+      var nome = trecho, qtd = null, medida = "";
+      var partido = quantidade.exec(trecho);
+      if (partido && partido.groups && partido.groups.nome.trim()){
+        nome = partido.groups.nome.trim();
+        qtd = partido.groups.qtd;
+        medida = partido.groups.medida.trim();
+      }
+      var peso = "";
+      if (m[3]){ medida = "a vontade"; qtd = null; }
+      else if (m[1]){ peso = m[1] + " " + m[2].toLowerCase(); }
+      else if (m[4]){ peso = m[4] + " ml"; }
+
+      nome = nome.replace(/^[\s\-•]+|[\s\-•]+$/g, "");
+      if (nome) itens.push({ nome: nome, qtd: qtd, medida: medida, peso: peso });
+    }
+    return itens;
+  }
+
+  function descreve(item){
+    if (item.medida === "a vontade") return item.nome + " — a vontade";
+    var partes = [];
+    if (item.qtd) partes.push((item.qtd + " " + item.medida).trim());
+    else if (item.medida) partes.push(item.medida);
+    if (item.peso) partes.push("(" + item.peso + ")");
+    return partes.length ? item.nome + " — " + partes.join(" ") : item.nome;
+  }
+
+  function telaDoPlano(itens, nomeArquivo){
+    var texto = "\u{1F4CB} <b>Seu nutricionista pediu isso no almoço</b>\n" +
+      "<i>Confira antes de valer.</i>\n\n" +
+      itens.map(function(i){ return "• " + descreve(i); }).join("\n") +
+      "\n\n<i>Sua ficha é um plano alimentar: ela lista alimento e medida, não " +
+      "caloria. Vou usar essa lista para te mostrar o que mais se parece com ela " +
+      "no cardápio de hoje.</i>\n" +
+      "<i>O documento não fica guardado — só esta lista.</i>";
+    TELAS["__minha_ficha__"] = {
+      texto: texto,
+      grupo: "",
+      caminho: ["__minha_ficha__"],
+      arquivo: nomeArquivo,
+      botoes: [
+        { rotulo: "✅ É isso, pode guardar", acao: "ficha_ok", destino: "ficha_ok" },
+        { rotulo: "\u{1F4CE} Anexar outra ficha", acao: "__anexar_meu__", destino: "" },
+        { rotulo: "\u{1F519} Voltar", acao: "ficha", destino: "ficha" }
+      ]
+    };
+    mostrar("__minha_ficha__");
+  }
+
+  function telaDeAviso(titulo, corpo){
+    TELAS["__aviso_ficha__"] = {
+      texto: "<b>" + titulo + "</b>\n\n" + corpo,
+      grupo: "", caminho: ["__aviso_ficha__"],
+      botoes: [
+        { rotulo: "\u{1F4CE} Tentar outro arquivo", acao: "__anexar_meu__", destino: "" },
+        { rotulo: "✍️ Digitar os números", acao: "ficha_manual", destino: "ficha_manual" },
+        { rotulo: "\u{1F519} Voltar", acao: "ficha", destino: "ficha" }
+      ]
+    };
+    mostrar("__aviso_ficha__");
+  }
+
+  var entrada = document.getElementById("arquivo-pdf");
+  entrada.addEventListener("change", async function(){
+    var arquivo = entrada.files && entrada.files[0];
+    entrada.value = "";
+    if (!arquivo) return;
+
+    telaDeAviso("\u{1F4C4} Lendo " + arquivo.name + "…", "Só um instante.");
+    try {
+      var texto = await lerPdf(arquivo);
+      var itens = planoDoTexto(texto);
+      if (itens.length){ telaDoPlano(itens, arquivo.name); return; }
+      telaDeAviso(
+        "Não achei um almoço nessa ficha",
+        "Eu procuro uma seção de <b>Almoço</b> com os alimentos e as medidas.\n\n" +
+        "Se a ficha for foto ou digitalização, o arquivo tem a imagem do texto e " +
+        "não o texto — eu não tento adivinhar letra de imagem, porque errar aqui " +
+        "vira orientação errada a partir de um documento clínico.\n\n" +
+        "Nesse caso, digite os números."
+      );
+    } catch (erro) {
+      telaDeAviso(
+        "Não consegui abrir esse arquivo",
+        erro && erro.message === "leitor-indisponivel"
+          ? "O leitor de PDF não carregou aqui. Use o exemplo pronto para ver o " +
+            "caminho, ou digite os números."
+          : "Ele pode estar protegido por senha ou corrompido. Tente outro arquivo " +
+            "ou digite os números."
+      );
+    }
+  });
 
   // ---------- carga ----------
   fetch("telas.json")

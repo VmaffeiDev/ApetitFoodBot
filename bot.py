@@ -65,13 +65,19 @@ from apetit.pilot import daily_activity, format_report, pilot_report
 from apetit.prescription import (
     FRACAO_ALMOCO_SUGERIDA,
     Campo,
+    ItemPlano,
     Leitura,
     Prescription,
+    delete_plan_lunch,
     delete_prescription,
+    extract_meal_plan,
     extract_prescription,
+    load_plan_lunch,
     load_prescription,
+    lunch_from_plan,
     parse_number,
     read_pdf,
+    save_plan_lunch,
     save_prescription,
 )
 from apetit.spreadsheet import is_spreadsheet, read_spreadsheet_rows
@@ -701,6 +707,22 @@ async def show_portions(update: Update, context: ContextTypes.DEFAULT_TYPE, edit
         linhas.append(
             "\n<i>E uma sugestao com base no que tem hoje e no objetivo que voce escolheu. "
             "Quem define quantidade individual e o nutricionista.</i>"
+        )
+
+    conn = db()
+    try:
+        plano = load_plan_lunch(conn, pessoa.telegram_id)
+    finally:
+        conn.close()
+    if plano:
+        # O plano vem depois da sugestao, e nao no lugar dela: o que o
+        # nutricionista pediu nem sempre esta no cardapio de hoje, e a pessoa
+        # precisa dos dois lado a lado para escolher na fila.
+        linhas.append("\n\U0001f4cb <b>O que seu nutricionista pediu no almoco</b>")
+        linhas.extend(f"• {escape(item.descreve())}" for item in plano)
+        linhas.append(
+            "<i>Compare com o que tem hoje e pegue o que mais se parecer. "
+            "Quem ajusta o plano e o seu nutricionista.</i>"
         )
 
     await reply(
@@ -1404,6 +1426,30 @@ async def show_prescription(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     if not pessoa:
         return
     ficha = prescription_for(pessoa)
+    conn = db()
+    try:
+        plano = load_plan_lunch(conn, pessoa.telegram_id)
+    finally:
+        conn.close()
+
+    if not ficha and plano:
+        linhas = ["\U0001f4cb <b>Seu almoco, pelo plano do nutricionista</b>\n"]
+        linhas.extend(f"• {escape(item.descreve())}" for item in plano)
+        linhas.append(
+            "\n<i>Sua ficha e um plano alimentar: lista alimento e medida, nao "
+            "caloria. O documento nao ficou guardado — so esta lista.</i>"
+        )
+        await reply(
+            update,
+            "\n".join(linhas),
+            [
+                [("\U0001f4ce Mandar outra ficha em PDF", "ficha_pdf")],
+                [("\U0001f5d1️ Remover a ficha", "ficha_remover")],
+                [("\U0001f519 Voltar", "menu")],
+            ],
+            edit=edit,
+        )
+        return
 
     if not ficha:
         await reply(
@@ -1497,6 +1543,19 @@ async def receive_prescription(update: Update, context: ContextTypes.DEFAULT_TYP
     del conteudo
 
     leitura = extract_prescription(texto)
+
+    # Ficha de meta e plano alimentar sao documentos diferentes. A primeira da
+    # numero, o segundo da lista de alimentos — e o segundo e o que apareceu no
+    # mundo real. Se nao veio numero, ainda pode ter vindo o almoco inteiro.
+    almoco = lunch_from_plan(extract_meal_plan(texto))
+    if almoco and not leitura.campos:
+        context.user_data[FICHA] = {
+            "leitura": leitura, "fonte": nome, "fora": [], "escopo": "almoco",
+            "plano": almoco,
+        }
+        await show_plan_reading(update, context, edit=False)
+        return
+
     if leitura.vazia:
         await reply(
             update,
@@ -1557,6 +1616,65 @@ async def show_prescription_reading(update: Update, context: ContextTypes.DEFAUL
     botoes.append([("✅ Esta certo, continuar", "ficha_escopo")])
     botoes.append([("❌ Cancelar", "ficha_cancelar")])
     await reply(update, "\n".join(linhas), botoes, edit=edit)
+
+
+async def show_plan_reading(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = True) -> None:
+    """O almoco que o nutricionista prescreveu, do jeito que ele escreveu.
+
+    Nao ha kcal aqui, e nao faz falta: o plano ja vem em concha e colher, que e
+    a medida que a pessoa usa na fila. Converter isso para caloria seria
+    inventar numero que o documento nao traz.
+    """
+    dados = ficha_pendente(context)
+    plano = dados.get("plano") or []
+    if not plano:
+        await show_prescription(update, context, edit=edit)
+        return
+
+    linhas = [
+        "\U0001f4cb <b>Seu nutricionista pediu isso no almoco</b>",
+        "<i>Confira antes de valer.</i>\n",
+    ]
+    linhas.extend(f"• {escape(item.descreve())}" for item in plano)
+    linhas.append(
+        "\n<i>Sua ficha e um plano alimentar: ela lista alimento e medida, nao "
+        "caloria. Vou usar essa lista para te mostrar o que mais se parece com "
+        "ela no cardapio de hoje.</i>"
+    )
+    linhas.append("<i>O documento nao fica guardado — so esta lista.</i>")
+    await reply(
+        update,
+        "\n".join(linhas),
+        [
+            [("✅ E isso, pode guardar", "ficha_plano_ok")],
+            [("❌ Nao e isso", "ficha_cancelar")],
+        ],
+        edit=edit,
+    )
+
+
+async def save_plan_confirmed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    pessoa = await require_registration(update, context, edit=True)
+    if not pessoa:
+        return
+    plano = ficha_pendente(context).get("plano") or []
+    if not plano:
+        await show_prescription(update, context, edit=True)
+        return
+    conn = db()
+    try:
+        save_plan_lunch(conn, pessoa.telegram_id, plano)
+    finally:
+        conn.close()
+    context.user_data.pop(FICHA, None)
+    await reply(
+        update,
+        "✅ <b>Guardado.</b>\n\n"
+        "Em <b>Quanto pegar hoje</b> eu mostro o seu almoco do plano junto com o "
+        "que tem no refeitorio.",
+        [[("\U0001f957 Quanto pegar hoje", "quanto")], [("\U0001f519 Voltar", "menu")]],
+        edit=True,
+    )
 
 
 async def ask_prescription_scope(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1745,6 +1863,7 @@ async def remove_prescription(update: Update, context: ContextTypes.DEFAULT_TYPE
     conn = db()
     try:
         delete_prescription(conn, pessoa.telegram_id)
+        delete_plan_lunch(conn, pessoa.telegram_id)
     finally:
         conn.close()
     await reply(
@@ -2788,6 +2907,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
         if data == "ficha_ok":
             await save_prescription_confirmed(update, context)
+            return
+        if data == "ficha_plano_ok":
+            await save_plan_confirmed(update, context)
             return
         if data == "ficha_remover":
             await reply(
