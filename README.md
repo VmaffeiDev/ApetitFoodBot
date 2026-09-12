@@ -693,6 +693,36 @@ exige cuidado alem do aviso de consentimento:
 - `/excluir_dados` apaga cadastro, restricoes, consumo, favoritos, pontos e ficha
 - a ficha do nutricionista entra como **numeros**: o documento nao e guardado
 
+## Demonstracao instalavel no celular (`demo/`)
+
+O bot vive no Telegram, e para o piloto as 15 pessoas precisam ver o app antes
+de existir bot no ar. A pasta `demo/` e um **PWA**: abre no navegador do
+celular, instala na tela inicial e roda em tela cheia, sem barra de navegador —
+"como se ja estivesse instalado".
+
+```powershell
+python scripts/demo_telas.py demo/telas.json Receitas-Cardapio-Nutri.xlsx
+python scripts/demo_icone.py demo/
+cd demo; python -m http.server        # http://localhost:8000
+```
+
+As telas sao **geradas rodando o `bot.py` de verdade** (ver `scripts/demo_telas.py`),
+entao o simulador nao envelhece sozinho: mudou o bot, roda o script de novo.
+
+O `sw.js` existe por dois motivos. Sem service worker o navegador nao oferece
+instalar na tela inicial. E o refeitorio costuma ter sinal ruim: um "app" que
+abre em branco no subsolo da fabrica nao demonstra nada, entao o shell fica em
+cache e abre sempre. Os dados das telas vao por rede primeiro, para uma
+republicacao chegar sem reinstalar.
+
+**Precisa de HTTPS.** Service worker e instalacao so funcionam em origem segura
+— `localhost` no desenvolvimento, e um host com TLS para as 15 pessoas. Servido
+de dentro de um iframe nao instala: a instalacao sai do documento de topo.
+
+Os icones sao desenhados em codigo (`scripts/demo_icone.py`) em vez de virarem
+binario solto: da para mudar a cor numa linha, e o `maskable` sai com margem
+folgada porque o Android recorta o icone na forma do lancador.
+
 ## O relatorio do piloto (`/piloto`)
 
 O piloto responde uma pergunta: **isso funciona na vida real do refeitorio?**
@@ -844,6 +874,7 @@ apetit/
   recipes.py     alergenico deduzido da lista de ingredientes
   pilot.py       relatorio do piloto, sem individualizar ninguem
 bot.py           camada do Telegram
+demo/            PWA de demonstracao, instalavel no celular
 LICENSE          todos os direitos reservados
 Dockerfile       imagem, com o banco em /data
 render.yaml      blueprint do Render, ja com disco persistente

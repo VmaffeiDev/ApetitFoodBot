@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Apetit · Nutrição</title>
+<meta name="description" content="Demonstração do acompanhamento nutricional do refeitório Apetit.">
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2E6B43" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1310" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Apetit">
+<meta name="mobile-web-app-capable" content="yes">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+:root{
+  --ground:#F1F3EF;
+  --surface:#FFFFFF;
+  --chat:#E4EAE1;
+  --bubble:#FFFFFF;
+  --ink:#161F19;
+  --muted:#5C6B61;
+  --faint:#7E8C82;
+  --line:#D6DCD2;
+  --line-soft:#E4E9E0;
+  --accent:#2E6B43;
+  --accent-ink:#FFFFFF;
+  --accent-soft:#E3EFE6;
+  --barra:#2E6B43;
+  --barra-ink:#FFFFFF;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0E1310;
+    --surface:#161D18;
+    --chat:#121814;
+    --bubble:#1C2520;
+    --ink:#E5ECE6;
+    --muted:#9AAA9E;
+    --faint:#7F8F84;
+    --line:#27312B;
+    --line-soft:#1F2822;
+    --accent:#74C28A;
+    --accent-ink:#0E1310;
+    --accent-soft:#182B1E;
+    --barra:#161D18;
+    --barra-ink:#E5ECE6;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0E1310;
+  --surface:#161D18;
+  --chat:#121814;
+  --bubble:#1C2520;
+  --ink:#E5ECE6;
+  --muted:#9AAA9E;
+  --faint:#7F8F84;
+  --line:#27312B;
+  --line-soft:#1F2822;
+  --accent:#74C28A;
+  --accent-ink:#0E1310;
+  --accent-soft:#182B1E;
+  --barra:#161D18;
+  --barra-ink:#E5ECE6;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--chat);color:var(--ink);
+  font-family:"IBM Plex Sans", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:none;
+}
+button{font:inherit}
+
+.app{
+  display:flex;flex-direction:column;
+  height:100dvh;max-width:560px;margin:0 auto;
+  background:var(--chat);
+}
+
+/* ---------- barra do app ---------- */
+.barra{
+  flex:none;display:flex;align-items:center;gap:11px;
+  background:var(--barra);color:var(--barra-ink);
+  padding:10px 14px;
+  padding-top:calc(10px + env(safe-area-inset-top));
+  box-shadow:0 1px 0 rgba(0,0,0,.06);
+}
+.marca{
+  width:36px;height:36px;border-radius:10px;flex:none;
+  display:grid;place-items:center;background:rgba(255,255,255,.16);
+  font-size:1.05rem;
+}
+:root[data-theme="dark"] .marca{background:var(--accent-soft)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .marca{background:var(--accent-soft)} }
+.titulo{display:flex;flex-direction:column;line-height:1.25;min-width:0;flex:1}
+.titulo b{font-family:Archivo,sans-serif;font-size:1rem;font-weight:600;letter-spacing:-.01em}
+.titulo span{font-size:.735rem;opacity:.82}
+.barra button{
+  background:rgba(255,255,255,.14);color:inherit;border:0;
+  width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:.95rem;
+  display:grid;place-items:center;flex:none;
+}
+:root[data-theme="dark"] .barra button{background:var(--accent-soft)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .barra button{background:var(--accent-soft)} }
+.barra button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+
+/* ---------- conversa ---------- */
+.chat{
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:15px;display:flex;flex-direction:column;gap:10px;
+}
+.cmd{
+  align-self:flex-end;background:var(--accent);color:var(--accent-ink);
+  font-family:"IBM Plex Mono",monospace;font-size:.78rem;
+  padding:6px 11px;border-radius:13px 13px 3px 13px;
+}
+.arquivo{
+  align-self:flex-end;display:flex;align-items:center;gap:8px;
+  background:var(--surface);border:1px solid var(--line);
+  padding:8px 12px;border-radius:13px 13px 3px 13px;font-size:.8rem;
+}
+.arquivo b{font-weight:600}
+.arquivo em{color:var(--faint);font-size:.72rem;font-style:normal}
+.bubble{
+  align-self:flex-start;max-width:97%;
+  background:var(--bubble);border-radius:3px 14px 14px 14px;padding:13px 15px;
+  font-size:.92rem;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;
+  box-shadow:0 1px 2px rgba(22,31,25,.07), 0 6px 16px -12px rgba(22,31,25,.35);
+}
+.bubble.mono{
+  align-self:stretch;max-width:100%;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.7rem;line-height:1.5;
+  white-space:pre;overflow-x:auto;
+}
+.bubble b{font-weight:600}
+
+/* ---------- teclado ---------- */
+.keys{
+  flex:none;display:flex;flex-direction:column;gap:6px;
+  padding:10px 12px;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  background:var(--surface);border-top:1px solid var(--line-soft);
+}
+.key{
+  font-size:.875rem;font-weight:500;text-align:left;width:100%;
+  background:var(--accent-soft);color:var(--accent);
+  border:1px solid transparent;border-radius:10px;padding:12px 14px;
+  cursor:pointer;transition:background .12s ease,border-color .12s ease,transform .1s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.key:active{transform:scale(.99)}
+.key:hover{background:var(--surface);border-color:var(--accent)}
+.key:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.key.anexo{background:var(--surface);border:1px dashed var(--accent);font-weight:600}
+.key.anexo:hover{background:var(--accent-soft);border-style:solid}
+.key[disabled]{opacity:.45;cursor:default}
+.key[disabled]:hover{background:var(--accent-soft);border-color:transparent}
+.key .tag{float:right;font-family:"IBM Plex Mono",monospace;font-size:.65rem;color:var(--faint);padding-left:8px}
+.voltar{
+  background:none;color:var(--muted);border:1px solid var(--line);
+  font-weight:400;font-size:.82rem;padding:9px 14px;
+}
+.voltar:hover{background:none;border-color:var(--accent);color:var(--accent)}
+
+/* ---------- folha de contexto ---------- */
+dialog{
+  border:0;padding:0;background:transparent;max-width:100%;width:100%;
+  margin:auto auto 0;
+}
+dialog::backdrop{background:rgba(10,16,12,.55)}
+.folha{
+  background:var(--surface);color:var(--ink);
+  border-radius:18px 18px 0 0;padding:22px 20px;
+  padding-bottom:calc(22px + env(safe-area-inset-bottom));
+  max-width:560px;margin:0 auto;max-height:86dvh;overflow-y:auto;
+}
+.folha h2{
+  font-family:Archivo,sans-serif;font-size:1.1rem;font-weight:700;
+  letter-spacing:-.015em;margin:0 0 4px;
+}
+.folha h3{
+  font-family:"IBM Plex Mono",monospace;font-size:.68rem;font-weight:500;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
+  margin:22px 0 8px;
+}
+.folha p{margin:0 0 10px;font-size:.875rem;color:var(--muted)}
+.folha dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:0;font-size:.865rem}
+.folha dt{color:var(--faint)}
+.folha dd{margin:0}
+.folha .fechar{
+  width:100%;margin-top:20px;background:var(--accent);color:var(--accent-ink);
+  border:0;border-radius:10px;padding:13px;font-weight:600;cursor:pointer;
+}
+.estados{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.estado{display:flex;gap:10px;align-items:baseline;font-size:.845rem;padding:9px 12px;border-radius:9px}
+.estado b{white-space:nowrap;font-weight:600}
+.blk{background:#F6E4E2;color:#A3261C}
+.wrn{background:#F7ECD7;color:#875E00}
+.okk{background:var(--accent-soft);color:var(--accent)}
+:root[data-theme="dark"] .blk{background:#331C19;color:#F09287}
+:root[data-theme="dark"] .wrn{background:#2E2513;color:#DCA745}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .blk{background:#331C19;color:#F09287}
+  :root:not([data-theme="light"]) .wrn{background:#2E2513;color:#DCA745}
+}
+
+/* ---------- convite para instalar ---------- */
+.instalar{
+  flex:none;display:none;align-items:center;gap:11px;
+  background:var(--accent-soft);color:var(--ink);
+  padding:11px 14px;border-bottom:1px solid var(--line-soft);font-size:.845rem;
+}
+.instalar.on{display:flex}
+.instalar p{margin:0;flex:1}
+.instalar button{
+  background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;
+  padding:8px 13px;font-size:.82rem;font-weight:600;cursor:pointer;flex:none;
+}
+.instalar .nao{background:none;color:var(--faint);font-weight:400;padding:8px 4px}
+
+@media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important} }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="barra">
+    <div class="marca" aria-hidden="true">🍽️</div>
+    <div class="titulo">
+      <b>Apetit · Nutrição</b>
+      <span id="sub">segunda-feira, 1 de setembro</span>
+    </div>
+    <button id="info" type="button" aria-label="Sobre esta demonstração">ⓘ</button>
+  </header>
+
+  <div class="instalar" id="faixa-instalar">
+    <p id="instalar-texto">Instale na tela inicial e use como aplicativo.</p>
+    <button id="btn-instalar" type="button">Instalar</button>
+    <button class="nao" id="btn-depois" type="button">Agora não</button>
+  </div>
+
+  <main class="chat" id="chat" aria-live="polite"></main>
+  <nav class="keys" id="keys" aria-label="Opções"></nav>
+</div>
+
+<dialog id="folha">
+  <div class="folha">
+    <h2>Sobre esta demonstração</h2>
+    <p>Você está usando o app como a <b>Mariana</b>. As telas foram geradas rodando o código real do bot — não são maquete.</p>
+
+    <h3>Quem você é</h3>
+    <dl>
+      <dt>Refeitório</dt><dd>SM</dd>
+      <dt>Empresa</dt><dd>Indústria Exemplo · Produção</dd>
+      <dt>Objetivo</dt><dd>Manter o equilíbrio</dd>
+      <dt>Alergias</dt><dd>Ovos, leite e derivados</dd>
+    </dl>
+
+    <h3>Os três avisos do cardápio</h3>
+    <div class="estados">
+      <div class="estado blk"><b>⛔ Não pode</b><span>a receita declara o alergênico</span></div>
+      <div class="estado wrn"><b>⚠️ Não sei</b><span>ninguém declarou — pergunte no balcão</span></div>
+      <div class="estado okk"><b>✅ Liberado</b><span>só quando alguém conferiu e declarou</span></div>
+    </div>
+
+    <h3>O que é de mentira aqui</h3>
+    <p>O cardápio é de exemplo, na estrutura que a operação exporta. O piloto de 15 pessoas nas telas da Apetit é simulado — nenhuma pessoa real aparece em relatório nenhum. No app de verdade, a ficha em PDF é anexada pelo clipe do Telegram.</p>
+
+    <h3>O que não muda</h3>
+    <p>Sua empresa não vê o que você come, nem o seu objetivo, nem as suas restrições. A avaliação do refeitório é a única coisa que sai de você — e vai sem nome, sem empresa e sem setor.</p>
+
+    <button class="fechar" id="fechar" type="button">Voltar ao app</button>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+
+  var TELAS = {}, historico = [], atual = "inicio";
+  var chat = document.getElementById("chat");
+  var keys = document.getElementById("keys");
+  var sub = document.getElementById("sub");
+
+  var PERMITIDAS = /^\/?(b|i|u|s|code|em|strong)$/i;
+  function escapar(s){
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  // O texto vem do proprio bot, que ja escapou o dado do usuario. Ainda assim
+  // so estas tags passam: qualquer outra vira texto visivel.
+  function render(texto){
+    var saida = "", resto = String(texto), re = /<([^>]{1,12})>/g, m, fim = 0;
+    while ((m = re.exec(resto)) !== null){
+      saida += escapar(resto.slice(fim, m.index));
+      saida += PERMITIDAS.test(m[1]) ? "<" + m[1] + ">" : escapar(m[0]);
+      fim = m.index + m[0].length;
+    }
+    return saida + escapar(resto.slice(fim));
+  }
+
+  function mostrar(id, guardar){
+    var tela = TELAS[id];
+    if (!tela) return;
+    if (guardar !== false && atual !== id) historico.push(atual);
+    atual = id;
+
+    chat.textContent = "";
+    keys.textContent = "";
+
+    if (tela.comando){
+      var cmd = document.createElement("div");
+      cmd.className = "cmd";
+      cmd.textContent = tela.comando;
+      chat.appendChild(cmd);
+    }
+    if (tela.caminho && tela.caminho[tela.caminho.length - 1] === "__anexar_pdf__"){
+      var arq = document.createElement("div");
+      arq.className = "arquivo";
+      arq.innerHTML = '<span aria-hidden="true">\u{1F4C4}</span>' +
+        '<b>ficha_nutricionista.pdf</b><em>enviado</em>';
+      chat.appendChild(arq);
+    }
+
+    var bolha = document.createElement("div");
+    bolha.className = "bubble" + (tela.grupo === "administracao" ? " mono" : "");
+    bolha.innerHTML = render(tela.texto);
+    chat.appendChild(bolha);
+
+    (tela.botoes || []).forEach(function(b){
+      var btn = document.createElement("button");
+      btn.className = "key";
+      btn.type = "button";
+      btn.textContent = b.rotulo;
+      if (b.acao === "__anexar_pdf__") btn.classList.add("anexo");
+      if (b.destino && TELAS[b.destino]){
+        btn.addEventListener("click", function(){ mostrar(b.destino); });
+      } else {
+        btn.disabled = true;
+        var tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = "só no bot";
+        btn.appendChild(tag);
+      }
+      keys.appendChild(btn);
+    });
+
+    // O "Voltar" proprio de varias telas ja leva ao menu. Repetir com o voltar
+    // do historico deixaria dois botoes iguais um debaixo do outro, e a pessoa
+    // sem saber qual e qual — entao o do historico so aparece quando falta.
+    var temVoltar = (tela.botoes || []).some(function(b){
+      return /voltar/i.test(b.rotulo) && b.destino && TELAS[b.destino];
+    });
+    if (historico.length && !temVoltar){
+      var volta = document.createElement("button");
+      volta.className = "key voltar";
+      volta.type = "button";
+      volta.textContent = "← Voltar";
+      volta.addEventListener("click", function(){ mostrar(historico.pop(), false); });
+      keys.appendChild(volta);
+    }
+
+    sub.textContent = tela.grupo === "administracao"
+      ? "visão da Apetit · agregada" : "segunda-feira, 1 de setembro";
+    chat.scrollTop = 0;
+  }
+
+  var folha = document.getElementById("folha");
+  document.getElementById("info").addEventListener("click", function(){
+    if (typeof folha.showModal === "function") folha.showModal(); else folha.setAttribute("open","");
+  });
+  document.getElementById("fechar").addEventListener("click", function(){
+    if (typeof folha.close === "function") folha.close(); else folha.removeAttribute("open");
+  });
+
+  // ---------- instalar na tela inicial ----------
+  var faixa = document.getElementById("faixa-instalar");
+  var btnInstalar = document.getElementById("btn-instalar");
+  var textoInstalar = document.getElementById("instalar-texto");
+  var evtInstalar = null;
+
+  function jaInstalado(){
+    return window.matchMedia("(display-mode: standalone)").matches ||
+           window.navigator.standalone === true;
+  }
+  function guardou(){
+    try { return localStorage.getItem("apetit-instalar") === "nao"; } catch (e) { return false; }
+  }
+
+  window.addEventListener("beforeinstallprompt", function(e){
+    e.preventDefault();
+    evtInstalar = e;
+    if (!jaInstalado() && !guardou()) faixa.classList.add("on");
+  });
+
+  btnInstalar.addEventListener("click", function(){
+    if (evtInstalar){
+      evtInstalar.prompt();
+      evtInstalar.userChoice.then(function(){ evtInstalar = null; faixa.classList.remove("on"); });
+    }
+  });
+  document.getElementById("btn-depois").addEventListener("click", function(){
+    faixa.classList.remove("on");
+    try { localStorage.setItem("apetit-instalar", "nao"); } catch (e) {}
+  });
+
+  // O iPhone nao dispara beforeinstallprompt: la a instalacao e manual, e a
+  // unica coisa util que o app pode fazer e dizer onde fica o botao.
+  var ehIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (ehIOS && !jaInstalado() && !guardou()){
+    textoInstalar.innerHTML = "Para instalar: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>.";
+    btnInstalar.style.display = "none";
+    faixa.classList.add("on");
+  }
+
+  if ("serviceWorker" in navigator){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").catch(function(){ /* segue sem offline */ });
+    });
+  }
+
+  // ---------- carga ----------
+  fetch("telas.json")
+    .then(function(r){ return r.json(); })
+    .then(function(dados){
+      TELAS = dados;
+      mostrar("inicio", false);
+    })
+    .catch(function(){
+      chat.innerHTML = '<div class="bubble">Não consegui carregar as telas.' +
+        '\n\nSe você abriu o arquivo direto do disco, use um servidor: ' +
+        '<code>python -m http.server</code> na pasta <code>demo/</code>.</div>';
+    });
+})();
+</script>
+</body>
+</html>
