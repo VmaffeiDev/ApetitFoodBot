@@ -1417,9 +1417,9 @@ async def show_prescription(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             "<b>O arquivo nao fica guardado.</b> Eu tiro os numeros, voce "
             "confirma, e o documento e descartado — ficha costuma trazer peso e "
             "historico, e disso eu nao preciso.\n\n"
-            "Se a sua ficha for foto ou papel, eu nao consigo ler: toque em "
-            "<b>Digitar os numeros</b>.",
+            "Se a sua ficha for foto ou papel, da para digitar os numeros.",
             [
+                [("\U0001f4ce Mandar a ficha em PDF", "ficha_pdf")],
                 [("✍️ Digitar os numeros", "ficha_manual")],
                 [("\U0001f519 Voltar", "menu")],
             ],
@@ -1438,9 +1438,37 @@ async def show_prescription(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         update,
         "\n".join(linhas),
         [
-            [("\U0001f504 Mandar outra ficha", "ficha_manual")],
+            [("\U0001f4ce Mandar outra ficha em PDF", "ficha_pdf")],
+            [("✍️ Digitar os numeros de novo", "ficha_manual")],
             [("\U0001f5d1️ Remover a ficha", "ficha_remover")],
             [("\U0001f519 Voltar", "menu")],
+        ],
+        edit=edit,
+    )
+
+
+async def ask_prescription_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = True) -> None:
+    """Onde a pessoa manda o PDF.
+
+    O bot nao consegue abrir o seletor de arquivo do celular — quem anexa e a
+    pessoa, pelo clipe do Telegram. Entao esta tela existe para **dizer onde
+    fica o clipe**: sem ela, o caminho do PDF so aparecia escondido num
+    paragrafo, e quem tem a ficha em PDF acabava digitando numero a mao.
+    """
+    await reply(
+        update,
+        "\U0001f4ce <b>Mande o PDF da sua ficha</b>\n\n"
+        "Aqui mesmo nesta conversa:\n\n"
+        "1. toque no <b>clipe 📎</b> ao lado de onde voce escreve\n"
+        "2. escolha <b>Arquivo</b> e ache o PDF da sua ficha\n"
+        "3. envie\n\n"
+        "Eu leio e te mostro o que entendi, numero por numero, antes de valer.\n\n"
+        "<b>O arquivo nao fica guardado.</b>\n\n"
+        "<i>Se a ficha for foto ou papel digitalizado, eu nao consigo ler a "
+        "letra da imagem — nesse caso, digite os numeros.</i>",
+        [
+            [("✍️ Digitar os numeros", "ficha_manual")],
+            [("\U0001f519 Voltar", "ficha")],
         ],
         edit=edit,
     )
@@ -1478,7 +1506,11 @@ async def receive_prescription(update: Update, context: ContextTypes.DEFAULT_TYP
             "letra de imagem de proposito — errar aqui viraria orientacao errada "
             "a partir de um documento do seu nutricionista.\n\n"
             "Me diga os numeros e eu sigo por eles.",
-            [[("✍️ Digitar os numeros", "ficha_manual")], [("\U0001f519 Voltar", "menu")]],
+            [
+                [("✍️ Digitar os numeros", "ficha_manual")],
+                [("\U0001f4ce Tentar outro arquivo", "ficha_pdf")],
+                [("\U0001f519 Voltar", "menu")],
+            ],
         )
         return
 
@@ -2084,7 +2116,11 @@ async def receive_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         "<b>Ficha do nutricionista:</b> mande em PDF.\n"
         "<b>Cardapio:</b> .csv ou .xlsx.\n\n"
         "Se a sua ficha for foto ou papel, toque em <b>Digitar os numeros</b>.",
-        [[("✍️ Digitar os numeros", "ficha_manual")], [("\U0001f519 Voltar", "menu")]],
+        [
+            [("\U0001f4ce Como mandar a ficha", "ficha_pdf")],
+            [("✍️ Digitar os numeros", "ficha_manual")],
+            [("\U0001f519 Voltar", "menu")],
+        ],
     )
 
 
@@ -2724,6 +2760,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             context.user_data.pop(FICHA, None)
             context.user_data.pop(STEP, None)
             await show_prescription(update, context, edit=True)
+            return
+        if data == "ficha_pdf":
+            await ask_prescription_pdf(update, context)
             return
         if data == "ficha_manual":
             await ask_prescription_manual(update, context)

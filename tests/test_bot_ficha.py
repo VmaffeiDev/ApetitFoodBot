@@ -345,6 +345,63 @@ class SemLeituraTest(FichaBase):
         self.assertIn("Sem nenhum numero", update.last)
 
 
+class CaminhoDoPdfTest(FichaBase):
+    """Onde a pessoa manda o PDF.
+
+    O bot nao abre o seletor de arquivo do celular — quem anexa e a pessoa,
+    pelo clipe do Telegram. Sem uma tela dizendo isso, o caminho do PDF fica
+    escondido num paragrafo e quem tem a ficha em PDF digita numero a mao.
+    """
+
+    async def test_the_sheet_screen_offers_the_pdf_before_typing(self):
+        context = FakeContext()
+        await self.registrar(context)
+
+        update = FakeUpdate(user_id=self.user)
+        await bot.show_prescription(update, context)
+
+        acoes = [d for _, d in update.buttons]
+        self.assertIn("ficha_pdf", acoes)
+        self.assertLess(acoes.index("ficha_pdf"), acoes.index("ficha_manual"))
+
+    async def test_it_says_where_the_paperclip_is(self):
+        context = FakeContext()
+        await self.registrar(context)
+
+        update = FakeUpdate(user_id=self.user, callback="ficha_pdf")
+        await bot.handle_callback(update, context)
+
+        self.assertIn("clipe", update.last)
+        self.assertIn("Arquivo", update.last)
+        self.assertIn("nao fica guardado", update.last)
+
+    async def test_sending_another_sheet_does_not_jump_to_typing(self):
+        # O rotulo diz "mandar outra ficha": levar para o teclado numerico
+        # entregaria outra coisa.
+        context = FakeContext()
+        await self.registrar(context)
+        await self.mandar_ficha(context, FICHA_DO_ALMOCO)
+        await bot.handle_callback(FakeUpdate(user_id=self.user, callback="ficha_escopo"), context)
+        await bot.handle_callback(FakeUpdate(user_id=self.user, callback="ficha_escopo:almoco"), context)
+        await bot.handle_callback(FakeUpdate(user_id=self.user, callback="ficha_ok"), context)
+
+        update = FakeUpdate(user_id=self.user)
+        await bot.show_prescription(update, context)
+
+        rotulos = dict((r, d) for r, d in update.buttons)
+        outra = [r for r in rotulos if "outra ficha" in r]
+        self.assertTrue(outra)
+        self.assertEqual(rotulos[outra[0]], "ficha_pdf")
+
+    async def test_an_unreadable_file_offers_trying_another_one(self):
+        context = FakeContext()
+        await self.registrar(context)
+
+        update = await self.mandar_ficha(context, "")
+
+        self.assertIn("ficha_pdf", [d for _, d in update.buttons])
+
+
 class RoteamentoTest(FichaBase):
     async def test_a_pdf_goes_to_the_sheet_and_a_spreadsheet_to_the_menu(self):
         # Um admin tambem almoca: o tipo do arquivo decide, sem perguntar nada.

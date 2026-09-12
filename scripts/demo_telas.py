@@ -33,7 +33,7 @@ from apetit.profile import Employee, save_employee  # noqa: E402
 from apetit.recipes import declarations_by_item, read_recipe_rows  # noqa: E402
 from apetit.spreadsheet import read_spreadsheet_rows  # noqa: E402
 from apetit.tracking import log_consumption  # noqa: E402
-from tests.test_bot import FakeContext, FakeUpdate  # noqa: E402
+from tests.test_bot import FakeContext, FakeDocument, FakeUpdate  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 DIA = "2025-09-01"          # segunda-feira coberta pelo cardapio de exemplo
@@ -44,6 +44,18 @@ PROFUNDIDADE = 6
 TEXTOS = {
     "ficha_manual": ["600", "35"],
 }
+
+# O caminho do PDF nao se alcanca clicando: o arquivo chega como documento.
+# Esta pseudo-acao anexa uma ficha de exemplo, para o simulador mostrar a
+# leitura de verdade em vez de parar na tela que explica o clipe.
+ANEXAR_PDF = "__anexar_pdf__"
+FICHA_EXEMPLO = """Plano alimentar - Clinica Exemplo
+Paciente: Mariana
+VET: 1800 kcal/dia
+PTN: 90 g/dia
+Evitar: frituras, refrigerante
+Nutricionista responsavel - CRN-3 12345
+"""
 
 # Botoes que nao levam a lugar nenhum util no simulador, ou que apagariam o
 # cadastro no meio da varredura.
@@ -148,6 +160,13 @@ async def rodar_caminho(caminho: list[str]) -> tuple[str, list]:
             await bot.handle_message(update, context)
             if pendentes:
                 continue
+        if passo == ANEXAR_PDF:
+            update = FakeUpdate(
+                user_id=USUARIO,
+                document=FakeDocument("ficha_nutricionista.pdf", b"%PDF-1.4"),
+            )
+            await bot.receive_document(update, context)
+            continue
         update = FakeUpdate(user_id=USUARIO, callback=passo)
         await bot.handle_callback(update, context)
         pendentes = list(TEXTOS.get(passo, []))
@@ -198,6 +217,15 @@ async def varrer() -> dict:
         for _, destino in botoes:
             if destino not in NAO_CLICAR:
                 fila.append(caminho + [destino])
+        if caminho and caminho[-1] == "ficha_pdf":
+            fila.append(caminho + [ANEXAR_PDF])
+
+    for ident, tela in telas.items():
+        if tela["caminho"] and tela["caminho"][-1] == "ficha_pdf":
+            tela["botoes"].insert(0, {
+                "rotulo": "\U0001f4ce Anexar ficha_nutricionista.pdf",
+                "acao": ANEXAR_PDF,
+            })
 
     # Liga cada botao a tela que ele abre, para o simulador navegar sozinho.
     destino_de = {tela["caminho"][-1]: ident for ident, tela in telas.items() if tela["caminho"]}
@@ -216,6 +244,9 @@ def main() -> int:
     try:
         preparar_banco(Path(tmp.name), receitas)
         bot.today = lambda: DIA
+        # O simulador nao carrega pypdf para dentro do navegador: a ficha de
+        # exemplo entra como texto ja extraido, e o resto do caminho e o real.
+        bot.read_pdf = lambda conteudo: FICHA_EXEMPLO
         telas = asyncio.run(varrer())
         telas.update(asyncio.run(capturar_comandos()))
     finally:
