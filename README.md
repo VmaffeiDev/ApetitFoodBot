@@ -736,17 +736,22 @@ reorganização visual não muda os vereditos nem as regras de pontuação.
 
 ### Prévia do visual, sem servidor
 
-Baixe e abra [Apetit-previa-visual.html](preview/Apetit-previa-visual.html) no
+Baixe e abra [Apetit-previa-visual-v2.html](preview/Apetit-previa-visual-v2.html) no
 navegador. É uma demonstração interativa com os mesmos dados de exemplo do
 `demo/`; refeições e avaliações não são persistidas. Essa versão não instala
 como PWA. Fontes e leitor de PDF dependem de conexão; a navegação usa os dados
 embutidos no arquivo.
 
+A tela inicial já vem montada no HTML e aparece mesmo em leitores de anexos
+que não executam JavaScript, como a prévia do iPhone. Nesse modo, os botões
+não funcionam. Em um navegador com JavaScript, a demonstração é interativa.
+
 O arquivo é gerado, não deve ser editado diretamente. Depois de alterar a
 interface ou os dados de exemplo, atualize-o a partir da raiz do repositório:
 
 ```bash
-python scripts/demo_pagina.py --documento preview/Apetit-previa-visual.html
+npm ci --prefix scripts
+python scripts/demo_pagina.py --documento preview/Apetit-previa-visual-v2.html
 ```
 
 Sem `--documento`, o script mantém o formato de fragmento para incorporação.

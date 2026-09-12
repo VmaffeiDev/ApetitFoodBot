@@ -1,7 +1,7 @@
 """Empacota a demonstracao numa pagina unica, para virar um link.
 
     python scripts/demo_pagina.py saida.html
-    python scripts/demo_pagina.py --documento preview/Apetit-previa-visual.html
+    python scripts/demo_pagina.py --documento preview/Apetit-previa-visual-v2.html
 
 O `demo/` e um PWA de varios arquivos: instala na tela inicial, guarda o
 shell em cache e busca `telas.json` e `dados.json` por HTTP. Isso exige um
@@ -22,6 +22,8 @@ que o proprio app ja sabe receber por `window.__APETIT__`.
 import argparse
 import json
 import re
+import subprocess
+import tempfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -128,6 +130,22 @@ def main() -> int:
     args = parser.parse_args()
     saida = Path(args.saida)
     pagina = empacotar(documento=args.documento)
+    if args.documento:
+        # A pre-visualizacao de anexos do iPhone pode nao executar JavaScript.
+        # Gere a home antes de entregar o arquivo; o navegador mantem o app vivo.
+        with tempfile.TemporaryDirectory() as pasta:
+            temporario = Path(pasta) / "previa.html"
+            temporario.write_text(pagina, encoding="utf-8")
+            try:
+                subprocess.run([
+                    "node", str(RAIZ / "scripts" / "demo_previa.cjs"), str(temporario)
+                ], check=True)
+            except (OSError, subprocess.CalledProcessError) as erro:
+                raise SystemExit(
+                    "Nao foi possivel montar a previa. Instale Node.js e rode "
+                    "`npm ci --prefix scripts` antes de tentar novamente."
+                ) from erro
+            pagina = temporario.read_text(encoding="utf-8")
     saida.write_text(pagina, encoding="utf-8")
     print(f"{saida}: {len(pagina) / 1024:.0f} KB numa pagina so")
     return 0

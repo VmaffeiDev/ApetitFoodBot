@@ -641,6 +641,9 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   var acoes = document.getElementById("acoes");
   var abas = document.getElementById("abas");
   var topo = document.getElementById("topo");
+  // A previa pode trazer a home ja montada para leitores sem JavaScript.
+  // Ao iniciar o app, a navegacao volta a ser criada pelo codigo abaixo.
+  abas.textContent = "";
 
   // O que a pessoa mexeu nesta sessao. Fica so na memoria: e demonstracao, e
   // dizer que gravou no servidor seria mentir sobre o que aconteceu.
