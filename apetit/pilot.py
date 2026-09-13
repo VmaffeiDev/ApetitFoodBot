@@ -184,14 +184,14 @@ def pilot_report(
 # que e exatamente o tipo de rastro que este app evita.
 def _uso_por_funcao(conn: sqlite3.Connection, inicio: str, fim: str) -> list[Funcao]:
     consultas = [
-        ("Registrar a refeicao",
+        ("Registrar a refeição",
          "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM consumption WHERE service_date BETWEEN ? AND ?",
          (inicio, fim)),
-        ("Seguir a sugestao de porcao",
+        ("Seguir a sugestão de porção",
          "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM consumption "
          "WHERE source = 'sugestao' AND service_date BETWEEN ? AND ?",
          (inicio, fim)),
-        ("Avaliar o refeitorio",
+        ("Avaliar o refeitório",
          "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM service_rating WHERE service_date BETWEEN ? AND ?",
          (inicio, fim)),
         # `created_at`/`updated_at` sao timestamp ISO completo; o corte usa so a

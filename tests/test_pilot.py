@@ -120,9 +120,9 @@ class UsoPorFuncaoTest(PilotoBase):
         rel = pilot_report(self.conn, "2026-09-01", "2026-09-07")
         por_nome = {f.nome: f for f in rel.funcoes}
 
-        self.assertEqual(por_nome["Registrar a refeicao"].pessoas, 5)
+        self.assertEqual(por_nome["Registrar a refeição"].pessoas, 5)
         self.assertEqual(por_nome["Guardar favorito"].pessoas, 1)
-        self.assertEqual(por_nome["Avaliar o refeitorio"].pessoas, 1)
+        self.assertEqual(por_nome["Avaliar o refeitório"].pessoas, 1)
         self.assertEqual(por_nome["Ficha nutricional"].pessoas, 1)
 
     def test_activity_outside_the_period_does_not_inflate_adoption(self):
@@ -170,8 +170,8 @@ class UsoPorFuncaoTest(PilotoBase):
         rel = pilot_report(self.conn, "2026-09-01", "2026-09-07")
         por_nome = {f.nome: f for f in rel.funcoes}
 
-        self.assertEqual(por_nome["Registrar a refeicao"].pessoas, 2)
-        self.assertEqual(por_nome["Seguir a sugestao de porcao"].pessoas, 1)
+        self.assertEqual(por_nome["Registrar a refeição"].pessoas, 2)
+        self.assertEqual(por_nome["Seguir a sugestão de porção"].pessoas, 1)
 
 
 class NaoExpoePessoaTest(PilotoBase):

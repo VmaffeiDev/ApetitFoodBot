@@ -74491,5 +74491,163 @@
    ]
   }
  },
- "plano_exemplo": []
+ "plano_exemplo": [],
+ "gestao": {
+  "periodo": {
+   "desde": "2025-09-01",
+   "ate": "2025-09-30",
+   "desde_amigavel": "segunda-feira, 1 de setembro",
+   "ate_amigavel": "terca-feira, 30 de setembro"
+  },
+  "piloto": {
+   "convidados": 16,
+   "cadastrados": 16,
+   "ativos": 11,
+   "voltaram": 8,
+   "registros": 19,
+   "dias_por_pessoa": 1.7272727272727273,
+   "avaliacoes": 9,
+   "comida_boa_pct": 66.66666666666667,
+   "atendimento_bom_pct": 77.77777777777777,
+   "itens_cardapio": 16,
+   "itens_sem_macro": 1,
+   "itens_sem_alergenico": 10,
+   "pessoas_com_restricao": 1,
+   "funcoes": [
+    {
+     "nome": "Registrar a refeição",
+     "saude": false,
+     "suprimido": false,
+     "pessoas": 11,
+     "usos": 19
+    },
+    {
+     "nome": "Avaliar o refeitório",
+     "saude": false,
+     "suprimido": false,
+     "pessoas": 9,
+     "usos": 9
+    },
+    {
+     "nome": "Seguir a sugestão de porção",
+     "saude": false,
+     "suprimido": false,
+     "pessoas": 0,
+     "usos": 0
+    },
+    {
+     "nome": "Guardar favorito",
+     "saude": false,
+     "suprimido": false,
+     "pessoas": 0,
+     "usos": 0
+    },
+    {
+     "nome": "Ficha nutricional",
+     "saude": true,
+     "suprimido": false,
+     "pessoas": 0,
+     "usos": 0
+    }
+   ],
+   "objetivos": [
+    {
+     "nome": "Comer mais leve",
+     "pessoas": 10
+    },
+    {
+     "nome": "Manter o equilibrio",
+     "pessoas": 6
+    }
+   ]
+  },
+  "setores": [
+   {
+    "empresa": "Industria Exemplo",
+    "setor": "Logistica",
+    "pessoas": 8,
+    "suprimido": false,
+    "motivo": ""
+   },
+   {
+    "empresa": "Industria Exemplo",
+    "setor": "Producao",
+    "pessoas": 8,
+    "suprimido": false,
+    "motivo": ""
+   }
+  ],
+  "refeitorios": [
+   {
+    "unidade": "SM",
+    "avaliacoes": 9,
+    "comida_boa_pct": 66.66666666666667,
+    "atendimento_bom_pct": 77.77777777777777,
+    "faltou_algo": 0,
+    "faltou_pct": 0.0,
+    "suprimido": false,
+    "motivo": "",
+    "marcacoes": []
+   }
+  ],
+  "cobertura": {
+   "total": 16,
+   "completos": 0,
+   "parciais": 6,
+   "sem_nenhuma": 10,
+   "resumo": "0 de 16 fichas com todos os alergenicos declarados (0%).\n6 parcialmente declaradas, 10 sem nenhuma declaracao.\nEnquanto a ficha nao estiver completa, o app avisa o funcionario que nao consegue confirmar — nunca que o prato e seguro.",
+   "faltando": [
+    {
+     "codigo": "arroz_parboilizado",
+     "nome": "Arroz parboilizado",
+     "faltam": 8
+    },
+    {
+     "codigo": "feijao_preto",
+     "nome": "Feijao preto",
+     "faltam": 9
+    },
+    {
+     "codigo": "arroz_integral",
+     "nome": "Arroz integral",
+     "faltam": 9
+    },
+    {
+     "codigo": "carne_assada_ao_molho",
+     "nome": "Carne assada ao molho",
+     "faltam": 9
+    },
+    {
+     "codigo": "feijao_carioca",
+     "nome": "Feijao carioca",
+     "faltam": 9
+    },
+    {
+     "codigo": "feijoada",
+     "nome": "Feijoada",
+     "faltam": 9
+    },
+    {
+     "codigo": "file_de_frango_grelhado",
+     "nome": "File de frango grelhado",
+     "faltam": 9
+    },
+    {
+     "codigo": "macarrao_alho_e_oleo",
+     "nome": "Macarrao alho e oleo",
+     "faltam": 7
+    },
+    {
+     "codigo": "omelete_de_legumes",
+     "nome": "Omelete de legumes",
+     "faltam": 8
+    },
+    {
+     "codigo": "ovo_cozido",
+     "nome": "Ovo cozido",
+     "faltam": 8
+    }
+   ]
+  }
+ }
 }

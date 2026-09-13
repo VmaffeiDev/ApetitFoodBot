@@ -31,7 +31,11 @@ os.environ.setdefault("TELEGRAM_BOT_TOKEN", "demo")
 import bot  # noqa: E402
 from apetit.allergens import ALLERGENS, Declaration, Restriction, Verdict, check_item  # noqa: E402
 from apetit.catalog import item_allergens  # noqa: E402
-from apetit.feedback import MISSING_TAGS, SCALE  # noqa: E402
+from apetit.allergen_sheet import coverage_summary  # noqa: E402
+from apetit.catalog import allergen_coverage  # noqa: E402
+from apetit.feedback import MISSING_TAGS, SCALE, all_unit_reports  # noqa: E402
+from apetit.pilot import pilot_report  # noqa: E402
+from apetit.profile import aggregate_by_sector  # noqa: E402
 from apetit.humanize import DIAS  # noqa: E402
 from apetit.humanize import (  # noqa: E402
     category_label, clean_dish_name, dish_hint, dish_role, dish_weight,
@@ -464,6 +468,83 @@ def montagens(pessoa) -> list[dict]:
     return saida
 
 
+def gestao(pessoa) -> dict:
+    """Os quatro relatorios da Apetit, em numero e nao em paragrafo.
+
+    Sai das mesmas funcoes que o bot usa — `pilot_report`, `aggregate_by_sector`,
+    `all_unit_reports`, `allergen_coverage` — e por isso o n minimo de cinco
+    pessoas, a supressao de recorte pequeno e a ordem "pior refeitorio primeiro"
+    vem de graca. Recalcular esses numeros em JavaScript seria escrever uma
+    segunda versao da regra de privacidade, que e o pior lugar possivel para ter
+    duas versoes.
+
+    **Isto nao entra em `/api/dia`.** Aquele payload e publico porque nao ha nada
+    de ninguem nele; relatorio de adesao e de avaliacao e dado da empresa e pede
+    rota autenticada. Aqui vai junto do arquivo do demo porque o demo e o
+    exemplo fechado da Mariana, e serve para a tela existir antes de a rota
+    existir.
+    """
+    conn = banco()
+    desde, ate = "2025-09-01", "2025-09-30"
+    rel = pilot_report(conn, desde=desde, ate=ate, convidados=16)
+    unidades = all_unit_reports(conn, from_date="2025-08-03", to_date="2025-09-01")
+    cob = allergen_coverage(conn)
+
+    return {
+        "periodo": {"desde": desde, "ate": ate,
+                    "desde_amigavel": friendly_date(desde), "ate_amigavel": friendly_date(ate)},
+        "piloto": {
+            "convidados": rel.convidados, "cadastrados": rel.cadastrados,
+            "ativos": rel.ativos, "voltaram": rel.voltaram,
+            "registros": rel.registros, "dias_por_pessoa": rel.dias_por_pessoa,
+            "avaliacoes": rel.avaliacoes,
+            "comida_boa_pct": rel.comida_boa_pct,
+            "atendimento_bom_pct": rel.atendimento_bom_pct,
+            "itens_cardapio": rel.itens_cardapio,
+            "itens_sem_macro": rel.itens_sem_macro,
+            "itens_sem_alergenico": rel.itens_sem_alergenico,
+            "pessoas_com_restricao": rel.pessoas_com_restricao,
+            # Quando a funcao e suprimida, o numero nao vai no arquivo — nao vai
+            # so escondido na tela. "Uma pessoa tem ficha nutricional" num
+            # piloto de quinze aponta para alguem tanto quanto o nome dela, e o
+            # arquivo e publico: mandar o numero e confiar que nenhuma tela, hoje
+            # ou depois, vai imprimi-lo.
+            "funcoes": [{"nome": f.nome, "saude": f.saude, "suprimido": f.suprimida,
+                         "pessoas": None if f.suprimida else f.pessoas,
+                         "usos": None if f.suprimida else f.usos}
+                        for f in rel.funcoes],
+            # `None` no lugar do numero e o recorte suprimido pelo n minimo. A
+            # tela precisa distinguir isso de zero: "ninguem declarou" e
+            # "declarou pouca gente para mostrar" nao sao a mesma informacao.
+            "objetivos": [{"nome": nome, "pessoas": quantos} for nome, quantos in rel.objetivos],
+        },
+        "setores": [
+            {"empresa": linha["client_company"], "setor": linha["sector"],
+             "pessoas": linha["total"], "suprimido": bool(linha.get("suprimido")),
+             "motivo": linha.get("motivo", "")}
+            for linha in aggregate_by_sector(conn)
+        ],
+        "refeitorios": [
+            {"unidade": u.apetit_unit, "avaliacoes": u.total,
+             "comida_boa_pct": u.food_good_pct, "atendimento_bom_pct": u.service_good_pct,
+             "faltou_algo": u.missing_count, "faltou_pct": u.missing_pct,
+             "suprimido": u.suppressed, "motivo": u.reason,
+             "marcacoes": [{"nome": nome, "vezes": vezes} for nome, vezes in u.tags]}
+            for u in unidades
+        ],
+        "cobertura": {
+            "total": cob["total"], "completos": cob["completos"], "parciais": cob["parciais"],
+            "sem_nenhuma": cob["total"] - cob["completos"] - cob["parciais"],
+            "resumo": coverage_summary(cob["total"], cob["completos"], cob["parciais"]),
+            # Os que mais aparecem no cardapio primeiro: declarar na ordem de
+            # quem mais e servido tira mais aviso de "nao consigo confirmar" por
+            # ficha preenchida.
+            "faltando": [{"codigo": c, "nome": clean_dish_name(n), "faltam": q}
+                         for c, n, q in cob["faltando"][:10]],
+        },
+    }
+
+
 def plano_exemplo(ficha: Path | None) -> list[dict]:
     """O almoco de uma ficha de exemplo, para a tela nascer com conteudo."""
     if not ficha or not ficha.exists():
@@ -514,6 +595,7 @@ def main() -> int:
                 "perfil": perfil(pessoa),
                 "registro_previsto": registro_previsto(pessoa),
                 "plano_exemplo": plano_exemplo(ficha),
+                "gestao": gestao(pessoa),
             }
         finally:
             conn_demo.close()

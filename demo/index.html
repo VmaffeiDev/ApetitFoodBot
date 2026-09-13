@@ -2939,23 +2939,10 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     ACOMPANHAMENTO.forEach(function(a){if(alvoDe(a)) atalhos.appendChild(atalho(a));});
     tela.appendChild(atalhos);
 
-    var notificacoes=el("details","discreto");
-    notificacoes.appendChild(el("summary","","Preferências de notificação"));
-    (p.avisos || []).forEach(function(a){
-      var b = el("button", "interruptor");
-      b.setAttribute("aria-pressed", a.ligado ? "true" : "false");
-      var txt = el("div", "txt");
-      txt.appendChild(el("b", "", escapar(a.nome)));
-      txt.appendChild(el("span", "", escapar(a.detalhe)));
-      b.appendChild(txt);
-      b.appendChild(el("span", "chave"));
-      b.addEventListener("click", function(){
-        a.ligado = !a.ligado;
-        b.setAttribute("aria-pressed", a.ligado ? "true" : "false");
-      });
-      notificacoes.appendChild(b);
-    });
-    tela.appendChild(notificacoes);
+    // As chavinhas de aviso ficavam aqui tambem, e nao guardavam nada: mexiam
+    // num objeto em memoria que morria na proxima tela. Duas telas para a mesma
+    // preferencia, e a desta era a que nao funcionava. Agora existe uma, na
+    // tela de avisos, e ela guarda no aparelho.
 
     // Quem pode por a foto tem que poder tirar, e no mesmo lugar onde ela esta.
     if (fotoGuardada()){
@@ -3093,7 +3080,542 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     });
   }
 
+  // ---------- 6b. acompanhamento: ficha, favoritos, avisos, ajuda ----------
+  //
+  // Estas quatro telas vinham da transcricao do bot: um bloco de texto com os
+  // botoes embaixo, capturado do Telegram. Era fiel ao bot e errado como app —
+  // a tela de favoritos nao sabia o que a pessoa tinha guardado, e a de avisos
+  // mostrava caixinhas que nao guardavam escolha nenhuma.
+
+  var MINHA_FICHA = "apetit-ficha";
+  var MINHAS_PREFS = "apetit-avisos";
+
+  function fichaSalva(){
+    try { return JSON.parse(lido(MINHA_FICHA) || "null"); } catch (e) { return null; }
+  }
+
+  function numeroSolto(valor){
+    var n = parseFloat(String(valor).replace(",", "."));
+    return isFinite(n) && n > 0 ? n : null;
+  }
+
+  function telaFicha(){
+    cabecalhoInterno("Apetit", "Ficha do nutricionista");
+    var minha = fichaSalva();
+    tela.appendChild(el("h1", "h1", "Minha ficha nutricional"));
+
+    if (minha){
+      tela.appendChild(el("p", "sub", "Guardada neste aparelho."));
+      var numeros = el("dl", "campos");
+      numeros.style.marginTop = "14px";
+      [["Calorias do almoço", minha.kcal ? Math.round(minha.kcal) + " kcal" : "—"],
+       ["Proteína do almoço", minha.ptn ? Math.round(minha.ptn) + " g" : "—"],
+       ["Profissional", minha.profissional || "—"],
+       ["Confirmada em", minha.em ? dataCurta(minha.em) : "—"]
+      ].forEach(function(par){
+        var linha = el("div", "campo");
+        linha.appendChild(el("dt", "", escapar(par[0])));
+        linha.appendChild(el("dd", "", escapar(par[1])));
+        numeros.appendChild(linha);
+      });
+      tela.appendChild(numeros);
+
+      // A comparacao com o objetivo generico e informacao de graca: os dois
+      // numeros ja existem, e ver a diferenca e o que explica por que a ficha
+      // importa. Nao e conta nova nem prescricao nova.
+      var generico = alvoDoObjetivo(pessoa().objetivo) || {};
+      if (minha.kcal && generico.kcal){
+        var dif = Math.round(minha.kcal - generico.kcal);
+        var cartaoDif = el("div", "cartao");
+        cartaoDif.style.marginTop = "16px";
+        cartaoDif.appendChild(el("p", "paragrafo",
+          "Sua ficha pede <b>" + Math.round(minha.kcal) + " kcal</b> no almoço. O objetivo " +
+          "<b>" + escapar(pessoa().objetivo || "genérico") + "</b> mira " +
+          Math.round(generico.kcal) + " kcal — " +
+          (dif === 0 ? "praticamente o mesmo."
+                     : (dif > 0 ? dif + " kcal a mais." : Math.abs(dif) + " kcal a menos."))));
+        tela.appendChild(cartaoDif);
+      }
+
+      // Honestidade sobre o que a ficha ainda nao faz. A sugestao de porcao sai
+      // de uma tabela que o Python calculou para os quatro objetivos; um alvo
+      // de ficha nao esta nela, e inventar a conta aqui no navegador seria uma
+      // segunda versao da regra de porcao — a pior duplicacao possivel num app
+      // que existe para dizer quanto comer.
+      var aviso = el("div", "aviso wrn");
+      aviso.appendChild(icone("i-info"));
+      aviso.appendChild(el("span", "", "<b>A sugestão de porções ainda usa o seu objetivo, " +
+        "não a ficha.</b> Seguir os números do nutricionista prato a prato depende do " +
+        "servidor da Apetit, que ainda não está ligado neste teste."));
+      tela.appendChild(aviso);
+
+      var trocar = el("button", "cta fantasma");
+      trocar.appendChild(icone("i-ficha"));
+      trocar.appendChild(el("b", "", "Trocar os números"));
+      trocar.addEventListener("click", function(){ mostrar("ficha_manual"); });
+      acoes.appendChild(trocar);
+
+      var remover = el("button", "cta fantasma");
+      remover.appendChild(icone("i-proibido"));
+      remover.appendChild(el("b", "", "Remover a ficha"));
+      remover.addEventListener("click", function(){
+        esquecer(MINHA_FICHA);
+        mostrar("ficha", false);
+        recado("Ficha removida deste aparelho.");
+      });
+      acoes.appendChild(remover);
+      return;
+    }
+
+    tela.appendChild(el("p", "sub",
+      "Se você faz acompanhamento com nutricionista, o app pode mostrar os números dele."));
+
+    var explica = el("div", "cartao");
+    explica.style.marginTop = "16px";
+    explica.appendChild(el("p", "paragrafo",
+      "<b>O arquivo não fica guardado.</b> O app tira os números, você confere, e o " +
+      "documento é descartado. Ficha de nutricionista costuma trazer peso, diagnóstico e " +
+      "histórico — disso o app não precisa."));
+    explica.appendChild(el("p", "paragrafo",
+      "Se a sua ficha for foto ou papel, dá para digitar os números."));
+    tela.appendChild(explica);
+
+    var pdf = el("button", "cta forte");
+    pdf.appendChild(icone("i-arquivo"));
+    pdf.appendChild(el("b", "", "Mandar a ficha em PDF"));
+    pdf.addEventListener("click", function(){
+      document.getElementById("arquivo-pdf").click();
+    });
+    acoes.appendChild(pdf);
+
+    var manual = el("button", "cta fantasma");
+    manual.appendChild(icone("i-lapis"));
+    manual.appendChild(el("b", "", "Digitar os números"));
+    manual.addEventListener("click", function(){ mostrar("ficha_manual"); });
+    acoes.appendChild(manual);
+  }
+
+  function telaFichaManual(){
+    cabecalhoInterno("Apetit", "Ficha do nutricionista");
+    var minha = fichaSalva() || {};
+    tela.appendChild(el("h1", "h1", "Os números da sua ficha"));
+    tela.appendChild(el("p", "sub", "Só do almoço. Deixe em branco o que a ficha não traz."));
+
+    var form = el("div", "pilha");
+    form.style.marginTop = "16px";
+    var campos = [
+      ["kcal", "Calorias do almoço (kcal)", "Ex.: 700", minha.kcal || ""],
+      ["ptn", "Proteína do almoço (g)", "Ex.: 35", minha.ptn || ""],
+      ["profissional", "Nome do profissional (opcional)", "Ex.: Dra. Ana", minha.profissional || ""]
+    ];
+    var entradas = {};
+    campos.forEach(function(c){
+      // Mesma classe do cadastro (`campo-texto`): rotulo visivel acima da
+      // caixa. Sem rotulo, "700" e "35" preenchidos ficam indistinguiveis — foi
+      // o defeito que apareceu no cadastro com "empresa" e "setor".
+      var bloco = el("div", "campo-texto");
+      var rotulo = el("label", "", escapar(c[1]));
+      rotulo.setAttribute("for", "ficha-" + c[0]);
+      bloco.appendChild(rotulo);
+      var input = document.createElement("input");
+      input.id = "ficha-" + c[0];
+      input.type = c[0] === "profissional" ? "text" : "number";
+      if (c[0] !== "profissional"){ input.inputMode = "decimal"; input.min = "1"; }
+      input.placeholder = c[2];
+      input.value = c[3];
+      input.autocomplete = "off";
+      bloco.appendChild(input);
+      entradas[c[0]] = input;
+      form.appendChild(bloco);
+    });
+    tela.appendChild(form);
+
+    tela.appendChild(notaDeSimulacao(
+      "Os números ficam só neste aparelho. A Apetit e a sua empresa não recebem a sua ficha."));
+
+    var salvar = el("button", "cta forte");
+    salvar.appendChild(icone("i-liberado"));
+    salvar.appendChild(el("b", "", "Guardar a ficha"));
+    salvar.addEventListener("click", function(){
+      var kcal = numeroSolto(entradas.kcal.value);
+      var ptn = numeroSolto(entradas.ptn.value);
+      if (!kcal && !ptn){
+        recado("Preencha pelo menos as calorias ou a proteína.");
+        return;
+      }
+      // Numero de dia inteiro entrando como refeicao e o erro que machuca: uma
+      // ficha de 2.000 kcal lida como almoco mandaria a pessoa comer o dia todo
+      // num prato. Mesma faixa que `Prescription.implausivel` usa no Python.
+      if (kcal && kcal > 1500){
+        recado("Esse valor parece ser do dia inteiro, não de uma refeição. Confira na ficha.");
+        return;
+      }
+      guardar(MINHA_FICHA, JSON.stringify({
+        kcal: kcal, ptn: ptn,
+        profissional: entradas.profissional.value.trim(),
+        em: new Date().toISOString()
+      }));
+      mostrar("ficha", false);
+      recado("Ficha guardada neste aparelho.");
+    });
+    acoes.appendChild(salvar);
+
+    var voltar = el("button", "cta fantasma");
+    voltar.appendChild(el("b", "", "Cancelar"));
+    voltar.addEventListener("click", function(){ mostrar("ficha", false); });
+    acoes.appendChild(voltar);
+  }
+
+  function telaFavoritos(){
+    cabecalhoInterno("Apetit", "Preferidos");
+    var guardados = meuHistorico().favoritos || [];
+    tela.appendChild(el("h1", "h1", "Alimentos preferidos"));
+
+    if (!guardados.length){
+      var vazio = el("div", "estado-exemplo");
+      var ic = el("span", "estado-icone");
+      ic.appendChild(icone("i-coracao"));
+      vazio.appendChild(ic);
+      vazio.appendChild(el("div", "",
+        "<b>Você ainda não guardou nenhum prato.</b>" +
+        "<p>Depois de montar o prato, toque em <b>Guardar um prato</b>.</p>"));
+      vazio.style.marginTop = "16px";
+      tela.appendChild(vazio);
+
+      var montar = el("button", "cta forte");
+      montar.appendChild(icone("i-tigela"));
+      montar.appendChild(el("b", "", "Montar meu prato"));
+      montar.addEventListener("click", function(){ mostrar("montar"); });
+      acoes.appendChild(montar);
+      return;
+    }
+
+    tela.appendChild(el("p", "sub", guardados.length === 1
+      ? "1 prato guardado." : guardados.length + " pratos guardados."));
+    var lista = el("div", "pilha");
+    lista.style.marginTop = "14px";
+    guardados.forEach(function(f){
+      var nome = typeof f === "string" ? f : (f.nome || f.item_name || f.codigo || "");
+      var linha = el("div", "item");
+      linha.appendChild(chip("i-coracao", true));
+      linha.appendChild(el("span", "item-texto", "<b>" + escapar(nome) + "</b>"));
+      lista.appendChild(linha);
+    });
+    tela.appendChild(lista);
+    tela.appendChild(notaDeSimulacao(
+      "Os pratos guardados ficam neste aparelho. Sua empresa não vê o que você gosta."));
+  }
+
+  var PREFS_PADRAO = { resumo: true, lembrete: false };
+
+  function prefsAvisos(){
+    try {
+      var salvo = JSON.parse(lido(MINHAS_PREFS) || "null");
+      if (salvo) return { resumo: !!salvo.resumo, lembrete: !!salvo.lembrete };
+    } catch (e) {}
+    return { resumo: PREFS_PADRAO.resumo, lembrete: PREFS_PADRAO.lembrete };
+  }
+
+  function telaAvisos(){
+    cabecalhoInterno("Apetit", "Notificações");
+    var prefs = prefsAvisos();
+    tela.appendChild(el("h1", "h1", "Avisos"));
+    tela.appendChild(el("p", "sub", "Toque para ligar ou desligar. Dá para mudar quando quiser."));
+
+    var itens = [
+      ["resumo", "Resumo da minha semana", "Na sexta, quantos dias você registrou e o que conquistou. " +
+        "Só sobre você: não existe ranking e sua empresa não vê nada disso."],
+      ["lembrete", "Lembrete do almoço", "Um toque no seu ombro na hora do almoço, " +
+        "só nos dias em que você ainda não registrou."]
+    ];
+
+    var lista = el("div", "pilha");
+    lista.style.marginTop = "14px";
+    itens.forEach(function(item){
+      var chave = item[0];
+      var b = el("button", "item");
+      b.setAttribute("role", "switch");
+      b.setAttribute("aria-checked", prefs[chave] ? "true" : "false");
+      b.appendChild(chip(prefs[chave] ? "i-liberado" : "i-sino", !prefs[chave]));
+      b.appendChild(el("span", "item-texto",
+        "<b>" + escapar(item[1]) + "</b><small>" + escapar(item[2]) + "</small>"));
+      b.appendChild(el("span", "etiqueta", prefs[chave] ? "Ligado" : "Desligado"));
+      b.addEventListener("click", function(){
+        prefs[chave] = !prefs[chave];
+        guardar(MINHAS_PREFS, JSON.stringify(prefs));
+        mostrar("avisos", false);
+      });
+      lista.appendChild(b);
+    });
+    tela.appendChild(lista);
+
+    // O bot entregava aviso pelo Telegram. O app nao tem por onde: aviso em
+    // navegador precisa de permissao de notificacao e de um servidor que
+    // empurre, e nenhum dos dois existe ainda. Mostrar a chavinha sem dizer
+    // isso seria prometer um toque no ombro que nunca vem.
+    var limite = el("div", "aviso wrn");
+    limite.appendChild(icone("i-info"));
+    limite.appendChild(el("span", "", "<b>Ainda não sai aviso nenhum.</b> Sua escolha fica " +
+      "guardada neste aparelho, mas enviar o resumo e o lembrete depende de o app pedir " +
+      "permissão de notificação e de o servidor da Apetit estar ligado."));
+    tela.appendChild(limite);
+
+    tela.appendChild(el("p", "legenda", "O app nunca comenta o que você comeu."));
+  }
+
+  function telaAjuda(){
+    cabecalhoInterno("Apetit", "Ajuda");
+    tela.appendChild(el("h1", "h1", "Como usar"));
+
+    var explicacoes = [
+      ["quanto", "i-tigela", "Quanto pegar hoje",
+       "Quantas conchas e colheres pegar de cada coisa para chegar no seu objetivo, " +
+       "com o cardápio de hoje. Se você pegar o que ele sugeriu, toque em <b>Vou pegar isso</b>."],
+      ["montar", "i-talher", "Montar meu prato",
+       "O app te leva pela fila, uma categoria por vez. Você toca no que pegou e ele mostra " +
+       "como ficou o prato."],
+      ["cardapio", "i-calendario", "Cardápio de hoje",
+       "O que tem hoje, com aviso do que você não pode comer."],
+      ["meu_dia", "i-prancheta", "Meu dia",
+       "O que você registrou hoje e nos dias anteriores. Registrar de novo no mesmo dia " +
+       "substitui o registro anterior."],
+      ["favoritos", "i-coracao", "Preferidos", "Pratos que você gostou."],
+      ["progresso", "i-barras", "Meu progresso",
+       "Seus dias registrados na semana e as conquistas."],
+      ["ficha", "i-ficha", "Minha ficha nutricional",
+       "Os números do seu nutricionista, guardados só neste aparelho."],
+      ["avaliar", "i-estrela", "Avaliar o refeitório",
+       "Sua opinião sobre a comida e o atendimento. Vai sem o seu nome."],
+      ["meus_dados", "i-escudo", "Meus dados e privacidade",
+       "Tudo o que o app guarda sobre você, e o botão de apagar."]
+    ];
+
+    var lista = el("div", "pilha");
+    lista.style.marginTop = "16px";
+    explicacoes.forEach(function(e){
+      var b = el("button", "item");
+      b.appendChild(chip(e[1], true));
+      b.appendChild(el("span", "item-texto", "<b>" + escapar(e[2]) + "</b><small>" + e[3] + "</small>"));
+      b.appendChild(icone("i-seta", "seta"));
+      b.addEventListener("click", function(){ mostrar(e[0]); });
+      lista.appendChild(b);
+    });
+    tela.appendChild(lista);
+
+    var privacidade = el("div", "cartao");
+    privacidade.style.marginTop = "18px";
+    privacidade.appendChild(el("p", "paragrafo",
+      "<b>O aviso de alergênico não substitui conferir com a equipe do refeitório.</b> " +
+      "O app só consegue avisar sobre o que a ficha técnica do prato declara. Quando a " +
+      "ficha não declara, ele diz que não consegue confirmar — nunca que o prato é seguro."));
+    tela.appendChild(privacidade);
+  }
+
   // ---------- 7. gestao ----------
+
+  // Os quatro relatorios saem de `DADOS.gestao`, calculado em Python pelas
+  // mesmas funcoes que o bot usa. O n minimo de cinco pessoas e a supressao de
+  // recorte pequeno chegam decididos: o numero suprimido nao vem no arquivo,
+  // entao nao existe tela capaz de imprimi-lo por descuido.
+
+  function pct(valor){
+    return valor === null || valor === undefined ? "—" : Math.round(valor) + "%";
+  }
+
+  function semDados(texto){
+    var vazio = el("div", "estado-exemplo");
+    var ic = el("span", "estado-icone");
+    ic.appendChild(icone("i-calendario"));
+    vazio.appendChild(ic);
+    vazio.appendChild(el("div", "", "<b>" + escapar(texto) + "</b>"));
+    vazio.style.marginTop = "16px";
+    tela.appendChild(vazio);
+  }
+
+  function notaAgregado(texto){
+    var n = el("p", "gestao-nota", texto);
+    tela.appendChild(n);
+  }
+
+  function linhasDe(pares){
+    var dl = el("dl", "campos");
+    dl.style.marginTop = "14px";
+    pares.forEach(function(par){
+      var linha = el("div", "campo");
+      linha.appendChild(el("dt", "", escapar(par[0])));
+      linha.appendChild(el("dd", "", escapar(String(par[1]))));
+      dl.appendChild(linha);
+    });
+    tela.appendChild(dl);
+    return dl;
+  }
+
+  function gestaoDados(){
+    return (DADOS && DADOS.gestao) || null;
+  }
+
+  function telaPiloto(){
+    cabecalhoInterno("Apetit", "Gestão");
+    var g = gestaoDados();
+    tela.appendChild(el("h1", "h1", "Relatório do piloto"));
+    if (!g){ semDados("Relatório indisponível."); return; }
+    tela.appendChild(el("p", "sub",
+      g.periodo.desde_amigavel + " a " + g.periodo.ate_amigavel));
+
+    var p = g.piloto;
+    secaoSimples("Adesão");
+    linhasDe([
+      ["Convidados", p.convidados],
+      ["Cadastrados", p.cadastrados + (p.convidados ? "  (" + pct(p.cadastrados * 100 / p.convidados) + " dos convidados)" : "")],
+      ["Usaram de fato", p.ativos + (p.cadastrados ? "  (" + pct(p.ativos * 100 / p.cadastrados) + " de quem se cadastrou)" : "")],
+      ["Voltaram outro dia", p.voltaram + (p.ativos ? "  (" + pct(p.voltaram * 100 / p.ativos) + " de quem usou)" : "")]
+    ]);
+
+    secaoSimples("Uso");
+    linhasDe([
+      ["Refeições registradas", p.registros],
+      ["Dias por pessoa", (p.dias_por_pessoa || 0).toFixed(1)]
+    ]);
+
+    secaoSimples("O que as pessoas usam");
+    var funcoes = el("div", "pilha");
+    funcoes.style.marginTop = "12px";
+    (p.funcoes || []).forEach(function(f){
+      var linha = el("div", "item");
+      linha.appendChild(chip(f.saude ? "i-escudo" : "i-barras", true));
+      var valor = f.suprimido
+        ? "suprimido (menos de 5 pessoas)"
+        : f.pessoas + " pessoa(s) · " + f.usos + " vez(es)";
+      linha.appendChild(el("span", "item-texto",
+        "<b>" + escapar(f.nome) + "</b><small>" + escapar(valor) + "</small>"));
+      funcoes.appendChild(linha);
+    });
+    tela.appendChild(funcoes);
+
+    secaoSimples("Objetivo declarado");
+    linhasDe((p.objetivos || []).map(function(o){
+      return [o.nome, o.pessoas === null ? "suprimido" : o.pessoas + " pessoa(s)"];
+    }));
+
+    secaoSimples("Avaliação do refeitório");
+    linhasDe([
+      ["Avaliações", p.avaliacoes],
+      ["Comida boa", pct(p.comida_boa_pct)],
+      ["Atendimento bom", pct(p.atendimento_bom_pct)]
+    ]);
+
+    secaoSimples("Qualidade do dado do cardápio");
+    var total = p.itens_cardapio || 0;
+    linhasDe([
+      ["Itens no cardápio", total],
+      ["Com informação nutricional", total ? pct((total - p.itens_sem_macro) * 100 / total) : "—"],
+      ["Com alergênico declarado", total ? pct((total - p.itens_sem_alergenico) * 100 / total) : "—"]
+    ]);
+
+    notaAgregado("Nenhum funcionário é identificado nominalmente. Refeições e metas " +
+      "individuais não aparecem. Recortes com menos de cinco pessoas são suprimidos.");
+  }
+
+  function telaRelatorio(){
+    cabecalhoInterno("Apetit", "Gestão");
+    var g = gestaoDados();
+    tela.appendChild(el("h1", "h1", "Adesão por setor"));
+    if (!g){ semDados("Relatório indisponível."); return; }
+
+    var setores = g.setores || [];
+    if (!setores.length){ semDados("Nenhum setor com cadastro ainda."); return; }
+
+    var lista = el("div", "pilha");
+    lista.style.marginTop = "14px";
+    setores.forEach(function(s){
+      var linha = el("div", "item");
+      linha.appendChild(chip("i-grupo", true));
+      var quanto = s.suprimido
+        ? "suprimido — " + (s.motivo || "recorte pequeno")
+        : s.pessoas + " pessoa(s)";
+      linha.appendChild(el("span", "item-texto",
+        "<b>" + escapar([s.empresa, s.setor].filter(Boolean).join(" · ")) + "</b>" +
+        "<small>" + escapar(quanto) + "</small>"));
+      lista.appendChild(linha);
+    });
+    tela.appendChild(lista);
+
+    notaAgregado("Só adesão agregada. Consumo, objetivo e restrição de pessoa identificada " +
+      "não saem daqui — são dado de saúde do funcionário.");
+  }
+
+  function telaAtendimento(){
+    cabecalhoInterno("Apetit", "Gestão");
+    var g = gestaoDados();
+    tela.appendChild(el("h1", "h1", "Resultados das avaliações"));
+    if (!g){ semDados("Relatório indisponível."); return; }
+
+    var unidades = g.refeitorios || [];
+    if (!unidades.length){ semDados("Nenhuma avaliação no período."); return; }
+    tela.appendChild(el("p", "sub", "Quem precisa de atenção primeiro."));
+
+    unidades.forEach(function(u){
+      var card = el("div", "cartao");
+      card.style.marginTop = "14px";
+      card.appendChild(el("h2", "h2", escapar(u.unidade)));
+      if (u.suprimido){
+        card.appendChild(el("p", "paragrafo",
+          "Suprimido — " + escapar(u.motivo || "poucas avaliações no recorte")));
+      } else {
+        card.appendChild(el("p", "paragrafo",
+          u.avaliacoes + " avaliação(ões) · comida boa <b>" + pct(u.comida_boa_pct) +
+          "</b> · atendimento bom <b>" + pct(u.atendimento_bom_pct) + "</b>"));
+        if (u.faltou_algo) card.appendChild(el("p", "legenda",
+          "Faltou algo em " + u.faltou_algo + " avaliação(ões) (" + pct(u.faltou_pct) + ")."));
+        (u.marcacoes || []).forEach(function(m){
+          card.appendChild(el("p", "legenda", escapar(m.nome) + " — " + m.vezes + "x"));
+        });
+      }
+      tela.appendChild(card);
+    });
+
+    notaAgregado("A avaliação não carrega nome, empresa nem setor de quem respondeu.");
+  }
+
+  function telaCobertura(){
+    cabecalhoInterno("Apetit", "Gestão");
+    var g = gestaoDados();
+    tela.appendChild(el("h1", "h1", "Cobertura de alergênicos"));
+    if (!g){ semDados("Relatório indisponível."); return; }
+
+    var c = g.cobertura;
+    linhasDe([
+      ["Fichas no cardápio", c.total],
+      ["Com todos os alergênicos", c.completos + (c.total ? "  (" + pct(c.completos * 100 / c.total) + ")" : "")],
+      ["Parcialmente declaradas", c.parciais],
+      ["Sem nenhuma declaração", c.sem_nenhuma]
+    ]);
+
+    var promessa = el("div", "aviso wrn");
+    promessa.appendChild(icone("i-escudo"));
+    promessa.appendChild(el("span", "", "Enquanto a ficha não estiver completa, o app avisa o " +
+      "funcionário que <b>não consegue confirmar</b> — nunca que o prato é seguro."));
+    tela.appendChild(promessa);
+
+    if ((c.faltando || []).length){
+      secaoSimples("Declarar primeiro");
+      tela.appendChild(el("p", "legenda", "Os que mais aparecem no cardápio."));
+      var lista = el("div", "pilha");
+      lista.style.marginTop = "12px";
+      c.faltando.forEach(function(f){
+        var linha = el("div", "item");
+        linha.appendChild(chip("i-atencao", true));
+        linha.appendChild(el("span", "item-texto",
+          "<b>" + escapar(f.nome) + "</b><small>faltam " + f.faltam + " alergênico(s)</small>"));
+        lista.appendChild(linha);
+      });
+      tela.appendChild(lista);
+    }
+
+    notaAgregado("Para declarar em lote: scripts/alergenicos.py --exportar, " +
+      "preencher na planilha e --importar.");
+  }
+
   function telaGestao(){
     cabecalhoInterno("Apetit", "Gestão");
     tela.appendChild(el("h1","h1","Visão da Apetit"));
@@ -3137,7 +3659,11 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     avaliar: telaAvaliar, progresso: telaProgresso, perfil: telaPerfil,
     gestao: telaGestao, estados: telaEstados,
     boas_vindas: telaBoasVindas, cadastro: telaCadastro,
-    meus_dados: telaMeusDados, meu_dia: telaMeuDia
+    meus_dados: telaMeusDados, meu_dia: telaMeuDia,
+    ficha: telaFicha, ficha_manual: telaFichaManual,
+    favoritos: telaFavoritos, avisos: telaAvisos, ajuda: telaAjuda,
+    piloto: telaPiloto, relatorio: telaRelatorio,
+    atendimento: telaAtendimento, cobertura: telaCobertura
   };
 
   // Telas de antes de existir cadastro. A navegacao inferior nao aparece nelas:
@@ -3152,12 +3678,22 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   // "quanto__"). Cinco troncos agora tem tela nativa, e qualquer sufixo deles
   // cai na nativa: o botao capturado do bot continua funcionando, e a pessoa
   // chega na tela boa em vez de na transcricao.
-  var TRONCOS = ["cardapio", "quanto", "avaliar", "progresso", "perfil"];
+  // A ordem importa: "ficha_manual" tem tela propria e precisa ser testada antes
+  // do tronco "ficha", senao o formulario nunca abre.
+  var TRONCOS = ["cardapio", "quanto", "avaliar", "progresso", "perfil",
+                 "ficha_manual", "ficha", "favoritos", "avisos", "ajuda",
+                 "piloto", "relatorio", "atendimento", "cobertura", "meu_dia"];
 
   function destinoReal(id){
     if (NATIVAS[id]) return id;
     // Nenhum atalho antigo pode voltar ao montador gravado da Mariana.
     if (/^(pick:|flow_|registrar(?:_|$))/.test(id)) return "montar";
+    // O passo a passo da ficha no bot virou uma tela com formulario: qualquer
+    // "ficha_campo:kcal", "ficha_escopo:dia" ou "ficha_ok" capturado cai nela.
+    if (/^ficha_(campo|escopo|ok|rever|pdf|cancelar|remover)/.test(id)) return "ficha";
+    // "fav:carne_assada" e "fav_lista" sao o favorito clicado no bot.
+    if (/^fav(?:_|:)/.test(id)) return "favoritos";
+    if (/^aviso:/.test(id)) return "avisos";
     for (var i = 0; i < TRONCOS.length; i++){
       if (id.indexOf(TRONCOS[i]) === 0) return TRONCOS[i];
     }
