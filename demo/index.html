@@ -1,0 +1,4041 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Apetit</title>
+<meta name="description" content="Acompanhamento nutricional do refeitório Apetit.">
+<!-- Endereco do servidor da Apetit. Vazio de proposito enquanto nao existe um:
+     o app funciona inteiro com a fotografia publicada ao lado desta pagina, e
+     e assim que o piloto testa hoje. Preenchendo aqui (https://…), o cardapio
+     do dia passa a vir do servidor e a fotografia vira so a rede de seguranca.
+     Para testar sem editar o arquivo: localStorage.setItem('apetit-api', url) -->
+<meta name="apetit-api" content="">
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#EC003F">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Apetit">
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- pdf.js na build UMD, que define window.pdfjsLib. Se nao carregar, o app
+     avisa em vez de quebrar: ver `lerPdf` no script. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+
+<style>
+/* ===========================================================================
+   Apetit — sistema de design.
+
+   O vermelho #EC003F e o amarelo #F5D94E sao a marca: vermelho no destaque
+   da refeicao, amarelo na acao principal. Superficies neutras organizam o resto.
+
+   Por isso o semaforo de alergenico nao usa nenhum dos dois. O aviso mais
+   importante do app e o "nao pode", e se ele fosse do mesmo vermelho que
+   decora a tela inteira viraria enfeite. Restricao, atencao e liberado tem
+   escala propria, e ela nunca aparece sozinha: cor sempre vem com icone e
+   palavra, para quem nao distingue as duas nao ficar sem a informacao.
+   ======================================================================== */
+:root{
+  --vermelho:#EC003F;
+  --vermelho-alto:#FF2057;
+  --vermelho-baixo:#B80031;
+  --amarelo:#F5D94E;
+  --amarelo-alto:#FFE97A;
+  --amarelo-ink:#121212;
+
+  --fundo:#0D0F11;
+  --card:#171A1D;
+  --card-2:#1D2024;
+  --card-3:#292D32;
+
+  --texto:#FFFFFF;
+  --texto-2:#B1B3BC;
+  --texto-3:#989BA5;
+
+  --verde:#45D490;
+  --verde-fundo:rgba(69,212,144,.12);
+  --laranja:#F4A72C;
+  --laranja-fundo:rgba(244,167,44,.12);
+  --restricao:#FF6B6B;
+  --restricao-fundo:rgba(255,107,107,.12);
+  --neutro-fundo:rgba(255,255,255,.06);
+
+  --linha:rgba(255,255,255,.07);
+  --linha-2:rgba(255,255,255,.12);
+
+  --r-card:16px;
+  --r-btn:14px;
+  --r-pill:999px;
+  --h-cta:54px;
+  --pad:18px;
+  --gap:12px;
+  --gap-secao:24px;
+
+  --rapido:150ms;
+  --medio:190ms;
+  --lento:220ms;
+  --curva:cubic-bezier(.22,.61,.36,1);
+
+  --fotos:url("assets/pratos.webp");
+  --sombra:0 1px 2px rgba(0,0,0,.32), 0 10px 26px -22px rgba(0,0,0,.9);
+
+  --t-h1:26px;
+  --t-h2:17px;
+  --t-card:17px;
+  --t-body:14px;
+  --t-label:12px;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+p,dl{margin:0}
+button,a{touch-action:manipulation}
+button:disabled{cursor:default}
+::selection{background:var(--vermelho);color:#fff}
+body{
+  margin:0;background:var(--fundo);color:var(--texto);
+  font-family:Inter,"SF Pro Text",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  font-size:var(--t-body);line-height:1.55;-webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:none;
+}
+button{font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
+h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
+.icone{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;
+       stroke-linecap:round;stroke-linejoin:round}
+
+.app{display:flex;flex-direction:column;height:100dvh;max-width:480px;margin:0 auto;background:var(--fundo);overflow:hidden}
+.app > *{min-width:0}
+
+/* ---------- cabecalho ---------- */
+.topo{flex:none;position:relative;z-index:2;background:var(--fundo)}
+.topo .barra{display:flex;align-items:center;gap:12px}
+.topo .titulo{flex:1;min-width:0;text-align:center}
+.topo .titulo h1{font-size:21px;font-weight:800;line-height:1.25;letter-spacing:-.025em}
+.topo .titulo p{margin-top:3px;font-size:10px;color:var(--texto-2)}
+.topo.marca{background:linear-gradient(135deg,#F80045,var(--vermelho) 60%,#C70039);
+  padding:18px 15px 20px;padding-top:calc(18px + env(safe-area-inset-top));border-radius:0 0 25px 25px}
+.topo.marca .titulo h1{font-size:28px}
+.topo .apoio{margin-top:10px;text-align:center;font-size:9px;font-weight:700;letter-spacing:.19em;color:#fff}
+.crculo{width:44px;height:44px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:transparent;border:0;cursor:pointer;position:relative;color:var(--texto-2);transition:background var(--rapido)}
+.crculo::before{content:"";position:absolute;inset:7px;border:1px solid var(--linha-2);border-radius:50%;background:rgba(255,255,255,.025)}
+.crculo .icone{width:18px;height:18px}
+.topo.marca .crculo{color:white}
+.topo.marca .crculo::before{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15)}
+.crculo:hover{background:var(--neutro-fundo)}
+.crculo:focus-visible{outline:2px solid var(--amarelo);outline-offset:2px}
+.topo.simples{padding:8px 12px 6px;padding-top:calc(8px + env(safe-area-inset-top))}
+
+/* ---------- corpo ---------- */
+.tela{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--card-3) transparent;-webkit-overflow-scrolling:touch;padding:16px var(--pad) 24px}
+.tela > * + *{margin-top:var(--gap)}
+.tela:focus{outline:none}
+.tela.entrando{animation:entrar var(--medio) var(--curva)}
+@keyframes entrar{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--texto-3)}
+.h1{font-size:var(--t-h1);font-weight:800;line-height:1.16;letter-spacing:-.03em}
+.h2{font-size:var(--t-h2);font-weight:700;letter-spacing:-.02em}
+.sub{color:var(--texto-2);font-size:var(--t-body)}
+.legenda{color:var(--texto-2);font-size:13px;line-height:1.55}
+.tela > .eyebrow + .h1{margin-top:6px}
+.tela > .h1 + .sub{margin-top:8px}
+
+.cabeca-secao{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:var(--gap-secao)}
+.cabeca-secao h2{font-size:var(--t-h2);font-weight:700;flex:1;min-width:0;letter-spacing:-.02em}
+/* A linha de apoio quebra em vez de ser cortada: titulo longo em portugues e
+   comum, e "SEU" sozinho na borda nao e apoio nenhum. */
+.cabeca-secao span{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--texto-3);text-align:right;flex:none;max-width:44%;line-height:1.35}
+.tela > .cabeca-secao + *{margin-top:12px}
+
+.cartao{background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);padding:18px;box-shadow:var(--sombra)}
+.cartao > * + *{margin-top:12px}
+
+/* ---------- inicio ---------- */
+.inicio-frase{font-size:12px;color:var(--texto-2);margin-bottom:18px}
+.refeicao-home{padding:20px;border:1px solid var(--verde);border-radius:var(--r-card);background:linear-gradient(140deg,var(--verde-fundo),var(--card));margin-bottom:14px}
+.refeicao-home .estado-refeicao{display:flex;align-items:center;gap:8px;color:var(--verde);font-size:12px;margin-bottom:12px}
+.refeicao-home h2{font-size:24px;line-height:1.2;margin-bottom:10px}
+.refeicao-home .resumo-almoco{font-size:17px;font-weight:700;margin-bottom:12px}
+.refeicao-home .alimentos-almoco{font-size:13px;line-height:1.6;color:var(--texto-2);margin:0}
+.home-acoes + .conquistas{margin-top:18px}
+.conquistas{border:1px solid var(--linha-2);border-radius:18px;padding:16px;
+  background:radial-gradient(ellipse at 100% 0%,rgba(236,0,63,.22),transparent 65%),linear-gradient(140deg,#1B1E22,#111315);box-shadow:var(--sombra)}
+.conq-topo{display:flex;align-items:center;gap:12px}
+.conq-topo h2{font-size:16px;letter-spacing:-.02em}
+.conq-topo .chip{width:40px;height:40px;border-radius:12px}
+.conq-corpo{display:flex;align-items:center;gap:16px;margin-top:14px}
+.conq-lista{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.conq-item{display:flex;align-items:flex-start;gap:9px;font-size:12px;line-height:1.35;color:var(--texto)}
+.conq-item .tick{width:22px;height:22px;flex:none;display:grid;place-items:center;border-radius:50%;background:var(--vermelho);color:white}
+.conq-item .tick .icone{width:12px;height:12px;stroke-width:2.5}
+.conq-item.nova .tick{animation:pulsar 420ms var(--curva)}
+@keyframes pulsar{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+.pontos{flex:none;width:104px;text-align:center}
+.anel{width:96px;height:96px;margin:auto;position:relative;display:grid;place-items:center}
+.anel > svg{position:absolute;inset:0;width:100%;height:100%}
+.anel .n{font-size:31px;font-weight:800;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.pontos .l{display:block;font-size:9px;font-weight:700;line-height:1.45;letter-spacing:.12em;margin-top:4px;color:var(--texto-2);text-transform:uppercase}
+.home-acoes{display:flex;flex-direction:column;gap:12px}
+.home-rapidas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.home-rapidas .item{min-height:76px;padding:12px 10px;gap:9px}
+.home-rapidas .item b{font-size:12px}
+.home-rapidas .chip{width:36px;height:40px;border-radius:11px}
+.home-rapidas .seta{width:13px;height:13px}
+.home-acoes .leve > .icone{color:var(--amarelo)}
+.item .item-texto{flex:1;min-width:0}
+.item .item-texto b{display:block}
+.item small{display:block;color:var(--texto-2);font-size:11px;line-height:1.4;margin-top:4px;font-weight:400}
+.lista-atalhos{background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);overflow:hidden}
+.lista-atalhos .item{border:0;border-radius:0;box-shadow:none;min-height:46px;padding:9px 12px;background:transparent}
+.lista-atalhos .item + .item{border-top:1px solid var(--linha)}
+.lista-atalhos .chip{width:26px;height:26px;border-radius:8px}
+.lista-atalhos .chip .icone{width:16px;height:16px}
+.lista-atalhos .item:focus-visible{outline-offset:-3px}
+.foto-prato{display:block;flex:none;width:58px;height:58px;border-radius:10px;background-image:var(--fotos);
+  background-size:400% 216%;background-position:0 0;background-color:var(--card-3)}
+.foto-ovo{background-position:33.333% 0}
+.foto-macarrao{background-position:66.667% 0}
+.foto-arroz{background-position:100% 0}
+.foto-feijao,.foto-salada,.foto-refeicao{background-size:400% 186%}
+.foto-feijao{background-position:0 100%}
+.foto-salada{background-position:33.333% 100%}
+.foto-refeicao{background-position:66.667% 100%}
+.fotos-nota{font-size:10px;color:var(--texto-2)}
+.escolha-prato[aria-pressed="true"]{border-color:var(--amarelo);box-shadow:inset 0 0 0 1px var(--amarelo)}
+.escolha-prato:disabled{cursor:not-allowed}
+.controle-quantidade{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:8px 2px 12px}
+.controle-quantidade button{width:44px;min-height:44px;border:1px solid var(--linha-2);border-radius:12px;background:var(--card-2);color:var(--texto);font-size:22px;cursor:pointer}
+.controle-quantidade button:disabled{opacity:.35;cursor:default}
+.controle-quantidade output{min-width:90px;text-align:center;font-size:14px;font-weight:600}
+.controle-quantidade button:focus-visible{outline:2px solid var(--amarelo);outline-offset:2px}
+.filtros{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:1px 0 4px}
+.filtro{flex:1;min-height:44px;border:1px solid var(--linha-2);border-radius:var(--r-pill);padding:7px 10px;
+  background:var(--card);color:var(--texto-2);font-size:11px;cursor:pointer;white-space:nowrap}
+.filtro[aria-pressed="true"]{background:var(--vermelho);border-color:var(--vermelho);color:white;font-weight:600}
+.filtro:focus-visible{outline:2px solid var(--amarelo);outline-offset:-2px}
+.prato-resumo{background:linear-gradient(135deg,rgba(245,217,78,.18),var(--card) 90%);border-color:rgba(245,217,78,.32);border-left:4px solid var(--amarelo)}
+.prato-resumo .prato-ficha{display:flex;gap:16px;align-items:center;margin-top:12px}
+.prato-resumo .foto-prato{width:120px;height:120px;border-radius:50%;border:3px solid rgba(255,255,255,.16)}
+.prato-resumo .macros{flex:1;min-width:0}
+.prato-resumo .macros > b{display:block;font-size:23px;line-height:1.2;letter-spacing:-.035em}
+.prato-resumo .macros > span{display:block;font-size:14px;margin-top:5px;font-weight:600}
+.prato-resumo .objetivo-resumo{display:flex;align-items:center;gap:9px;margin-top:16px;font-size:11px;line-height:1.4;color:var(--texto-2)}
+.objetivo-resumo .icone{color:var(--amarelo);width:23px;height:23px}
+.objetivo-resumo b{display:block;color:var(--texto);font-size:11px;font-weight:500}
+.estimativa{border:1px solid var(--linha);border-radius:12px;padding:12px;background:var(--card)}
+.estimativa b{font-size:12px;font-weight:600}
+.estimativa p{font-size:11px;color:var(--texto-2);line-height:1.5;margin-top:5px}
+.resumo-progresso{display:flex;align-items:center;gap:13px;background:linear-gradient(130deg,rgba(245,217,78,.14),var(--card) 70%)}
+.resumo-progresso .pontos{width:75px}
+.resumo-progresso .anel{width:72px;height:72px}
+.resumo-progresso .anel .n{font-size:24px}
+.resumo-progresso .pontos .l{display:none}
+.resumo-progresso .placar-label{font-size:11px;line-height:1.4;max-width:9ch}
+.resumo-progresso .resumo-mensagem{flex:1;border-left:1px solid var(--linha-2);padding-left:15px;font-size:11px;line-height:1.5;color:var(--texto-2)}
+.periodos{display:flex;padding:3px;background:var(--card);border:1px solid var(--linha);border-radius:11px}
+.periodos .filtro{border-radius:8px;border:0;min-height:44px;background:transparent;padding:5px}
+.periodos .filtro[aria-pressed="true"]{background:var(--vermelho)}
+.discreto{border:1px solid var(--linha);border-radius:12px;background:var(--card);padding:11px 13px;font-size:12px;color:var(--texto-2)}
+.discreto summary{cursor:pointer;color:var(--texto);min-height:24px;font-weight:500}
+.discreto[open] summary{margin-bottom:10px}
+.discreto > .interruptor{margin-top:8px}
+.gestao-nota{text-align:center;font-size:11px;color:var(--texto-2);line-height:1.6;margin-top:28px}
+.estado-exemplo{display:flex;gap:14px;align-items:center;border:1px solid var(--linha);border-radius:14px;padding:18px;background:var(--card);font-size:13px}
+.estado-exemplo .estado-icone{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--neutro-fundo)}
+.estado-exemplo b{display:block;font-size:13px}
+.estado-exemplo p{font-size:11px;color:var(--texto-2);margin-top:5px;line-height:1.5}
+.estado-exemplo.erro{background:linear-gradient(120deg,var(--restricao-fundo),var(--card));border-color:rgba(255,107,107,.2)}
+.estado-exemplo.erro .estado-icone{color:var(--restricao);background:var(--restricao-fundo)}
+.estado-exemplo.sucesso{background:linear-gradient(120deg,var(--verde-fundo),var(--card));border-color:rgba(69,212,144,.2)}
+.estado-exemplo.sucesso .estado-icone{color:var(--verde);background:var(--verde-fundo)}
+.estado-exemplo.loading{justify-content:center;flex-direction:column;text-align:center}
+.estado-exemplo.loading .icone{animation:girar 1s linear infinite;color:var(--texto-2)}
+@keyframes girar{to{transform:rotate(360deg)}}
+
+/* ---------- botoes ---------- */
+.cta{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  min-height:var(--h-cta);border-radius:var(--r-btn);padding:0 18px;cursor:pointer;
+  transition:transform var(--rapido) var(--curva), filter var(--medio) var(--curva),
+             background var(--medio) var(--curva), border-color var(--medio) var(--curva);
+}
+.cta:active{transform:scale(.98)}
+.cta b{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px;font-weight:700;letter-spacing:-.01em}
+.cta .seta{opacity:.5;width:18px;height:18px}
+.cta:focus-visible{outline:2px solid var(--amarelo);outline-offset:3px}
+.cta.forte{background:var(--amarelo);color:var(--amarelo-ink);border:0;
+  box-shadow:0 8px 22px -16px rgba(245,217,78,.6)}
+.cta.forte:hover{filter:brightness(1.05)}
+.cta.leve{background:var(--card);color:var(--texto);border:1px solid var(--linha-2);box-shadow:var(--sombra)}
+.cta.leve:hover{background:var(--card-2);border-color:rgba(255,255,255,.2)}
+.cta.fantasma{background:transparent;border:1px solid var(--linha-2);color:var(--texto-2)}
+.cta.fantasma:hover{color:var(--texto);border-color:var(--linha-2);background:var(--card)}
+.cta.feito{background:var(--verde-fundo);color:var(--verde);border:1px solid rgba(69,212,144,.3);box-shadow:none}
+.cta[disabled]{opacity:.45;cursor:default}
+.cta[disabled]:active{transform:none}
+.so-bot{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--texto-3)}
+
+/* ---------- lista de itens ---------- */
+.grade{display:grid;gap:12px}
+.grade.uma{grid-template-columns:1fr}
+.grade.duas{grid-template-columns:1fr 1fr}
+.grade.tres{grid-template-columns:repeat(3,1fr)}
+
+.item{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;min-height:56px;
+  background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);
+  padding:12px 14px;cursor:pointer;box-shadow:var(--sombra);
+  transition:background var(--medio) var(--curva), border-color var(--medio) var(--curva),
+             transform var(--rapido) var(--curva);
+}
+.item:hover{background:var(--card-2);border-color:var(--linha-2)}
+.item:active{transform:scale(.98)}
+.item:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:2px}
+.item b{flex:1;font-size:14px;font-weight:600;line-height:1.3;min-width:0;letter-spacing:-.005em}
+.item .seta{color:var(--texto-3);width:16px;height:16px;flex:none}
+.item[disabled]{opacity:.45;cursor:default}
+.chip{width:38px;height:38px;border-radius:12px;flex:none;display:grid;place-items:center;
+  background:linear-gradient(145deg,#FF1450,#D20039);color:white;box-shadow:0 5px 14px -8px rgba(236,0,63,.6)}
+.chip .icone{width:19px;height:19px}
+.chip.calmo{background:var(--card-3);color:var(--texto-2);box-shadow:none}
+.grade.tres .item{flex-direction:column;align-items:flex-start;gap:10px;padding:14px 12px;min-height:0}
+.grade.tres .item b{font-size:13px;flex:none}
+.grade.tres .item .seta{display:none}
+
+/* ---------- cardapio compacto ---------- */
+.prato{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);
+  padding:12px 14px;cursor:pointer;min-height:64px;
+  transition:background var(--medio) var(--curva), border-color var(--medio) var(--curva),
+             transform var(--rapido) var(--curva);
+}
+.prato:hover{background:var(--card-2);border-color:var(--linha-2)}
+.prato:active{transform:scale(.98)}
+.prato:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:2px}
+.prato{padding:8px;min-height:76px;gap:10px;border-radius:13px;box-shadow:var(--sombra)}
+.prato .corpo{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.prato .nome{font-size:12px;font-weight:700;line-height:1.25;letter-spacing:-.01em}
+/* Papel e selos na mesma linha: em pilha, seis pratos viravam seis blocos de
+   130px e a pessoa rolava a tela inteira para ver o almoco de um dia so. */
+.prato .selos{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.prato .papel{font-size:10px;color:var(--texto-2);line-height:1.3}
+.prato .seta{color:var(--texto-3);width:16px;height:16px;flex:none}
+.prato.blk{border-color:rgba(255,107,107,.35)}
+.prato.okk{border-color:rgba(69,212,144,.23)}
+.prato.wrn{border-color:var(--linha-2)}
+
+.selo-tag{
+  display:inline-flex;align-items:center;gap:5px;border-radius:var(--r-pill);
+  padding:2px 7px;font-size:10px;font-weight:600;line-height:1.4;white-space:normal;overflow-wrap:anywhere;
+  background:var(--neutro-fundo);color:var(--texto-2);
+}
+.selo-tag .icone{width:12px;height:12px;stroke-width:2.4}
+.selo-tag.verde{background:var(--verde-fundo);color:var(--verde)}
+.selo-tag.laranja{background:var(--laranja-fundo);color:var(--laranja)}
+.selo-tag.vermelho{background:var(--restricao-fundo);color:var(--restricao)}
+
+/* ---------- resumo numerico ---------- */
+.resumo{
+  background:linear-gradient(160deg,var(--card-2),#141416);
+  border:1px solid var(--linha-2);border-radius:var(--r-card);padding:18px;box-shadow:var(--sombra);
+}
+.resumo .numeros{display:flex;gap:26px;margin-top:10px;flex-wrap:wrap}
+.resumo .numero b{display:block;font-size:30px;font-weight:800;line-height:1;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.resumo .numero span{display:block;font-size:12px;color:var(--texto-2);margin-top:5px}
+.resumo .rodape{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:13px;border-top:1px solid var(--linha);font-size:13px;color:var(--texto-2)}
+.resumo .rodape b{color:var(--texto);font-weight:600}
+
+.linha-porcao{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:43px;
+  background:var(--card);border:1px solid var(--linha);border-radius:11px;padding:9px 12px;
+}
+.linha-porcao .nome{font-size:12px;font-weight:600;letter-spacing:-.005em}
+.linha-porcao .medida{
+  font-size:12px;font-weight:700;color:var(--texto);max-width:48%;text-align:right;
+  background:var(--card-3);border:1px solid var(--linha-2);border-radius:var(--r-pill);padding:3px 9px;
+}
+.pilha{display:flex;flex-direction:column;gap:7px}
+
+.resumo.prato-resumo{background:linear-gradient(135deg,rgba(245,217,78,.18),var(--card) 90%);border-color:rgba(245,217,78,.32);border-left:4px solid var(--amarelo)}
+.resumo.resumo-progresso{background:linear-gradient(130deg,rgba(245,217,78,.14),var(--card) 70%)}
+/* ---------- avaliacao ---------- */
+.notas{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.avaliacao-nota{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
+  min-height:112px;background:var(--card);border:1.5px solid var(--linha);
+  border-radius:var(--r-card);cursor:pointer;padding:14px 8px;
+  transition:border-color var(--medio) var(--curva), background var(--medio) var(--curva),
+             transform var(--rapido) var(--curva);
+}
+.avaliacao-nota .icone{width:42px;height:42px;color:var(--texto-2);transition:color var(--medio) var(--curva)}
+.avaliacao-nota span{font-size:13.5px;font-weight:600;color:var(--texto-2);transition:color var(--medio) var(--curva)}
+.avaliacao-nota:hover{border-color:var(--linha-2);background:var(--card-2)}
+.avaliacao-nota:active{transform:scale(.98)}
+.avaliacao-nota:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:2px}
+.avaliacao-nota[aria-pressed="true"]{background:var(--card-2);animation:escolher 260ms var(--curva)}
+.avaliacao-nota[aria-pressed="true"] span{color:var(--texto)}
+.avaliacao-nota.boa[aria-pressed="true"]{border-color:var(--verde);background:var(--verde-fundo)}
+.avaliacao-nota.boa[aria-pressed="true"] .icone{color:var(--verde)}
+.avaliacao-nota.regular[aria-pressed="true"]{border-color:var(--amarelo);background:rgba(245,217,78,.08)}
+.avaliacao-nota.regular .icone{color:var(--amarelo)}
+.avaliacao-nota.boa .icone{color:var(--verde)}
+.avaliacao-nota.ruim .icone{color:var(--restricao)}
+.avaliacao-nota.ruim[aria-pressed="true"]{border-color:var(--restricao);background:var(--restricao-fundo)}
+.avaliacao-nota.ruim[aria-pressed="true"] .icone{color:var(--restricao)}
+@keyframes escolher{0%{transform:scale(1)}45%{transform:scale(1.035)}100%{transform:scale(1)}}
+
+.marcas{display:flex;flex-wrap:wrap;gap:9px}
+.marca-tag{
+  display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:8px 14px;
+  background:var(--card);border:1px solid var(--linha);border-radius:var(--r-pill);
+  font-size:11px;font-weight:500;color:var(--texto-2);cursor:pointer;
+  transition:border-color var(--medio) var(--curva), color var(--medio) var(--curva),
+             background var(--medio) var(--curva);
+}
+.marca-tag .icone{width:15px;height:15px;opacity:0;transition:opacity var(--rapido) var(--curva)}
+.marca-tag:hover{border-color:var(--linha-2);color:var(--texto)}
+.marca-tag[aria-pressed="true"]{border-color:var(--amarelo);color:var(--amarelo);background:rgba(245,217,78,.09)}
+.marca-tag[aria-pressed="true"] .icone{opacity:1;color:var(--amarelo)}
+.marca-tag:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:2px}
+
+/* ---------- progresso ---------- */
+/* Grade de cinco colunas com trilho de altura fixa: em flex, coluna sem barra
+   colapsava e cada dia acabava com uma altura diferente. */
+.semana{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;
+  background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);padding:20px 16px}
+.dia{display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0}
+.dia .valor-dia{font-size:11px;font-weight:600;line-height:18px;color:var(--texto-2);font-variant-numeric:tabular-nums}
+.dia .trilho{width:70%;height:94px;border-radius:10px;background:transparent;
+  display:flex;align-items:flex-end;overflow:hidden}
+.dia .barra{width:100%;border-radius:10px;background:linear-gradient(180deg,var(--vermelho-alto),var(--vermelho));
+  transition:height var(--lento) var(--curva)}
+.dia .sigla{font-size:11px;font-weight:700;color:var(--texto-3);letter-spacing:.04em}
+.dia.hoje .barra{background:linear-gradient(180deg,var(--amarelo-alto),var(--amarelo))}
+.dia.hoje .sigla{color:var(--texto)}
+.dia.hoje .trilho{outline:0}
+.dia.sem-registro .barra{background:transparent}
+
+.metricas{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.metrica{background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);padding:14px;box-shadow:var(--sombra)}
+.metrica .topo-m{display:flex;align-items:center;gap:9px;color:var(--texto-2)}
+.metrica .topo-m .icone{width:16px;height:16px}
+.metrica .topo-m span{font-size:11.5px;font-weight:600;line-height:1.3}
+.metrica b{display:block;font-size:22px;font-weight:800;margin-top:10px;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.metrica em{display:block;font-size:11.5px;color:var(--texto-3);font-style:normal;margin-top:5px}
+
+/* ---------- perfil ---------- */
+.perfil-topo{display:flex;align-items:center;gap:14px;padding:10px 0}
+.campo-edicao{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:13px;background:var(--card);border:1px solid var(--linha);border-radius:12px;text-align:left;color:var(--texto);cursor:pointer}
+.campo-edicao .rotulo{font-size:13px;color:var(--texto-2);min-width:72px}
+.campo-edicao .valor{flex:1;min-width:0;font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.campo-edicao .icone{width:18px;height:18px;flex:none;color:var(--texto-2)}
+.campo-edicao:focus-visible{outline:2px solid var(--amarelo);outline-offset:2px}
+.avatar{width:64px;height:64px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:linear-gradient(145deg,#77808D,#424954);border:2px solid #858D99;color:#fff;font-size:24px;font-weight:700;
+  position:relative;overflow:visible;padding:0;cursor:pointer;
+  transition:border-color var(--medio) var(--curva),transform var(--rapido) var(--curva)}
+.avatar:hover{border-color:var(--vermelho-alto)}
+.avatar:active{transform:scale(.97)}
+.avatar:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:3px}
+.avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+/* O selo da camera diz que o circulo e tocavel. Sem ele, a foto parece
+   decoracao e ninguem descobre que da para trocar. */
+.avatar .camera{position:absolute;right:-3px;bottom:-3px;width:24px;height:24px;border-radius:50%;
+  display:grid;place-items:center;background:var(--vermelho);border:2px solid var(--fundo);color:#fff}
+.avatar .camera .icone{width:12px;height:12px}
+
+.perfil-topo .quem{min-width:0}
+.perfil-topo .quem b{display:block;font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+.perfil-topo .quem span{display:block;font-size:13px;color:var(--texto-2);margin-top:3px}
+
+.campos{background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);overflow:hidden}
+.campo{display:flex;justify-content:space-between;gap:16px;align-items:baseline;padding:9px 13px;min-height:40px}
+.campo + .campo{border-top:1px solid var(--linha)}
+.campo dt{font-size:12px;color:var(--texto-2);flex:none}
+.campo dd{margin:0;font-size:12px;font-weight:600;text-align:right;min-width:0;overflow-wrap:anywhere}
+
+.tags{display:flex;flex-wrap:wrap;gap:8px}
+.tag{display:inline-flex;align-items:center;gap:7px;border-radius:var(--r-pill);padding:7px 13px;
+  font-size:13px;font-weight:600;background:var(--restricao-fundo);color:var(--restricao)}
+.tag .icone{width:14px;height:14px}
+.tag.calma{background:var(--neutro-fundo);color:var(--texto-2)}
+
+.interruptor{
+  display:flex;align-items:center;gap:13px;width:100%;text-align:left;min-height:60px;
+  background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);
+  padding:13px 16px;cursor:pointer;transition:border-color var(--medio) var(--curva);
+}
+.interruptor:hover{border-color:var(--linha-2)}
+.interruptor:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:2px}
+.interruptor .txt{flex:1;min-width:0}
+.interruptor .txt b{display:block;font-size:14px;font-weight:600}
+.interruptor .txt span{display:block;font-size:12px;color:var(--texto-2);margin-top:2px;line-height:1.4}
+.chave{width:46px;height:28px;border-radius:var(--r-pill);flex:none;background:var(--card-3);
+  border:1px solid var(--linha-2);position:relative;transition:background var(--medio) var(--curva)}
+.chave::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+  background:var(--texto-3);transition:transform var(--medio) var(--curva), background var(--medio) var(--curva)}
+.interruptor[aria-pressed="true"] .chave{background:var(--vermelho);border-color:var(--vermelho)}
+.interruptor[aria-pressed="true"] .chave::after{transform:translateX(18px);background:#fff}
+
+/* ---------- estados ---------- */
+.esqueleto{border-radius:var(--r-card);background:linear-gradient(100deg,var(--card) 30%,var(--card-3) 50%,var(--card) 70%);
+  background-size:220% 100%;animation:brilhar 1.25s linear infinite}
+@keyframes brilhar{from{background-position:120% 0}to{background-position:-120% 0}}
+.vazio{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:34px 20px;
+  background:var(--card);border:1px dashed var(--linha-2);border-radius:var(--r-card)}
+.vazio .icone{width:28px;height:28px;color:var(--texto-3)}
+.vazio b{font-size:15px;font-weight:600}
+.vazio span{font-size:13px;color:var(--texto-2);max-width:30ch;line-height:1.5}
+
+.aviso{display:flex;gap:11px;align-items:flex-start;border-radius:var(--r-card);padding:13px 14px;
+  font-size:13.5px;line-height:1.5;border:1px solid transparent}
+.aviso .icone{margin-top:1px;width:18px;height:18px}
+.aviso.blk{background:var(--restricao-fundo);color:var(--restricao);border-color:rgba(255,107,107,.22)}
+.aviso.wrn{background:var(--laranja-fundo);color:var(--laranja);border-color:rgba(244,167,44,.22)}
+.aviso.okk{background:var(--verde-fundo);color:var(--verde);border-color:rgba(69,212,144,.22)}
+.aviso b{font-weight:700}
+
+/* ---------- telas do bot (as que ainda saem do texto) ---------- */
+.secao{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--texto-3);margin:22px 0 -4px}
+.tela > .secao:first-child{margin-top:0}
+.paragrafo{margin:0;font-size:var(--t-body);color:var(--texto)}
+.cartao > .paragrafo + .paragrafo{margin-top:12px}
+.paragrafo b{font-weight:700}
+.nota{margin:0;font-size:13px;color:var(--texto-2);line-height:1.55}
+.prosa{background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);padding:16px}
+.prosa > * + *{margin-top:10px}
+.passo{display:inline-flex;align-items:center;gap:8px;background:var(--card-2);border:1px solid var(--linha-2);
+  border-radius:var(--r-pill);padding:7px 14px;font-size:13px;font-weight:700}
+.linha{display:flex;justify-content:space-between;gap:12px;align-items:center;min-height:52px;
+  background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);padding:12px 14px;font-size:14px}
+.linha .medida{font-size:12px;font-weight:700;color:var(--texto);max-width:48%;text-align:right;
+  background:var(--card-3);border-radius:var(--r-pill);padding:4px 11px}
+.tabela{background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);padding:15px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;line-height:1.6;
+  white-space:pre;overflow-x:auto;color:var(--texto-2)}
+.opcao{display:flex;gap:12px;align-items:center;width:100%;text-align:left;min-height:56px;
+  background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);padding:14px;
+  font-size:14px;font-weight:600;cursor:pointer;transition:background var(--medio) var(--curva),border-color var(--medio) var(--curva)}
+.opcao:hover{background:var(--card-2);border-color:var(--linha-2)}
+.opcao:active{transform:scale(.98)}
+.opcao:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:2px}
+.opcao[disabled]{opacity:.5;cursor:default}
+.opcao .caixa{width:20px;height:20px;border-radius:6px;flex:none;border:2px solid var(--texto-3);
+  display:grid;place-items:center;color:transparent}
+.opcao.marcada .caixa{background:var(--vermelho);border-color:var(--vermelho);color:#fff}
+.opcao .caixa .icone{width:12px;height:12px;stroke-width:3}
+.opcao .txt{flex:1;min-width:0}
+.opcao .txt b{display:block;font-size:14px;font-weight:600}
+.opcao .txt span{display:block;font-size:12px;font-weight:400;color:var(--texto-2);margin-top:3px;line-height:1.45}
+.cabeca-tela{font-size:26px;font-weight:800;line-height:1.22;letter-spacing:-.03em}
+
+/* ---------- cadastro ---------- */
+.progresso-cadastro{height:4px;border-radius:2px;background:var(--card-3);overflow:hidden;margin-bottom:20px}
+.progresso-cadastro .feito{height:100%;background:var(--vermelho);border-radius:2px;
+  transition:width var(--medio) var(--curva)}
+.campo-texto{margin-top:14px}
+.campo-texto label{display:block;font-size:12px;font-weight:600;color:var(--texto-2);margin-bottom:6px}
+/* 16px nao e capricho: abaixo disso o Safari do iPhone da zoom ao focar o
+   campo, e a tela inteira sai de lugar no meio do cadastro. */
+.campo-texto input{width:100%;min-height:56px;font:inherit;font-size:16px;color:var(--texto);
+  background:var(--card);border:1px solid var(--linha-2);border-radius:var(--r-card);padding:0 16px}
+.campo-texto input::placeholder{color:var(--texto-3)}
+.campo-texto input:focus{border-color:var(--vermelho-alto);outline:2px solid var(--vermelho-alto);outline-offset:1px}
+
+/* ---------- acoes no rodape ---------- */
+.acoes{flex:none;display:flex;flex-direction:column;gap:7px;padding:10px var(--pad);max-height:38dvh;overflow-y:auto;
+  background:var(--card);border-top:1px solid var(--linha)}
+.acoes > *{flex-shrink:0}
+.acoes .cta{min-height:44px;padding:8px 14px;border-radius:11px}
+.acoes .cta b{font-size:12px}
+.acoes .cta > .icone{width:18px;height:18px}
+.acoes .leve > .icone,.acoes .fantasma > .icone{color:var(--amarelo)}
+.acoes:empty{display:none}
+.acoes .anexo{background:transparent;border:1.5px dashed var(--vermelho-alto);color:var(--vermelho-alto)}
+.acoes .anexo:hover{background:var(--restricao-fundo)}
+
+/* ---------- navegacao inferior ---------- */
+.abas{flex:none;display:flex;background:var(--fundo);border-top:1px solid var(--linha-2);padding:7px 8px 6px;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+/* No cadastro a navegacao sai: um toque numa aba abandonaria o rascunho sem
+   avisar. O `display:flex` acima vence o `[hidden]` do navegador, por isso a
+   regra explicita. */
+.abas[hidden]{display:none}
+.aba{flex:1;min-width:0;min-height:55px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  padding:7px 3px;background:transparent;border:0;cursor:pointer;font-size:10px;color:var(--texto-3)}
+.aba .icone{width:21px;height:21px}
+.aba[aria-current="page"]{color:var(--vermelho-alto);font-weight:700}
+.aba[aria-current="page"]::after{content:"";height:3px;width:35px;position:absolute;bottom:-6px;left:calc(50% - 17.5px);background:var(--vermelho);border-radius:3px}
+.aba:focus-visible{outline:2px solid var(--amarelo);outline-offset:-3px;border-radius:8px}
+/* Enquanto o cardapio nao chegou. Sem opacidade: a barra piscando de cinza
+   claro para cinza escuro na abertura chamaria mais atencao que a espera. */
+.aba[disabled]{cursor:default}
+
+/* ---------- convite para instalar ---------- */
+.instalar{flex:none;display:none;align-items:center;flex-wrap:wrap;gap:8px;background:var(--card-2);
+  border-bottom:1px solid var(--linha);padding:12px var(--pad);font-size:13.5px;color:var(--texto)}
+.instalar.on{display:flex}
+.instalar p{margin:0;flex:1 1 160px;font-size:12px}
+.instalar button{background:var(--card-3);color:var(--texto);border:0;border-radius:12px;
+  padding:10px 15px;font-size:13px;font-weight:700;cursor:pointer;flex:none;min-height:44px}
+.instalar .nao{background:none;color:var(--texto-3);font-weight:500;padding:10px 4px}
+
+/* ---------- folha ---------- */
+dialog{border:0;padding:0;background:transparent;max-width:100%;width:100%;margin:auto auto 0}
+dialog::backdrop{background:rgba(0,0,0,.72)}
+.folha::before{content:"";display:block;width:36px;height:4px;background:var(--linha-2);border-radius:9px;margin:-10px auto 22px}
+.folha{background:var(--card);color:var(--texto);border:1px solid var(--linha-2);
+  border-radius:24px 24px 0 0;padding:24px var(--pad);
+  padding-bottom:calc(24px + env(safe-area-inset-bottom));
+  max-width:480px;margin:0 auto;max-height:86dvh;overflow-y:auto}
+.folha h2{font-size:var(--t-h2);margin-bottom:6px}
+.folha h3{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--texto-3);margin:22px 0 9px}
+.folha p{margin:0 0 10px;font-size:14px;color:var(--texto-2);line-height:1.55}
+.folha dl{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;margin:0;font-size:14px}
+.folha dt{color:var(--texto-3)}
+.folha dd{margin:0}
+.folha .fechar{width:100%;margin-top:22px;background:var(--amarelo);color:var(--amarelo-ink);
+  border:0;border-radius:var(--r-btn);padding:15px;font-weight:700;cursor:pointer;font-size:15px;min-height:var(--h-cta)}
+.estados{display:flex;flex-direction:column;gap:8px}
+.estado{display:flex;gap:11px;align-items:center;font-size:13.5px;padding:11px 13px;border-radius:12px}
+.estado b{white-space:nowrap;font-weight:700}
+.estado.blk{background:var(--restricao-fundo);color:var(--restricao)}
+.estado.wrn{background:var(--laranja-fundo);color:var(--laranja)}
+.estado.okk{background:var(--verde-fundo);color:var(--verde)}
+.estado span{color:var(--texto-2)}
+
+/* ---------- marca no rodape ---------- */
+.assinatura{text-align:center;padding:24px 0 8px}
+.assinatura .nome{color:var(--texto-2);font-size:20px;font-weight:800;letter-spacing:-.03em}
+.assinatura .nome i{color:var(--amarelo);font-style:normal}
+.assinatura p{margin:5px 0 0;font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--texto-3)}
+
+@media (max-width:359px){
+  :root{--pad:14px;--t-h1:23px}
+  .conquistas{padding:13px}
+  .conq-corpo{gap:9px}
+  .conq-item{font-size:11px;gap:6px}
+  .pontos{width:85px}
+  .anel{width:81px;height:81px}
+  .conq-topo h2{font-size:15px}
+  .filtros{gap:5px}
+  .filtro{font-size:10px;padding:6px 7px}
+  .foto-prato{width:48px;height:48px}
+  .prato-resumo .foto-prato{width:95px;height:95px}
+  .prato-resumo .macros > b{font-size:20px}
+  .resumo-progresso{gap:10px}
+}
+
+@media (min-width:600px){
+  body{background:radial-gradient(ellipse at 50% 0%,#242025,#090A0C 65%)}
+  .app{height:min(940px,calc(100dvh - 48px));margin:24px auto;border:1px solid var(--linha-2);
+    border-radius:30px;box-shadow:0 24px 80px rgba(0,0,0,.45)}
+  dialog{margin:auto;width:min(480px,calc(100% - 40px))}
+  .folha{border-radius:24px}
+}
+
+@media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important} }
+</style>
+</head>
+<body>
+
+<!-- Icones desenhados aqui, em traco de 2px na grade de 24, que e a do Lucide.
+     Ficam no arquivo em vez de virem de uma biblioteca por um motivo do lugar:
+     refeitorio costuma ter sinal ruim, e um app sem icone nenhum no subsolo da
+     fabrica nao demonstra nada. Alem disso o simbolo de restricao carrega
+     significado de seguranca, e significado nao pode depender de download. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></symbol>
+  <symbol id="i-ajuda" viewBox="0 0 24 24"><path d="M21 12a8.5 8.5 0 0 1-12.3 7.6L3 21l1.4-5.1A8.5 8.5 0 1 1 21 12Z"/><path d="M9.6 9.5a2.4 2.4 0 1 1 3.3 2.2c-.6.3-.9.8-.9 1.4v.3M12 16.5h.01"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8.2 6.8M12 3l3.8 3.8"/><path d="M4 13v5.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V13"/></symbol>
+  <symbol id="i-voltar" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-seta" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-trofeu" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4.8a.8.8 0 0 0-.8.9c.2 1.8 1.2 3.4 3.2 3.9M17 6h2.2a.8.8 0 0 1 .8.9c-.2 1.8-1.2 3.4-3.2 3.9"/><path d="M12 14v3M9 20h6M10.5 17h3l.7 3H9.8l.7-3Z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-estrela-cheia" viewBox="0 0 24 24"><path d="M12 2.6l2.8 5.7 6.3.9-4.6 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.2l6.3-.9L12 2.6Z"/></symbol>
+  <symbol id="i-coracao" viewBox="0 0 24 24"><path d="M12 20.5C6.5 16.8 3 13.9 3 10.2 3 7.4 5.2 5.3 7.9 5.3c1.6 0 3.1.7 4.1 2 1-1.3 2.5-2 4.1-2 2.7 0 4.9 2.1 4.9 4.9 0 3.7-3.5 6.6-9 10.3Z"/></symbol>
+  <symbol id="i-talher" viewBox="0 0 24 24"><path d="M6 3v7a2.5 2.5 0 0 0 5 0V3M8.5 12.5V21"/><path d="M17.5 3c-1.7 1-2.5 3-2.5 5.5 0 1.7.8 2.8 2.5 3V21"/></symbol>
+  <symbol id="i-tigela" viewBox="0 0 24 24"><path d="M3 11h18a9 9 0 0 1-18 0Z"/><path d="M8.5 7.8c.6-1.6 2-2.6 3.7-2.6 1.4 0 2.6.6 3.4 1.7M12 5.2V3.5"/></symbol>
+  <symbol id="i-calendario" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-estrela" viewBox="0 0 24 24"><path d="M12 3.2l2.7 5.5 6.1.9-4.4 4.3 1 6-5.4-2.8L6.6 20l1-6-4.4-4.3 6.1-.9L12 3.2Z"/></symbol>
+  <symbol id="i-tendencia" viewBox="0 0 24 24"><path d="M3.5 16.5l5.5-5.5 3.5 3.5 6-6"/><path d="M14.5 8.5h4v4"/></symbol>
+  <symbol id="i-ficha" viewBox="0 0 24 24"><path d="M8 4h8a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M9.5 3h5v2.5h-5zM9.5 11h5M9.5 15h3"/></symbol>
+  <symbol id="i-barras" viewBox="0 0 24 24"><path d="M5 20V12M12 20V5M19 20v-5"/></symbol>
+  <symbol id="i-pessoa" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5c.6-3.7 3.8-6 7.5-6s6.9 2.3 7.5 6"/></symbol>
+  <symbol id="i-sino" viewBox="0 0 24 24"><path d="M18 9a6 6 0 1 0-12 0c0 4.5-1.5 6-1.5 6h15S18 13.5 18 9Z"/><path d="M10.3 19a2 2 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-marcador" viewBox="0 0 24 24"><path d="M6.5 4h11a1 1 0 0 1 1 1v15.2a.6.6 0 0 1-.9.5L12 17.5l-5.6 3.2a.6.6 0 0 1-.9-.5V5a1 1 0 0 1 1-1Z"/></symbol>
+  <symbol id="i-clipe" viewBox="0 0 24 24"><path d="M20 11.5l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></symbol>
+  <symbol id="i-lapis" viewBox="0 0 24 24"><path d="M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"/><path d="M14.5 6.5l3 3"/></symbol>
+  <symbol id="i-arquivo" viewBox="0 0 24 24"><path d="M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5L13.5 3Z"/><path d="M13.5 3v5.5H19"/></symbol>
+  <symbol id="i-bloqueio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+  <symbol id="i-atencao" viewBox="0 0 24 24"><path d="M12 3.8L21 19.5H3L12 3.8Z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-liberado" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.3l2.7 2.7L16 9.6"/></symbol>
+  <symbol id="i-pular" viewBox="0 0 24 24"><path d="M5 12h13M13.5 7l5 5-5 5"/></symbol>
+  <symbol id="i-mao" viewBox="0 0 24 24"><path d="M9 11V4.8a1.4 1.4 0 0 1 2.8 0V11M11.8 10.5V3.8a1.4 1.4 0 0 1 2.8 0v6.7M14.6 11V5.5a1.4 1.4 0 0 1 2.8 0V14a6.5 6.5 0 0 1-6.5 6.5h-.6a5 5 0 0 1-4-2L4 15.5a1.5 1.5 0 0 1 2.3-1.9L9 16.2V11"/></symbol>
+  <symbol id="i-bom" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.4 14.2a4.3 4.3 0 0 0 7.2 0M9 9.5h.01M15 9.5h.01"/></symbol>
+  <symbol id="i-medio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.6 15h6.8M9 9.5h.01M15 9.5h.01"/></symbol>
+  <symbol id="i-ruim" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.6 15.8a4.3 4.3 0 0 0-7.2 0M9 9.5h.01M15 9.5h.01"/></symbol>
+  <symbol id="i-grupo" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.8 20c.5-3.2 3.2-5.2 6.2-5.2s5.7 2 6.2 5.2"/><path d="M16.2 5.2a3.2 3.2 0 0 1 0 5.9M17.6 14.9c2 .6 3.4 2.4 3.7 4.6"/></symbol>
+  <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 3l7 2.6v5.6c0 4.3-2.9 7.7-7 9.2-4.1-1.5-7-4.9-7-9.2V5.6L12 3Z"/><path d="M8.8 12.2l2.3 2.3 4.1-4.4"/></symbol>
+  <symbol id="i-chama" viewBox="0 0 24 24"><path d="M12 3s4.5 3.4 4.5 7.6a4.5 4.5 0 0 1-9 0c0-1.3.5-2.4 1.2-3.3"/><path d="M12 21a5 5 0 0 0 5-5c0-2-1.2-3.6-2.4-4.8"/><path d="M12 21a5 5 0 0 1-5-5c0-1.2.5-2.3 1.2-3.2"/></symbol>
+  <symbol id="i-alvo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></symbol>
+  <symbol id="i-folha" viewBox="0 0 24 24"><path d="M4 20c0-8 5-13 16-13 0 9-5 13-11 13H4Z"/><path d="M4 20c2-5 5-8 9-10"/></symbol>
+  <symbol id="i-gota" viewBox="0 0 24 24"><path d="M12 3.5c3.5 4 5.5 6.6 5.5 9.2a5.5 5.5 0 0 1-11 0C6.5 10.1 8.5 7.5 12 3.5Z"/></symbol>
+  <symbol id="i-pao" viewBox="0 0 24 24"><path d="M5 10.5C5 7.9 8.1 6 12 6s7 1.9 7 4.5c0 1.2-.7 1.8-1.6 2v6a1.5 1.5 0 0 1-1.5 1.5h-7.8A1.5 1.5 0 0 1 6.6 18.5v-6c-.9-.2-1.6-.8-1.6-2Z"/></symbol>
+  <symbol id="i-relogio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></symbol>
+  <symbol id="i-cadeado" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7"/></symbol>
+  <symbol id="i-sair" viewBox="0 0 24 24"><path d="M10 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4"/><path d="M15.5 15.5 20 12l-4.5-3.5M20 12H9.5"/></symbol>
+  <symbol id="i-engrenagem" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.5a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></symbol>
+  <symbol id="i-proibido" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></symbol>
+  <symbol id="i-atualizar" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-.7 4.5"/><path d="M20 5.5V11h-5.5"/></symbol>
+  <symbol id="i-prancheta" viewBox="0 0 24 24"><rect x="4.5" y="4.5" width="15" height="15" rx="2.5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
+  <symbol id="i-fogo" viewBox="0 0 24 24"><path d="M12 21a6 6 0 0 0 6-6c0-4.5-6-12-6-12S6 10.5 6 15a6 6 0 0 0 6 6Z"/><path d="M12 21a2.7 2.7 0 0 0 2.7-2.7c0-2-2.7-5.3-2.7-5.3s-2.7 3.3-2.7 5.3A2.7 2.7 0 0 0 12 21Z"/></symbol>
+  <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4.5 7.5h3l1.4-2.2h6.2l1.4 2.2h3a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 17.5V9a1.5 1.5 0 0 1 1.5-1.5Z"/><circle cx="12" cy="13" r="3.4"/></symbol>
+  <symbol id="i-casa" viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8.5Z"/><path d="M9.5 21v-6h5v6"/></symbol>
+</defs></svg>
+
+<div class="app">
+  <header class="topo" id="topo"></header>
+
+  <div class="instalar" id="faixa-instalar">
+    <p id="instalar-texto">Instale na tela inicial e use como aplicativo.</p>
+    <button id="btn-instalar" type="button">Instalar</button>
+    <button class="nao" id="btn-depois" type="button">Agora não</button>
+  </div>
+
+  <main class="tela" id="tela" tabindex="-1" aria-live="polite"></main>
+  <input type="file" id="arquivo-pdf" accept="application/pdf,.pdf" hidden>
+  <input type="file" id="arquivo-foto" accept="image/*" hidden>
+  <div class="acoes" id="acoes"></div>
+  <nav class="abas" id="abas" aria-label="Seções"></nav>
+</div>
+
+<dialog id="folha"><div class="folha" id="folha-corpo"></div></dialog>
+
+<script>
+(function(){
+  "use strict";
+
+  var DADOS = null, historico = [], atual = "inicio";
+  var tela = document.getElementById("tela");
+  var acoes = document.getElementById("acoes");
+  var abas = document.getElementById("abas");
+  var topo = document.getElementById("topo");
+  // A previa pode trazer a home ja montada para leitores sem JavaScript.
+  // Ao iniciar o app, a navegacao volta a ser criada pelo codigo abaixo.
+  abas.textContent = "";
+
+  // O que a pessoa mexeu nesta sessao. Fica so na memoria: e demonstracao, e
+  // dizer que gravou no servidor seria mentir sobre o que aconteceu.
+  var estado = {
+    nota: null, faltas: [], avaliado: false,
+    registrado: false, registro: null, montagem: [], passoMontagem: 0,
+    pontos: 0, conquistaNova: null, gestao: false,
+    filtroCardapio: "todos", periodoProgresso: "semana"
+  };
+  try { estado.gestao = localStorage.getItem("apetit-gestao") === "sim"; } catch (e) {}
+  // `lido`, `guardar` e `esquecer` ficam mais abaixo; a leitura acima acontece
+  // antes de tudo e por isso fala direto com o navegador.
+
+  var ABAS = [
+    { id: "inicio",    icone: "i-casa",       nome: "Início" },
+    { id: "cardapio",  icone: "i-talher",     nome: "Cardápio" },
+    { id: "progresso", icone: "i-barras",     nome: "Progresso" },
+    { id: "perfil",    icone: "i-pessoa",     nome: "Perfil" }
+  ];
+
+  var ACOMPANHAMENTO = [
+    { id: "ficha", nome: "Minha ficha nutricional", busca: "Minha ficha", icone: "i-ficha" },
+    { id: "meu_dia", nome: "Meu dia", busca: "Meu dia", icone: "i-prancheta" },
+    { id: "favoritos", nome: "Alimentos preferidos", busca: "Favoritos", icone: "i-coracao" },
+    { id: "avisos", nome: "Notificações", busca: "Avisos", icone: "i-sino" },
+    { id: "ajuda", nome: "Ajuda", busca: "Ajuda", icone: "i-ajuda" }
+  ];
+
+  // "Avaliacao do refeitorio" virou "Resultados das avaliacoes": o funcionario
+  // ja tem uma acao chamada "Avaliar o refeitorio", e dois nomes quase iguais
+  // para coisas opostas — uma escreve, a outra le — confundem quem administra.
+  var ADMIN = [
+    { id: "piloto",      icone: "i-trofeu",  nome: "Relatório do piloto", detalhe: "Visão geral e indicadores" },
+    { id: "relatorio",   icone: "i-grupo",   nome: "Adesão por setor", detalhe: "Participação agregada" },
+    { id: "atendimento", icone: "i-estrela", nome: "Resultados das avaliações", detalhe: "Satisfação e pontos de melhoria" },
+    { id: "cobertura",   icone: "i-escudo",  nome: "Cobertura de alergênicos", detalhe: "Informação e segurança" }
+  ];
+
+  // Categoria do cardapio -> icone. Sem entrada, o prato usa o talher generico:
+  // desenho errado ensina a desconfiar do desenho certo.
+  var ICONE_CATEGORIA = {
+    "PRATO PRINCIPAL": "i-talher", "OPCAO AO PP": "i-talher",
+    "GUARNICAO": "i-pao", "ARROZ": "i-tigela", "FEIJAO": "i-tigela",
+    "SALADA": "i-folha", "FRUTA": "i-folha",
+    "SOBREMESA": "i-gota", "BEBIDA": "i-gota"
+  };
+
+  // ---------- utilitarios ----------
+  function escapar(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  function el(tag, classe, html){
+    var n = document.createElement(tag);
+    if (classe) n.className = classe;
+    if (html != null) n.innerHTML = html;
+    if (tag === "button") n.type = "button";
+    return n;
+  }
+  function icone(nome, classe){
+    var s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    s.setAttribute("class", "icone " + (classe || ""));
+    s.setAttribute("aria-hidden", "true");
+    var u = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    u.setAttribute("href", "#" + nome);
+    s.appendChild(u);
+    return s;
+  }
+  function chip(nome, calmo){
+    var c = el("span", "chip" + (calmo ? " calmo" : ""));
+    c.appendChild(icone(nome));
+    return c;
+  }
+  function selo(texto, cor, ic){
+    var s = el("span", "selo-tag" + (cor ? " " + cor : ""));
+    if (ic) s.appendChild(icone(ic));
+    s.appendChild(el("span", "", escapar(texto)));
+    return s;
+  }
+  function botaoIcone(ic, rotulo, aoClicar){
+    var b = el("button", "crculo");
+    b.setAttribute("aria-label", rotulo);
+    b.appendChild(icone(ic));
+    b.addEventListener("click", aoClicar);
+    return b;
+  }
+  // Contador que anda ate o numero em vez de pular. Respeita quem pediu menos
+  // animacao no sistema.
+  function contarAte(no, de, ate){
+    var reduz = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduz || de === ate){ no.textContent = String(ate); return; }
+    var inicio = performance.now(), dur = 620;
+    (function passo(agora){
+      var t = Math.min(1, (agora - inicio) / dur);
+      var suave = 1 - Math.pow(1 - t, 3);
+      no.textContent = String(Math.round(de + (ate - de) * suave));
+      if (t < 1) requestAnimationFrame(passo);
+    })(inicio);
+  }
+
+  var COR = { bloqueio: "vermelho", atencao: "laranja", liberado: "verde" };
+  var ICONE_VEREDITO = { bloqueio: "i-proibido", atencao: "i-atencao", liberado: "i-liberado" };
+
+
+// ---------- para onde os itens de menu levam ----------
+  //
+  // Aqui moravam ~200 linhas que liam a mensagem do bot e a desenhavam como
+  // tela: um interpretador de texto do Telegram com regex para prato,
+  // porcao, secao e aviso. Ele existia porque reescrever setenta telas a mao
+  // teria criado uma segunda copia do conteudo. Com todas as telas nativas,
+  // o conteudo passou a ter um dono so, e o interpretador virou peso morto.
+
+  // Onde um item do menu leva. Sobrou uma linha: antes era preciso procurar o
+  // destino entre os botoes capturados do bot quando a tela nao era nativa.
+  function alvoDe(item){
+    return NATIVAS[item.id] ? item.id : "";
+  }
+
+
+  // ---------- cabecalhos ----------
+  function cabecalhoInicio(){
+    topo.className = "topo marca";
+    topo.textContent = "";
+    var barra = el("div", "barra");
+    barra.appendChild(botaoIcone("i-info", "Sobre esta demonstração", abrirSobre));
+    var titulo = el("div", "titulo");
+    titulo.appendChild(el("h1", "", "Apetit"));
+    barra.appendChild(titulo);
+    barra.appendChild(botaoIcone("i-sino", "Notificações", function(){
+      var alvo = alvoDe({id:"avisos", busca:"Avisos"});
+      if (alvo) mostrar(alvo);
+    }));
+    topo.appendChild(barra);
+    topo.appendChild(el("p", "apoio", "Alimenta o que te faz bem"));
+  }
+
+  function cabecalhoInterno(nome, apoio){
+    topo.className = "topo simples";
+    topo.textContent = "";
+    var barra = el("div", "barra");
+    barra.appendChild(botaoIcone("i-voltar", "Voltar", function(){
+      mostrar(historico.length ? historico.pop() : "inicio", false);
+    }));
+    var titulo = el("div", "titulo");
+    titulo.appendChild(el("h1", "", escapar(nome || "Apetit")));
+    if (apoio) titulo.appendChild(el("p", "", escapar(apoio)));
+    barra.appendChild(titulo);
+    barra.appendChild(botaoIcone("i-info", "Sobre esta demonstração", abrirSobre));
+    topo.appendChild(barra);
+  }
+
+  // Compartilhar de verdade: e assim que as pessoas do piloto recebem o link.
+  function compartilhar(){
+    var dados = { title: "Apetit", text: "O app do refeitório da Apetit.", url: location.href };
+    if (navigator.share){ navigator.share(dados).catch(function(){}); return; }
+    if (navigator.clipboard){
+      navigator.clipboard.writeText(location.href)
+        .then(function(){ recado("Link copiado."); })
+        .catch(function(){ recado(location.href); });
+      return;
+    }
+    recado(location.href);
+  }
+
+  // O cadastro fica guardado; o registro e a avaliacao, nao. A diferenca e real
+  // — no app de verdade quem grava isso e o servidor do bot, e aqui nao ha
+  // servidor — e precisa aparecer na hora da confirmacao. Descobrir sozinho,
+  // recarregando a pagina e vendo os pontos voltarem, e a pior forma de saber:
+  // a pessoa passa a duvidar de tudo que o app confirmou antes.
+  function notaDeSimulacao(html){
+    var n = el("p", "legenda", html);
+    n.style.marginTop = "10px";
+    return n;
+  }
+
+  function recado(texto){
+    var antigo = document.getElementById("recado");
+    if (antigo) antigo.remove();
+    var nota = el("div", "aviso okk");
+    nota.id = "recado";
+    nota.appendChild(icone("i-liberado"));
+    nota.appendChild(el("span", "", escapar(texto)));
+    tela.insertBefore(nota, tela.firstChild);
+    tela.scrollTop = 0;
+    setTimeout(function(){ if (nota.parentNode) nota.remove(); }, 4000);
+  }
+
+  var folha = document.getElementById("folha");
+  var folhaCorpo = document.getElementById("folha-corpo");
+
+  function abrirFolha(montar){
+    folhaCorpo.textContent = "";
+    montar(folhaCorpo);
+    var fechar = el("button", "fechar", "Fechar");
+    fechar.addEventListener("click", function(){
+      if (typeof folha.close === "function") folha.close(); else folha.removeAttribute("open");
+    });
+    folhaCorpo.appendChild(fechar);
+    if (typeof folha.showModal === "function") folha.showModal(); else folha.setAttribute("open", "");
+  }
+
+  function abrirSobre(){
+    abrirFolha(function(c){
+      c.appendChild(el("h2", "", "Sobre esta demonstração"));
+      c.appendChild(el("p", "", (cadastroSalvo()
+        ? "Você está usando o app com o <b>seu cadastro</b>, guardado neste aparelho. "
+        : "Você está usando o app como a <b>Mariana</b>, o cadastro de exemplo. ") +
+        "As telas foram geradas rodando o código real do bot — não são maquete."));
+
+      var compartilharApp = el("button", "cta leve");
+      compartilharApp.appendChild(icone("i-share"));
+      compartilharApp.appendChild(el("b", "", "Compartilhar o app"));
+      compartilharApp.addEventListener("click", compartilhar);
+      c.appendChild(compartilharApp);
+      var verEstados = el("button", "cta leve");
+      verEstados.style.marginTop = "10px";
+      verEstados.appendChild(icone("i-prancheta"));
+      verEstados.appendChild(el("b", "", "Ver estados da interface"));
+      verEstados.addEventListener("click", function(){ folha.close(); mostrar("estados"); });
+      c.appendChild(verEstados);
+      c.appendChild(el("h3", "", "Quem você é"));
+      var dl = el("dl", "");
+      var p = pessoa();
+      [["Refeitório", p.refeitorio], ["Empresa", p.empresa], ["Setor", p.setor],
+       ["Objetivo", p.objetivo], ["Alergias", (p.restricoes || []).join(", ")]
+      ].forEach(function(par){
+        if (!par[1]) return;
+        dl.appendChild(el("dt", "", escapar(par[0])));
+        dl.appendChild(el("dd", "", escapar(par[1])));
+      });
+      c.appendChild(dl);
+
+      c.appendChild(el("h3", "", "Os três avisos do cardápio"));
+      var estados = el("div", "estados");
+      [["blk", "i-proibido", "Não pode", "a receita declara o alergênico"],
+       ["wrn", "i-atencao", "Não sei", "ninguém declarou — pergunte no balcão"],
+       ["okk", "i-liberado", "Liberado", "só quando alguém conferiu e declarou"]
+      ].forEach(function(e){
+        var linha = el("div", "estado " + e[0]);
+        linha.appendChild(icone(e[1]));
+        linha.appendChild(el("b", "", e[2]));
+        linha.appendChild(el("span", "", e[3]));
+        estados.appendChild(linha);
+      });
+      c.appendChild(estados);
+
+      c.appendChild(el("h3", "", "Os pontos são de verdade"));
+      c.appendChild(el("p", "", "Saem das regras de pontuação do código — 10 por registrar a " +
+        "refeição, 5 por incluir salada ou fruta, 10 por bater a meta de proteína — aplicadas " +
+        "ao almoço que a Mariana registrou. Não é um número escrito na tela."));
+
+      c.appendChild(el("h3", "", "O que é de mentira aqui"));
+      c.appendChild(el("p", "", "O cardápio é de exemplo, na estrutura que a operação exporta. " +
+        "O piloto na visão da Apetit é simulado — nenhuma pessoa real aparece em relatório " +
+        "nenhum. Nesta demonstração nada é gravado: registrar uma refeição ou avaliar o " +
+        "refeitório muda a tela e se perde ao recarregar."));
+
+      c.appendChild(el("h3", "", "O que não muda"));
+      c.appendChild(el("p", "", "Sua empresa não vê o que você come, nem o seu objetivo, nem as " +
+        "suas restrições. A avaliação do refeitório é a única coisa que sai de você — e vai sem " +
+        "nome, sem empresa e sem setor."));
+    });
+  }
+
+
+  // ======================= telas nativas =======================
+  //
+  // Estas cinco saem de `dados.json`, nao do texto do bot: elas precisam de
+  // estrutura que uma mensagem de Telegram nao tem — selo por prato, grafico
+  // da semana, campos de cadastro. O conteudo continua vindo das mesmas
+  // funcoes de dominio; o que muda e o formato em que ele chega.
+
+  function vazio(titulo, detalhe, ic){
+    var c = el("div", "vazio");
+    c.appendChild(icone(ic || "i-prancheta"));
+    c.appendChild(el("b", "", escapar(titulo)));
+    if (detalhe) c.appendChild(el("span", "", escapar(detalhe)));
+    return c;
+  }
+
+  // ---------- 1. inicio ----------
+  // Rotulos de apresentacao; as chaves e as regras de pontuacao continuam no dominio.
+  function nomeConquista(nome){
+    return ({
+      "Atingiu a meta de proteina do dia": "Meta de proteína atingida",
+      "Registrou a refeicao": "Refeição registrada",
+      "Incluiu salada ou fruta no prato": "Salada ou fruta no prato"
+    })[nome] || nome;
+  }
+
+  // O anel e decorativo: os pontos nao tem teto nem porcentagem de conclusao.
+  function circuloPontos(){
+    var pontos = el("div", "pontos");
+    var anel = el("div", "anel");
+    anel.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="none" stroke="rgba(245,217,78,.2)" stroke-width="5"/>' +
+      '<circle cx="50" cy="50" r="40" fill="none" stroke="#F5D94E" stroke-width="5" stroke-linecap="round" stroke-dasharray="226 26" transform="rotate(-92 50 50)"/>' +
+      '<path d="m51 5 1.5 3 3.5.5-2.5 2.4.6 3.5L51 12.8l-3.1 1.6.6-3.5L46 8.5l3.5-.5Z" fill="#F5D94E"/></svg>';
+    anel.appendChild(el("span", "n", String(estado.pontos)));
+    pontos.appendChild(anel);
+    pontos.appendChild(el("span", "l", "Pontos<br>acumulados"));
+    return pontos;
+  }
+
+  function cartaoConquistas(){
+    var p = meuHistorico().progresso;
+    var cartao = el("section", "conquistas");
+    var cabeca = el("div", "conq-topo");
+    cabeca.appendChild(chip("i-trofeu"));
+    cabeca.appendChild(el("h2", "", "Minhas conquistas"));
+    cartao.appendChild(cabeca);
+    var corpo = el("div", "conq-corpo");
+    var lista = el("div", "conq-lista");
+    var conquistas = p.conquistas || [];
+    if (conquistas.length){
+      conquistas.forEach(function(c){
+        var item = el("div", "conq-item" + (estado.conquistaNova === c.nome ? " nova" : ""));
+        var tick = el("span", "tick");
+        tick.appendChild(icone("i-check"));
+        item.appendChild(tick);
+        item.appendChild(el("span", "", escapar(nomeConquista(c.nome))));
+        lista.appendChild(item);
+      });
+    } else lista.appendChild(el("p", "nota", "Registre seu primeiro almoço para começar a conquistar."));
+    corpo.appendChild(lista);
+    var pontos = circuloPontos();
+    corpo.appendChild(pontos);
+    cartao.appendChild(corpo);
+    cartao._contador = pontos.querySelector(".n");
+    return cartao;
+  }
+
+  function atalho(item, classe){
+    var b = el("button", classe || "item");
+    var alvo = alvoDe(item);
+    b.appendChild(classe && classe.indexOf("cta") >= 0 ? icone(item.icone) : chip(item.icone));
+    b.appendChild(el("b", "", escapar(item.nome)));
+    b.appendChild(icone("i-seta", "seta"));
+    if (alvo) b.addEventListener("click", function(){mostrar(alvo);}); else b.disabled = true;
+    return b;
+  }
+
+  function telaInicio(){
+    cabecalhoInicio();
+    tela.appendChild(el("p", "inicio-frase", "Escolhas hoje, um amanhã melhor"));
+    var cartao = cartaoConquistas();
+    if (estado.registro){
+      var refeicao = estado.registro.refeicao;
+      var resumo = el("section", "refeicao-home");
+      var status = el("div", "estado-refeicao");
+      status.appendChild(icone("i-liberado"));
+      status.appendChild(el("span", "", "Registrado nesta sessão"));
+      resumo.appendChild(status);
+      resumo.appendChild(el("h2", "", "Seu almoço de hoje"));
+      resumo.appendChild(el("p", "resumo-almoco", (refeicao.kcal == null ? "Energia não informada" : refeicao.kcal + " kcal") + " · " + (refeicao.ptn == null ? "Proteína não informada" : refeicao.ptn + " g de proteína")));
+      resumo.appendChild(el("p", "alimentos-almoco", refeicao.itens.map(function(i){
+        return escapar(i.nome) + " · " + escapar(i.medida === "a vontade" ? "À vontade" : i.medida);
+      }).join("<br>")));
+      if (refeicao.incompleto) resumo.appendChild(el("p", "legenda", "Totais incompletos: há alimento sem informação nutricional."));
+      tela.appendChild(resumo);
+    } else tela.appendChild(cartao);
+    if (estado.pontosAnimar != null){
+      contarAte(cartao._contador, estado.pontosAnimar, estado.pontos);
+      estado.pontosAnimar = null;
+    }
+    var principais = el("div", "home-acoes");
+    if (estado.registro){
+      principais.appendChild(atalho({id:"avaliar", nome:estado.avaliado ? "Ver minha avaliação" : "Avaliar o almoço", icone:"i-estrela"}, "cta forte"));
+      principais.appendChild(atalho({id:"meu_dia", nome:"Ver refeição registrada", icone:"i-prancheta"}, "cta leve"));
+    } else {
+      principais.appendChild(atalho({id:"montar", busca:"Montar", nome:"Montar meu prato", icone:"i-talher"}, "cta forte"));
+      principais.appendChild(atalho({id:"quanto", nome:"Quanto pegar hoje", icone:"i-tigela"}, "cta leve"));
+    }
+    tela.appendChild(principais);
+    if (estado.registro) tela.appendChild(cartao);
+    var cabeca = el("div", "cabeca-secao");
+    cabeca.appendChild(el("h2", "", "Ações rápidas"));
+    cabeca.appendChild(el("span", "", "Facilita o seu dia"));
+    tela.appendChild(cabeca);
+    var grade = el("div", "home-rapidas");
+    grade.appendChild(atalho({id:"cardapio", nome:"Cardápio", icone:"i-calendario"}));
+    grade.appendChild(atalho(estado.registro
+      ? {id:"progresso", nome:"Meu progresso", icone:"i-tendencia"}
+      : {id:"avaliar", nome:"Avaliar o refeitório", icone:"i-estrela"}));
+    tela.appendChild(grade);
+  }
+
+  var FOTOS = {
+    "carne assada ao molho":"carne", "ovo cozido":"ovo", "macarrao alho e oleo":"macarrao",
+    "arroz parboilizado":"arroz", "feijao preto":"feijao", "mix de alface":"salada"
+  };
+  function fotoPrato(nome, fallback){
+    var normal = String(nome).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    var foto = FOTOS[normal];
+    if (!foto) return chip(fallback || "i-talher", true);
+    var no = el("span", "foto-prato foto-" + foto);
+    no.setAttribute("aria-hidden", "true");
+    return no;
+  }
+
+  // ---------- 2. cardapio ----------
+  function telaCardapio(){
+    cabecalhoInterno("Apetit", DADOS ? DADOS.dia_amigavel : "");
+    var grupos = (DADOS && DADOS.cardapio) || [];
+
+    porFonte();
+    tela.appendChild(el("p", "eyebrow", "Cardápio do dia"));
+    var dia = (DADOS && DADOS.dia_amigavel) || "";
+    var corte = dia.indexOf(",");
+    tela.appendChild(el("h1", "h1", corte > 0
+      ? escapar(dia.slice(0, corte + 1)) + "<br>" + escapar(dia.slice(corte + 1).trim())
+      : escapar(dia)));
+    tela.appendChild(el("p", "sub", "Alimentação equilibrada para um dia melhor."));
+
+    if (!grupos.length){
+      tela.appendChild(vazio("Nenhum cardápio publicado para hoje.",
+        "Assim que a operação enviar a planilha do dia, ele aparece aqui.", "i-calendario"));
+      return;
+    }
+
+    var filtros = el("div", "filtros");
+    filtros.setAttribute("role", "group");
+    filtros.setAttribute("aria-label", "Categorias do cardápio");
+    [["todos","Todos"],["proteinas","Proteínas"],["carboidratos","Carboidratos"],["saladas","Saladas"]].forEach(function(f){
+      var b = el("button", "filtro", f[1]);
+      b.setAttribute("aria-pressed", estado.filtroCardapio === f[0] ? "true" : "false");
+      b.addEventListener("click", function(){estado.filtroCardapio = f[0]; redesenhar();});
+      filtros.appendChild(b);
+    });
+    tela.appendChild(filtros);
+    var categorias = {proteinas:["PRATO PRINCIPAL","OPCAO AO PP"], carboidratos:["ARROZ","FEIJAO","GUARNICAO"], saladas:["SALADA","FRUTA"]};
+    var visiveis = grupos.filter(function(g){return estado.filtroCardapio === "todos" || (categorias[estado.filtroCardapio] || []).indexOf(g.codigo) >= 0;});
+    var pilha = el("div", "pilha");
+    pilha.style.marginTop = "10px";
+    visiveis.forEach(function(g){
+      g.itens.forEach(function(i){
+        pilha.appendChild(linhaDoPrato(i, g));
+      });
+    });
+    tela.appendChild(pilha);
+    if (!pilha.childElementCount) tela.appendChild(vazio("Nenhum prato nesta categoria.", "Escolha outra categoria para continuar.", "i-talher"));
+    tela.appendChild(el("p", "fotos-nota", "Fotos ilustrativas. Confira os avisos antes de se servir."));
+
+    // O contador vem dos pratos que estao na tela, avaliados contra a lista de
+    // quem esta usando o app — nao do numero que o Python calculou para o
+    // exemplo. Dizer "3 pratos sem declaracao" a quem nao declarou alergia
+    // seria contar um aviso que nao e dela.
+    var restricoes = restricoesAtuais();
+    if (restricoes.length){
+      var pendentes = 0;
+      grupos.forEach(function(g){
+        g.itens.forEach(function(i){ if (vereditoPara(i, restricoes) === "atencao") pendentes++; });
+      });
+      if (pendentes){
+        var aviso = el("div", "aviso wrn");
+        aviso.appendChild(icone("i-atencao"));
+        aviso.appendChild(el("span", "", "<b>" + pendentes + (pendentes === 1
+          ? " prato sem declaração completa" : " pratos sem declaração completa") +
+          " dos alergênicos que você evita.</b> Não consigo garantir que são seguros " +
+          "para você — pergunte no balcão."));
+        tela.appendChild(aviso);
+      }
+    } else {
+      // Sem restricao cadastrada o app nao tem o que conferir, e nao pode deixar
+      // o silencio parecer aprovacao.
+      var neutro = el("div", "aviso okk");
+      neutro.appendChild(icone("i-escudo"));
+      neutro.appendChild(el("span", "", "<b>Você não tem alergia cadastrada.</b> " +
+        "Por isso não marquei nenhum prato — não é o mesmo que dizer que todos " +
+        "estão liberados para você."));
+      tela.appendChild(neutro);
+    }
+  }
+
+  // O veredito nao vem pronto do prato: ele e calculado agora, contra a lista de
+  // restricoes de quem esta usando o app. Sem isso, alguem que se cadastrasse
+  // com outra alergia veria as cores da Mariana.
+  function avaliado(i){
+    var restricoes = restricoesAtuais();
+    return {
+      veredito: vereditoPara(i, restricoes),
+      etiqueta: etiquetaPara(i, restricoes),
+      motivo: motivoPara(i, restricoes)
+    };
+  }
+
+  var CLASSE_VEREDITO = { bloqueio: "blk", liberado: "okk", atencao: "wrn", sem_restricao: "" };
+
+  function linhaDoPrato(i, grupo){
+    var a = avaliado(i);
+    var no = el("button", "prato " + CLASSE_VEREDITO[a.veredito]);
+    // O codigo e o veredito ficam no proprio no: e o que
+    // `scripts/conferir_vereditos.py` le para comparar prato por prato com o
+    // que o Python calculou. Conferir a cor na tela, e nao a funcao por dentro,
+    // e o que garante que a pessoa viu o aviso certo.
+    no.dataset.codigo = i.codigo || "";
+    no.dataset.veredito = a.veredito;
+    no.appendChild(fotoPrato(i.nome, ICONE_CATEGORIA[grupo.codigo]));
+
+    var corpo = el("div", "corpo");
+    corpo.appendChild(el("div", "nome", escapar(i.nome)));
+
+    var selos = el("div", "selos");
+    if (i.papel) selos.appendChild(el("span", "papel", escapar(i.papel)));
+    // O peso e informacao neutra; a cor fica reservada para o que e seguranca.
+    if (i.peso && i.peso !== "sem informacao") selos.appendChild(selo(i.peso));
+    if (a.veredito === "bloqueio"){
+      selos.appendChild(selo(a.etiqueta, "vermelho", "i-proibido"));
+    } else if (a.veredito === "liberado"){
+      selos.appendChild(selo("Liberado", "verde", "i-liberado"));
+    } else if (a.veredito === "atencao"){
+      selos.appendChild(selo(a.etiqueta || "Confirme alergênicos", "laranja", "i-atencao"));
+    }
+    corpo.appendChild(selos);
+    no.appendChild(corpo);
+    no.appendChild(icone("i-seta", "seta"));
+    no.addEventListener("click", function(){ abrirPrato(i, grupo); });
+    return no;
+  }
+
+  function abrirPrato(i, grupo){
+    var a = avaliado(i);
+    abrirFolha(function(c){
+      c.appendChild(el("h2", "", escapar(i.nome)));
+      c.appendChild(el("p", "", escapar(grupo.categoria + (i.papel ? " · " + i.papel : ""))));
+
+      var selos = el("div", "tags");
+      if (a.veredito === "bloqueio") selos.appendChild(etiquetaGrande("Não pode", "i-proibido"));
+      else if (a.veredito === "liberado") selos.appendChild(etiquetaGrande("Liberado", "i-liberado", "calma"));
+      else if (a.veredito === "atencao") selos.appendChild(etiquetaGrande("Confirme no balcão", "i-atencao", "calma"));
+      else selos.appendChild(etiquetaGrande("Sem restrição cadastrada", "i-escudo", "calma"));
+      c.appendChild(selos);
+
+      if (a.motivo){
+        c.appendChild(el("h3", "", "Por quê"));
+        c.appendChild(el("p", "", escapar(a.motivo)));
+      }
+      if (i.kcal != null || i.ptn != null){
+        c.appendChild(el("h3", "", "Por porção servida"));
+        var dl = el("dl", "");
+        if (i.kcal != null){ dl.appendChild(el("dt", "", "Energia")); dl.appendChild(el("dd", "", i.kcal + " kcal")); }
+        if (i.ptn != null){ dl.appendChild(el("dt", "", "Proteína")); dl.appendChild(el("dd", "", i.ptn + " g")); }
+        c.appendChild(dl);
+      }
+    });
+  }
+
+  function etiquetaGrande(texto, ic, calma){
+    var t = el("span", "tag" + (calma ? " calma" : ""));
+    t.appendChild(icone(ic));
+    t.appendChild(el("span", "", escapar(texto)));
+    return t;
+  }
+
+  // ---------- montagem manual com o cadastro atual ----------
+  function itensDoCardapio(){
+    return ((DADOS && DADOS.cardapio) || []).flatMap(function(g){ return g.itens; });
+  }
+
+  function resultadoMontagem(){
+    var chave = estado.montagem.slice().sort().join("|");
+    var montagem = ((DADOS && DADOS.montagens) || []).find(function(m){ return m.codigos.join("|") === chave; });
+    if (!montagem) return null;
+    var alvo = montagem.objetivos.find(function(o){ return o.objetivo === pessoa().objetivo; });
+    return alvo ? {refeicao:montagem.refeicao, resultado:cadastroSalvo() ? alvo.novo : alvo.exemplo} : null;
+  }
+
+  function controlesQuantidade(i){
+    var faixa = ((DADOS && DADOS.opcoes_montagem) || []).find(function(o){ return o.codigo === i.codigo; });
+    if (!faixa || faixa.maximo <= 1) return null;
+    var qtd = estado.montagem.filter(function(c){ return c === i.codigo; }).length;
+    if (!qtd) return null;
+    var grupo = el("div", "controle-quantidade");
+    grupo.dataset.quantidadeCodigo = i.codigo;
+    grupo.setAttribute("role", "group");
+    grupo.setAttribute("aria-label", "Quantidade de " + i.nome);
+    function alterar(delta){
+      if (avaliado(i).veredito === "bloqueio") { mostrar("montar"); return; }
+      var atual = estado.montagem.filter(function(c){ return c === i.codigo; }).length;
+      var proxima = atual + delta;
+      if (proxima < 1 || proxima > faixa.maximo) return;
+      estado.montagem = estado.montagem.filter(function(c){ return c !== i.codigo; }).concat(Array(proxima).fill(i.codigo));
+      redesenhar();
+      var novo = Array.from(tela.querySelectorAll('[data-quantidade-codigo]')).find(function(n){ return n.dataset.quantidadeCodigo === i.codigo; });
+      if (novo){
+        var botao = novo.querySelector(delta > 0 ? '[data-ajuste="mais"]' : '[data-ajuste="menos"]');
+        if (botao.disabled) botao = novo.querySelector(delta > 0 ? '[data-ajuste="menos"]' : '[data-ajuste="mais"]');
+        botao.focus({preventScroll:true});
+      }
+    }
+    var menos = el("button", "", "−");
+    menos.dataset.ajuste = "menos";
+    menos.setAttribute("aria-label", "Diminuir quantidade de " + i.nome);
+    menos.disabled = qtd <= 1;
+    menos.addEventListener("click", function(){ alterar(-1); });
+    grupo.appendChild(menos);
+    var valor = el("output", "", escapar(faixa.medidas[qtd-1] || "Quantidade indisponível"));
+    valor.setAttribute("aria-live", "polite");
+    grupo.appendChild(valor);
+    var mais = el("button", "", "+");
+    mais.dataset.ajuste = "mais";
+    mais.setAttribute("aria-label", "Aumentar quantidade de " + i.nome);
+    mais.disabled = qtd >= faixa.maximo;
+    mais.addEventListener("click", function(){ alterar(1); });
+    grupo.appendChild(mais);
+    return grupo;
+  }
+
+  function botaoMontagem(rotulo, executar, forte){
+    var b = el("button", "cta " + (forte ? "forte" : "leve"));
+    b.appendChild(el("b", "", escapar(rotulo)));
+    b.addEventListener("click", executar);
+    return b;
+  }
+
+  function telaMontar(){
+    var grupos = (DADOS && DADOS.cardapio) || [];
+    cabecalhoInterno("Montar meu prato", DADOS ? DADOS.dia_amigavel : "");
+    if (!grupos.length){
+      tela.appendChild(vazio("Cardápio indisponível.", "Tente novamente quando o cardápio estiver disponível.", "i-talher"));
+      return;
+    }
+    porFonte();
+    var todos = itensDoCardapio();
+    var anteriores = estado.montagem.length;
+    estado.montagem = estado.montagem.filter(function(c){
+      var i = todos.find(function(p){ return p.codigo === c; });
+      return i && avaliado(i).veredito !== "bloqueio";
+    });
+    estado.passoMontagem = Math.min(estado.passoMontagem, grupos.length-1);
+    var grupo = grupos[estado.passoMontagem];
+    tela.appendChild(el("p", "eyebrow", "Passo " + (estado.passoMontagem+1) + " de " + grupos.length));
+    tela.appendChild(el("h1", "h1", escapar(grupo.categoria)));
+    tela.appendChild(el("p", "legenda", "Selecione o que vai pegar e ajuste as medidas. Para retirar um alimento, toque nele novamente."));
+    if (anteriores !== estado.montagem.length) tela.appendChild(el("p", "aviso wrn", "Retirei da seleção os alimentos bloqueados pelo seu cadastro atual."));
+    var lista = el("div", "pilha");
+    grupo.itens.forEach(function(i){
+      var a = avaliado(i), marcada = estado.montagem.includes(i.codigo);
+      // Reutiliza a apresentação do cardápio, sem o evento que abre detalhes.
+      var b = linhaDoPrato(i, grupo).cloneNode(true);
+      b.classList.add("escolha-prato");
+      b.setAttribute("aria-pressed", marcada ? "true" : "false");
+      b.disabled = a.veredito === "bloqueio";
+      var seta = b.querySelector(".seta");
+      if (seta) seta.remove();
+      b.appendChild(icone(marcada ? "i-check" : "i-mais"));
+      b.addEventListener("click", function(){
+        if (avaliado(i).veredito === "bloqueio") return;
+        estado.montagem = marcada ? estado.montagem.filter(function(c){ return c !== i.codigo; }) : estado.montagem.concat([i.codigo]);
+        redesenhar();
+      });
+      lista.appendChild(b);
+      if (marcada){
+        var controle = controlesQuantidade(i);
+        if (controle) lista.appendChild(controle);
+      }
+    });
+    tela.appendChild(lista);
+    tela.appendChild(el("p", "legenda", new Set(estado.montagem).size + " alimento(s) selecionado(s). Fotos ilustrativas."));
+    if (grupo.itens.some(function(i){ return avaliado(i).veredito === "atencao"; }))
+      tela.appendChild(el("p", "aviso wrn", "Os itens com aviso precisam de confirmação no balcão antes de se servir."));
+    if (estado.passoMontagem < grupos.length-1){
+      acoes.appendChild(botaoMontagem("Próxima categoria", function(){ estado.passoMontagem++; redesenhar(); }, true));
+    }
+    var revisar = botaoMontagem("Revisar meu prato", function(){ mostrar("montagem_resumo"); }, estado.passoMontagem === grupos.length-1);
+    revisar.disabled = !estado.montagem.length;
+    acoes.appendChild(revisar);
+    if (estado.passoMontagem > 0) acoes.appendChild(botaoMontagem("Categoria anterior", function(){ estado.passoMontagem--; redesenhar(); }));
+  }
+
+  function telaMontagemResumo(){
+    cabecalhoInterno("Montar meu prato", "Revise antes de registrar");
+    tela.appendChild(el("h1", "h1", "Seu prato"));
+    var resultado = resultadoMontagem();
+    var pratos = itensDoCardapio().filter(function(i){ return estado.montagem.includes(i.codigo); });
+    var bloqueado = pratos.some(function(i){ return avaliado(i).veredito === "bloqueio"; });
+    if (!resultado || bloqueado){
+      tela.appendChild(vazio("Revise a seleção.", bloqueado ? "Um alimento foi bloqueado pelas suas restrições atuais." : "Não tenho um resultado calculado para esta seleção e objetivo.", "i-atencao"));
+    } else {
+      var refeicao = resultado.refeicao;
+      tela.appendChild(el("p", "sub", (refeicao.kcal == null ? "Energia não informada" : refeicao.kcal + " kcal") + " · " + (refeicao.ptn == null ? "Proteína não informada" : refeicao.ptn + " g de proteína")));
+      var lista = el("div", "pilha");
+      refeicao.itens.forEach(function(i){
+        var linha = el("div", "linha-porcao");
+        linha.appendChild(el("span", "nome", escapar(i.nome)));
+        linha.appendChild(el("span", "medida", escapar(i.medida === "a vontade" ? "À vontade" : i.medida)));
+        lista.appendChild(linha);
+        var controle = controlesQuantidade(pratos.find(function(p){ return p.codigo === i.codigo; }));
+        if (controle) lista.appendChild(controle);
+      });
+      tela.appendChild(lista);
+      tela.appendChild(el("p", "legenda", "Estas são as quantidades disponíveis na demonstração. A quantidade individual deve seguir a orientação do nutricionista."));
+      if (refeicao.incompleto) tela.appendChild(el("p", "aviso wrn", "O total está incompleto: há alimento sem informação nutricional."));
+      pratos.filter(function(i){ return avaliado(i).veredito === "atencao"; }).forEach(function(i){
+        tela.appendChild(el("p", "aviso wrn", "<b>" + escapar(i.nome) + ":</b> " + escapar(avaliado(i).motivo)));
+      });
+      tela.appendChild(notaDeSimulacao("Nesta demonstração, o registro vale apenas enquanto a página estiver aberta e não é enviado à Apetit."));
+      if (estado.registro){
+        tela.appendChild(el("p", "aviso okk", "O almoço desta sessão já está registrado. Esta seleção não altera o histórico."));
+        acoes.appendChild(botaoMontagem("Ver refeição registrada", function(){ mostrar("meu_dia"); }, true));
+      } else acoes.appendChild(botaoMontagem("Registrar este prato", function(){
+        // Reavalia objetivo e restrições no clique, inclusive após edição do cadastro.
+        var r = resultadoMontagem();
+        if (r) registrarRefeicao(r.refeicao, r.resultado);
+      }, true));
+    }
+    acoes.appendChild(botaoMontagem("Mudar o prato", function(){ mostrar("montar"); }));
+  }
+
+  // ---------- 3. quanto pegar hoje ----------
+  //
+  // A sugestao nao e calculada aqui. `apetit/portions.py` decide quanto alguem
+  // come, e reescrever isso em JavaScript seria a segunda implementacao mais
+  // perigosa do app: uma divergencia entre as duas apareceria como um prato
+  // bloqueado dentro da sugestao de quem tem alergia a ele.
+  //
+  // O que o navegador faz e **escolher** entre respostas prontas. A sugestao
+  // depende de quais pratos sobram e do alvo do objetivo — nao da lista de
+  // alergias em si —, e das 512 combinacoes de alergia deste cardapio saem so
+  // quatro conjuntos de bloqueados. O exportador calculou os quatro, vezes os
+  // quatro objetivos, com o motor de verdade.
+  function bloqueadosAgora(){
+    var restricoes = restricoesAtuais(), fora = [];
+    ((DADOS && DADOS.cardapio) || []).forEach(function(g){
+      g.itens.forEach(function(i){
+        if (vereditoPara(i, restricoes) === "bloqueio") fora.push(i.codigo);
+      });
+    });
+    return fora.sort();
+  }
+
+  function combinacaoAtual(){
+    var chave = bloqueadosAgora().join("|");
+    var objetivo = pessoa().objetivo;
+    var achado = null;
+    ((DADOS && DADOS.combinacoes) || []).forEach(function(c){
+      if (c.objetivo === objetivo && c.bloqueados.slice().sort().join("|") === chave) achado = c;
+    });
+    return achado;
+  }
+
+  function telaQuanto(){
+    cabecalhoInterno("Apetit", DADOS ? DADOS.dia_amigavel : "");
+    var combinacao = combinacaoAtual();
+    var p = (combinacao && combinacao.sugestao) || {};
+
+    porFonte();
+    tela.appendChild(el("h1", "h1", "Quanto pegar hoje"));
+
+    // Sem resposta pronta para este cadastro, o app nao mostra sugestao
+    // nenhuma. Cair na sugestao de outra pessoa seria pior que nao sugerir:
+    // ela viria com a cara de ter sido feita para quem esta lendo.
+    if (!p.itens || !p.itens.length){
+      tela.appendChild(vazio("Ainda não consigo sugerir um prato.",
+        combinacao
+          ? "Falta informação nutricional no cardápio de hoje."
+          : "Não tenho uma sugestão calculada para as suas restrições e o seu objetivo. "
+            + "Monte o prato do seu jeito e eu confiro os alergênicos.", "i-tigela"));
+      var verCardapio = el("button", "cta leve");
+      verCardapio.appendChild(icone("i-calendario"));
+      verCardapio.appendChild(el("b", "", "Ver cardápio"));
+      verCardapio.addEventListener("click", function(){ mostrar("cardapio"); });
+      acoes.appendChild(verCardapio);
+      return;
+    }
+
+    var resumo = el("div", "resumo prato-resumo");
+    resumo.appendChild(el("span", "eyebrow", "Seu prato sugerido hoje"));
+    var ficha = el("div", "prato-ficha");
+    var foto = el("span", "foto-prato foto-refeicao");
+    foto.setAttribute("aria-hidden", "true");
+    ficha.appendChild(foto);
+    var macros = el("div", "macros");
+    macros.appendChild(el("b", "", escapar(p.kcal) + " kcal"));
+    macros.appendChild(el("span", "", escapar(p.ptn) + " g de proteína"));
+    var objetivo = el("div", "objetivo-resumo");
+    objetivo.appendChild(icone("i-alvo"));
+    objetivo.appendChild(el("div", "", "Objetivo<b>" + escapar(pessoa().objetivo || "") + "</b>"));
+    macros.appendChild(objetivo);
+    ficha.appendChild(macros);
+    resumo.appendChild(ficha);
+    tela.appendChild(resumo);
+    tela.appendChild(el("p", "secao", "Suas porções"));
+
+    // O que esta sugerido, e para qual alvo, fica legivel no proprio no:
+    // `scripts/conferir_vereditos.py` le daqui para provar que nenhum prato
+    // bloqueado entrou na sugestao de ninguem.
+    var pilha = el("div", "pilha");
+    pilha.style.marginTop = "10px";
+    pilha.dataset.sugestao = "";
+    pilha.dataset.alvoKcal = p.alvo_kcal;
+    pilha.dataset.alvoPtn = p.alvo_ptn;
+    p.itens.forEach(function(i){
+      var linha = el("div", "linha-porcao");
+      linha.dataset.codigo = i.codigo || "";
+      linha.appendChild(el("span", "nome", escapar(i.nome)));
+      linha.appendChild(el("span", "medida", escapar(i.medida === "a vontade" ? "À vontade" : i.medida)));
+      pilha.appendChild(linha);
+    });
+    tela.appendChild(pilha);
+
+    var estimativa = el("div", "estimativa");
+    estimativa.appendChild(el("b", "", "Estimativa: " + escapar(p.kcal) + " kcal · " + escapar(p.ptn) + " g de proteína"));
+    estimativa.appendChild(el("p", "", "Calculada para o objetivo <b>" +
+      escapar(pessoa().objetivo || "") + "</b> (alvo de " + escapar(p.alvo_kcal) +
+      " kcal e " + escapar(p.alvo_ptn) + " g de proteína)" +
+      (bloqueadosAgora().length
+        ? ", e sem os pratos que você não pode comer."
+        : ".") +
+      " Quantidade individual é definição do nutricionista responsável. Foto ilustrativa."));
+    tela.appendChild(estimativa);
+
+
+    (p.avisos || []).forEach(function(t){
+      var a = el("div", "aviso wrn");
+      a.appendChild(icone("i-atencao"));
+      a.appendChild(el("span", "", escapar(t)));
+      tela.appendChild(a);
+    });
+
+    if (estado.registro){
+      var feito = el("button", "cta feito");
+      feito.appendChild(icone("i-liberado"));
+      feito.appendChild(el("b", "", "Você já registrou o almoço nesta sessão"));
+      feito.disabled = true;
+      acoes.appendChild(feito);
+      tela.appendChild(notaDeSimulacao(
+        "Registro desta demonstração: ele some ao recarregar a página, e não chega à Apetit."));
+      var verRegistro = el("button", "cta leve");
+      verRegistro.appendChild(el("b", "", "Ver refeição registrada"));
+      verRegistro.addEventListener("click", function(){ mostrar("meu_dia"); });
+      acoes.appendChild(verRegistro);
+    } else {
+      var registrar = el("button", "cta forte");
+      registrar.appendChild(icone("i-liberado"));
+      registrar.appendChild(el("b", "", "Vou pegar isso — registrar"));
+      registrar.addEventListener("click", registrarPrato);
+      acoes.appendChild(registrar);
+    }
+
+    [{ nome: "Montar do meu jeito", icone: "i-talher", busca: "Montar", id: "montar" },
+     { nome: "Ver cardápio", icone: "i-calendario", id: "cardapio" }
+    ].forEach(function(c){
+      var alvo = alvoDe(c);
+      if (!alvo) return;
+      var b = el("button", "cta " + (c.id === "cardapio" ? "fantasma" : "leve"));
+      b.appendChild(icone(c.icone));
+      b.appendChild(el("b", "", c.nome));
+      b.appendChild(icone("i-seta", "seta"));
+      b.addEventListener("click", function(){ mostrar(alvo); });
+      acoes.appendChild(b);
+    });
+  }
+
+  // O ganho de pontos nao e calculado aqui: ele vem de `registro_previsto`, que
+  // o exportador obteve rodando o registro de verdade contra as regras de
+  // `apetit/tracking.py`. Recalcular no navegador seria uma segunda
+  // implementacao das regras, que um dia discordaria da primeira.
+  function registrarPrato(){
+    var combinacao = combinacaoAtual();
+    // Com cadastro proprio o historico comeca vazio, e as regras de semana
+    // ("variedade", "sequencia") dependem do que veio antes: a previsao da
+    // Mariana prometeria ponto que nao vem.
+    var previsto = (cadastroSalvo()
+      ? (combinacao && combinacao.registro)
+      : (DADOS && DADOS.registro_previsto)) || {};
+    registrarRefeicao(previsto.refeicao, previsto);
+  }
+
+  // Uma fotografia do registro alimenta todas as telas. Alterar objetivo,
+  // restrições ou rascunho depois não reescreve o almoço já confirmado.
+  function registrarRefeicao(refeicao, previsto){
+    if (!refeicao || !refeicao.itens || !refeicao.itens.length || !previsto ||
+        typeof previsto.pontos_depois !== "number"){
+      recado("Não tenho o resultado deste prato. Revise a montagem.");
+      return;
+    }
+    var cardapio = itensDoCardapio();
+    if (refeicao.itens.some(function(i){
+      var prato = cardapio.find(function(p){ return p.codigo === i.codigo; });
+      return !prato || avaliado(prato).veredito === "bloqueio";
+    })){
+      recado("Suas restrições mudaram. Revise os alimentos antes de registrar.");
+      mostrar("montar");
+      return;
+    }
+    if (estado.registro){
+      recado("O almoço desta sessão já está registrado.");
+      mostrar("meu_dia");
+      return;
+    }
+    estado.registro = JSON.parse(JSON.stringify({refeicao: refeicao, resultado: previsto}));
+    estado.registrado = true;
+    estado.pontosAnimar = estado.pontos;
+    estado.pontos = previsto.pontos_depois != null ? previsto.pontos_depois : estado.pontos;
+    var novas = previsto.conquistas || [];
+    estado.conquistaNova = novas.length ? novas[novas.length - 1].nome : null;
+
+    acoes.textContent = "";
+    var feito = el("button", "cta feito");
+    feito.appendChild(icone("i-liberado"));
+    feito.appendChild(el("b", "", "Refeição registrada nesta sessão"));
+    feito.disabled = true;
+    acoes.appendChild(feito);
+
+    var ganho = previsto.ganho || 0;
+    var a = el("div", "aviso okk");
+    a.appendChild(icone("i-trofeu"));
+    var texto = el("span", "", ganho
+      ? "<b>+" + ganho + " pontos.</b> " + novas.map(function(c){ return c.nome; }).join(" · ")
+      : "Refeição registrada.");
+    texto.appendChild(notaDeSimulacao(
+      "Nesta demonstração o registro vale enquanto a página estiver aberta e não " +
+      "chega à Apetit. No app de verdade ele fica guardado com o seu histórico."));
+    a.appendChild(texto);
+    tela.insertBefore(a, tela.firstChild);
+    tela.scrollTop = 0;
+
+    var ver = el("button", "cta leve");
+    ver.appendChild(icone("i-tendencia"));
+    ver.appendChild(el("b", "", "Ver meu progresso"));
+    ver.appendChild(icone("i-seta", "seta"));
+    ver.addEventListener("click", function(){ mostrar("progresso"); });
+    acoes.appendChild(ver);
+  }
+
+  // ---------- 4. avaliar ----------
+  function telaAvaliar(){
+    cabecalhoInterno("Apetit", DADOS ? DADOS.dia_amigavel : "");
+    var av = (DADOS && DADOS.avaliacao) || {escala:[], faltas:[]};
+    tela.appendChild(el("h1", "h1", "Como foi o almoço de hoje?"));
+    var explica = el("div", "cartao");
+    explica.appendChild(el("h2", "h2", "A comida estava boa?"));
+    explica.appendChild(el("p", "legenda", "Sua avaliação é anônima. Ela ajuda a Apetit a acompanhar a qualidade do refeitório."));
+    tela.appendChild(explica);
+    var rostos = {3:["i-bom","boa"],2:["i-medio","regular"],1:["i-ruim","ruim"]};
+    var notas = el("div", "notas");
+    av.escala.forEach(function(e){
+      var cfg = rostos[e.nota] || ["i-medio","regular"];
+      var b = el("button", "avaliacao-nota " + cfg[1]);
+      b.setAttribute("aria-pressed", estado.nota === e.nota ? "true" : "false");
+      b.appendChild(icone(cfg[0]));
+      b.appendChild(el("span", "", escapar(e.nota === 3 ? "Boa" : e.rotulo)));
+      b.addEventListener("click", function(){estado.nota=e.nota;estado.avaliado=false;redesenhar();});
+      notas.appendChild(b);
+    });
+    tela.appendChild(notas);
+    var cabeca = el("div", "cabeca-secao");
+    cabeca.appendChild(el("h2", "", "Faltou alguma coisa?"));
+    cabeca.appendChild(el("span", "", "Opcional"));
+    tela.appendChild(cabeca);
+    // Os motivos mantem os codigos definidos pelo dominio do refeitorio.
+    var marcas = el("div", "marcas");
+    av.faltas.forEach(function(f){
+      var b = el("button", "marca-tag");
+      b.setAttribute("aria-pressed", estado.faltas.indexOf(f.codigo) >= 0 ? "true" : "false");
+      b.appendChild(el("span", "", escapar(f.rotulo)));
+      b.addEventListener("click", function(){
+        var pos=estado.faltas.indexOf(f.codigo);
+        if(pos >= 0) estado.faltas.splice(pos,1); else estado.faltas.push(f.codigo);
+        estado.avaliado=false;redesenhar();
+      });
+      marcas.appendChild(b);
+    });
+    tela.appendChild(marcas);
+    var enviar=el("button", "cta " + (estado.avaliado ? "feito" : "forte"));
+    enviar.appendChild(el("b", "", estado.avaliado ? "Avaliação registrada nesta sessão" : "Enviar avaliação"));
+    enviar.style.textAlign="center";
+    enviar.disabled=estado.nota == null || estado.avaliado;
+    enviar.addEventListener("click", function(){estado.avaliado=true;redesenhar();});
+    tela.appendChild(enviar);
+    if(estado.avaliado){
+      var obrigado=el("div","aviso okk");
+      obrigado.setAttribute("role","status");
+      obrigado.appendChild(icone("i-liberado"));
+      var textoAv = el("span","","<b>Obrigado pela sua avaliação!</b><br>Sua opinião ajuda a melhorar o refeitório a cada dia.");
+      textoAv.appendChild(notaDeSimulacao(
+        "Nesta demonstração ela não foi enviada a lugar nenhum. No app de verdade ela " +
+        "vai para a Apetit sem o seu nome, sem a sua empresa e sem o seu setor."));
+      obrigado.appendChild(textoAv);
+      tela.appendChild(obrigado);
+    }
+  }
+
+  // ---------- 5. progresso ----------
+  function telaProgresso(){
+    cabecalhoInterno("Apetit", "");
+    var p = meuHistorico().progresso;
+    var semana = meuHistorico().semana;
+
+    tela.appendChild(el("h1", "h1", "Meu progresso"));
+    tela.appendChild(el("p", "sub", "Pequenas escolhas, grandes resultados."));
+    var resumo=el("div","resumo resumo-progresso");
+    var anel=circuloPontos();
+    var valor=anel.querySelector(".n");
+    resumo.appendChild(anel);
+    resumo.appendChild(el("span","placar-label","pontos acumulados"));
+    resumo.appendChild(el("p","resumo-mensagem",escapar(p.resumo_semana || "Registre o almoço para acompanhar seu progresso.")));
+    tela.appendChild(resumo);
+
+    var periodos=el("div","periodos");
+    periodos.setAttribute("role","group");
+    periodos.setAttribute("aria-label","Período do progresso");
+    [["semana","Semana"],["mes","Mês"],["ano","Ano"]].forEach(function(f){
+      var b=el("button","filtro",f[1]);
+      b.setAttribute("aria-pressed",estado.periodoProgresso === f[0] ? "true" : "false");
+      b.addEventListener("click",function(){estado.periodoProgresso=f[0];redesenhar();});
+      periodos.appendChild(b);
+    });
+    tela.appendChild(periodos);
+    semana = serieProgresso(estado.periodoProgresso);
+
+
+    if (semana.length){
+      var cabeca = el("div", "cabeca-secao");
+      cabeca.appendChild(el("h2", "", estado.periodoProgresso === "semana" ? "Últimos 5 dias úteis" : estado.periodoProgresso === "mes" ? "Últimos 30 dias" : "Últimos 12 meses"));
+      cabeca.appendChild(el("span", "", estado.periodoProgresso === "ano" ? "kcal por mês" : "kcal registradas"));
+      tela.appendChild(cabeca);
+
+      var teto = Math.max.apply(null, semana.map(function(d){ return d.kcal || 0; }).concat([1]));
+      var grafico = el("div", "semana");
+      grafico.style.gridTemplateColumns="repeat(" + semana.length + ",minmax(0,1fr))";
+      semana.forEach(function(d){
+        var col = el("div", "dia" + (d.hoje ? " hoje" : "") + (d.registrado ? "" : " sem-registro"));
+        var valorDia = el("span", "valor-dia", d.registrado ? escapar(d.kcal) : "—");
+        valorDia.setAttribute("aria-label", d.registrado ? d.kcal + " kcal" : "Sem registro");
+        col.appendChild(valorDia);
+        var trilho = el("div", "trilho");
+        var barra = el("div", "barra");
+        barra.style.height = d.registrado ? Math.max(12, (d.kcal / teto) * 100) + "%" : "0%";
+        barra.title = d.registrado ? d.kcal + " kcal" : "sem registro";
+        trilho.appendChild(barra);
+        col.appendChild(trilho);
+        col.appendChild(el("span", "sigla", escapar(d.sigla)));
+        grafico.appendChild(col);
+      });
+      tela.appendChild(grafico);
+      tela.appendChild(el("p", "legenda",
+        "Energia das refeições disponíveis neste período. Sem barra: nenhum registro disponível."));
+    }
+
+    var vezes = {};
+    (p.conquistas || []).forEach(function(c){ vezes[c.nome] = c.vezes; });
+    var registros = (meuHistorico().meu_dia.dias || []).length;
+
+    var cabeca2 = el("div", "cabeca-secao");
+    cabeca2.appendChild(el("h2", "", "Como você está indo"));
+    tela.appendChild(cabeca2);
+
+    var metricas = el("div", "metricas");
+    [["Proteína do dia", "i-chama", vezes["Atingiu a meta de proteina do dia"] || 0, "vezes atingida"],
+     ["Frutas e saladas", "i-folha", vezes["Incluiu salada ou fruta no prato"] || 0, "vezes no prato"],
+     ["Refeições registradas", "i-prancheta", registros, "dias com registro"],
+     ["Pontuação", "i-trofeu", estado.pontos, "pontos acumulados"]
+    ].forEach(function(m){
+      var c = el("div", "metrica");
+      var t = el("div", "topo-m");
+      t.appendChild(icone(m[1]));
+      t.appendChild(el("span", "", escapar(m[0])));
+      c.appendChild(t);
+      c.appendChild(el("b", "", String(m[2])));
+      c.appendChild(el("em", "", escapar(m[3])));
+      metricas.appendChild(c);
+    });
+    tela.appendChild(metricas);
+
+    var cabeca3 = el("div", "cabeca-secao");
+    cabeca3.appendChild(el("h2", "", "Conquistas recentes"));
+    tela.appendChild(cabeca3);
+
+    var conquistas = p.conquistas || [];
+    if (conquistas.length){
+      var pilha = el("div", "pilha");
+      conquistas.forEach(function(c){
+        var linha = el("div", "linha");
+        var esq = el("span", "");
+        esq.style.display = "flex";
+        esq.style.alignItems = "center";
+        esq.style.gap = "10px";
+        var tick = el("span", "tick");
+        tick.style.cssText = "width:22px;height:22px;border-radius:50%;display:grid;" +
+          "place-items:center;background:var(--verde-fundo);color:var(--verde);flex:none";
+        tick.appendChild(icone("i-check"));
+        esq.appendChild(tick);
+        esq.appendChild(el("span", "", escapar(nomeConquista(c.nome))));
+        linha.appendChild(esq);
+        if (c.vezes > 1) linha.appendChild(el("span", "medida", c.vezes + "x"));
+        pilha.appendChild(linha);
+      });
+      tela.appendChild(pilha);
+    } else {
+      tela.appendChild(vazio("Nenhuma conquista ainda.",
+        "Registre o almoço de hoje para começar.", "i-trofeu"));
+    }
+
+    tela.appendChild(atalho({id:"meu_dia", busca:"Meu dia", nome:"Ver meu histórico", icone:"i-prancheta"}));
+    tela.appendChild(el("p", "legenda", "Seu progresso é só seu. Sem rankings ou comparações."));
+
+    if (estado.pontosAnimar != null){
+      contarAte(valor, estado.pontosAnimar, estado.pontos);
+      estado.pontosAnimar = null;
+    }
+  }
+
+  function serieProgresso(periodo){
+    if(periodo === "semana") return meuHistorico().semana;
+    var dia=(DADOS && DADOS.dia) || "", hoje=new Date(dia + "T12:00:00Z");
+    if(!isFinite(hoje.getTime())) return [];
+    var dias=meuHistorico().meu_dia.dias;
+    var mensal=periodo === "mes", numero=mensal ? 5 : 12, partes=[];
+    for(var n=0;n<numero;n++){
+      var inicio, fim;
+      if(mensal){
+        inicio=new Date(hoje);inicio.setUTCDate(inicio.getUTCDate()-29+n*6);
+        fim=new Date(inicio);fim.setUTCDate(fim.getUTCDate()+6);
+      }else{
+        inicio=new Date(Date.UTC(hoje.getUTCFullYear(),hoje.getUTCMonth()-11+n,1,12));
+        fim=new Date(Date.UTC(inicio.getUTCFullYear(),inicio.getUTCMonth()+1,1,12));
+      }
+      var a=inicio.toISOString().slice(0,10),b=fim.toISOString().slice(0,10);
+      var achados=dias.filter(function(d){return d.data >= a && d.data < b && d.data <= dia;});
+      partes.push({sigla:mensal ? String(inicio.getUTCDate()).padStart(2,"0") : ["J","F","M","A","M","J","J","A","S","O","N","D"][inicio.getUTCMonth()],
+        hoje:n===numero-1,registrado:achados.length > 0,kcal:achados.reduce(function(s,d){return s+(d.kcal || 0);},0)});
+    }
+    return partes;
+  }
+
+  // ---------- onde as coisas ficam guardadas ----------
+  //
+  // Num quadro embutido — e e assim que a previa chega para quem so recebeu o
+  // link — o navegador bloqueia o `localStorage` do endereco de dentro. Sem
+  // alternativa, o cadastro morreria no ultimo passo, e com uma mensagem sobre
+  // espaco em disco que nem e o motivo.
+  //
+  // Entao ha dois lugares: o aparelho, quando da, e a memoria da aba, quando
+  // nao da. O app funciona nos dois. O que muda e o que ele pode prometer — e
+  // ele diz qual dos dois esta valendo, em vez de deixar a pessoa descobrir ao
+  // fechar a pagina.
+  var naMemoria = {};
+
+  function guardar(chave, valor){
+    try { localStorage.setItem(chave, valor); return "aparelho"; }
+    catch (e) { naMemoria[chave] = valor; return "memoria"; }
+  }
+  function lido(chave){
+    try {
+      var v = localStorage.getItem(chave);
+      if (v != null) return v;
+    } catch (e) {}
+    return naMemoria[chave] != null ? naMemoria[chave] : null;
+  }
+  function esquecer(chave){
+    delete naMemoria[chave];
+    try { localStorage.removeItem(chave); } catch (e) {}
+  }
+  // Uma escrita de teste responde o que `typeof localStorage` nao responde: no
+  // quadro embutido o objeto existe e so o uso e que falha.
+  function guardaNoAparelho(){
+    try {
+      localStorage.setItem("apetit-teste", "1");
+      localStorage.removeItem("apetit-teste");
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---------- cadastro ----------
+  //
+  // Na primeira vez o funcionario se cadastra do zero; depois o cadastro fica
+  // guardado e ele edita quando quiser. Os passos e a ordem sao os mesmos do
+  // bot (`ask_name` ate `ask_consent` em `bot.py`), para as duas portas de
+  // entrada pedirem a mesma coisa, na mesma sequencia, com as mesmas palavras
+  // no termo.
+  //
+  // Fica em `localStorage`, como a foto: esta demonstracao nao tem servidor, e
+  // inventar um "salvo na nuvem" seria prometer o que nao existe. No app de
+  // verdade quem guarda e o banco do bot, com o mesmo `Employee`.
+  var CADASTRO = "apetit-cadastro";
+
+  function cadastroSalvo(){
+    try { return JSON.parse(lido(CADASTRO) || "null"); } catch (e) { return null; }
+  }
+  function guardarCadastro(dados){
+    return guardar(CADASTRO, JSON.stringify(dados));
+  }
+
+  // O cadastro guardado manda no que as telas mostram. Sem ele, vale o exemplo
+  // exportado do dominio, que e como a demonstracao nasce para quem so quer ver.
+  function pessoa(){
+    var salvo = cadastroSalvo();
+    var exemplo = (DADOS && DADOS.perfil) || {};
+    if (!salvo) return exemplo;
+    return {
+      nome: salvo.nome,
+      iniciais: iniciaisDe(salvo.nome),
+      refeitorio: salvo.refeitorio,
+      empresa: salvo.empresa,
+      setor: salvo.setor,
+      objetivo: salvo.objetivo,
+      alvo: alvoDoObjetivo(salvo.objetivo),
+      restricoes: nomesDasRestricoes(salvo.restricoes),
+      restricoes_codigos: salvo.restricoes || [],
+      restricoes_livres: [],
+      evitar: [],
+      favoritos: [],
+      // Preferencia de aviso e ajuste com padrao, nao historico: nasce igual
+      // para todo mundo e a pessoa mexe se quiser.
+      avisos: exemplo.avisos || []
+    };
+  }
+
+  // Quem se cadastra comeca do zero. O histórico — pontos, conquistas, dias
+  // registrados, favoritos — e da Mariana, e mostrá-lo para outra pessoa daria
+  // a ela refeicoes que nunca fez e pontos que nunca ganhou. E o app ficaria
+  // dizendo, na tela de privacidade, que guarda sobre ela o que e de outro.
+  function meuHistorico(){
+    var novo = !!cadastroSalvo();
+    var base = novo ? {pontos:0, conquistas:[]} : ((DADOS && DADOS.progresso) || {pontos:0, conquistas:[]});
+    var progresso = JSON.parse(JSON.stringify(base));
+    var dias = novo ? [] : (((DADOS || {}).meu_dia || {}).dias || []).slice();
+    if (estado.registro){
+      var r = estado.registro;
+      dias = dias.filter(function(d){ return d.data !== r.refeicao.data; }).concat([r.refeicao]);
+      progresso.pontos = r.resultado.pontos_depois;
+      (r.resultado.conquistas || []).forEach(function(c){
+        var existente = progresso.conquistas.find(function(a){ return a.nome === c.nome; });
+        if (existente) existente.vezes++;
+        else progresso.conquistas.push({nome:c.nome, vezes:1});
+      });
+    }
+    dias.sort(function(a,b){ return b.data.localeCompare(a.data); });
+    progresso.resumo_semana = dias.length ? dias.length + (dias.length === 1 ? " dia com refeição registrada." : " dias com refeições registradas.") : "Registre o almoço para acompanhar seu progresso.";
+    var semana = [], cursor = new Date(((DADOS || {}).dia || "") + "T12:00:00Z");
+    while (isFinite(cursor.getTime()) && semana.length < 5){
+      if (cursor.getUTCDay() !== 0 && cursor.getUTCDay() !== 6){
+        var data = cursor.toISOString().slice(0,10);
+        var refeicao = dias.find(function(d){ return d.data === data; });
+        semana.unshift({data:data, sigla:["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"][cursor.getUTCDay()],
+          hoje:data === DADOS.dia, registrado:!!refeicao, kcal:refeicao ? refeicao.kcal : null});
+      }
+      cursor.setUTCDate(cursor.getUTCDate()-1);
+    }
+    return {progresso:progresso, meu_dia:{dias:dias}, semana:semana,
+      favoritos:novo ? [] : (((DADOS || {}).perfil || {}).favoritos || [])};
+  }
+
+  // O que muda quando a pessoa deixa de ser o exemplo, ou volta a ser.
+  function zerarSessao(){
+    estado.nota = null;
+    estado.faltas = [];
+    estado.avaliado = false;
+    estado.registrado = false;
+    estado.registro = null;
+    estado.montagem = [];
+    estado.passoMontagem = 0;
+    estado.conquistaNova = null;
+    estado.pontosAnimar = null;
+    estado.pontos = meuHistorico().progresso.pontos;
+  }
+
+  function restricoesAtuais(){
+    var salvo = cadastroSalvo();
+    if (salvo) return salvo.restricoes || [];
+    return (DADOS && DADOS.perfil && DADOS.perfil.restricoes_codigos) || [];
+  }
+
+  function iniciaisDe(nome){
+    return String(nome || "").trim().split(/\s+/).slice(0, 2)
+      .map(function(p){ return p.charAt(0); }).join("").toUpperCase() || "?";
+  }
+  function alvoDoObjetivo(objetivo){
+    var achado = ((DADOS && DADOS.objetivos) || []).filter(function(o){ return o.nome === objetivo; })[0];
+    return achado ? achado.alvo : {};
+  }
+  function nomesDasRestricoes(codigos){
+    var nomes = {};
+    ((DADOS && DADOS.alergenicos) || []).forEach(function(a){ nomes[a.codigo] = a.nome; });
+    return (codigos || []).map(function(c){ return nomes[c] || c; });
+  }
+
+  // rascunho do cadastro em andamento
+  var rascunho = null;
+  var passoAtual = 0;
+  var campoEdicao = null;
+  var ROTULOS_CADASTRO = {nome:"Nome", refeitorio:"Refeitório", empresa:"Empresa", setor:"Setor", objetivo:"Objetivo", restricoes:"Restrições"};
+
+  var PASSOS = [
+    { campo: "nome",       titulo: "Como você quer ser chamado?",
+      apoio: "É esse nome que vai aparecer no seu app. Não precisa ser o nome completo.",
+      tipo: "texto", rotulo: "Nome", exemplo: "Mariana" },
+    { campo: "refeitorio", titulo: "Onde você almoça?",
+      apoio: "A unidade da Apetit que serve o seu refeitório.",
+      tipo: "texto", rotulo: "Refeitório", exemplo: "SM" },
+    { campo: "empresa",    titulo: "Onde você trabalha?",
+      apoio: "A empresa e o setor. Isso ajuda a Apetit a ver a adesão por setor — nunca o que você come.",
+      tipo: "dupla", segundo: "setor",
+      rotulo: "Empresa", exemplo: "Indústria Exemplo",
+      rotulo2: "Setor", exemplo2: "Produção" },
+    { campo: "objetivo",   titulo: "O que você quer do app?",
+      apoio: "Isso só ajusta as dicas que eu te dou. Dá para mudar quando quiser.",
+      tipo: "objetivo" },
+    { campo: "restricoes", titulo: "Você tem alguma alergia ou intolerância?",
+      apoio: "Marque o que se aplica. Eu aviso no cardápio o que você não pode comer — e nunca afirmo que um prato é seguro sem alguém ter conferido.",
+      tipo: "alergias" },
+    { campo: "consentimento", titulo: "Antes de terminar",
+      apoio: "", tipo: "termo" }
+  ];
+
+  function novoRascunho(editando){
+    var salvo = cadastroSalvo();
+    if (editando && salvo){
+      return { nome: salvo.nome, refeitorio: salvo.refeitorio, empresa: salvo.empresa,
+               setor: salvo.setor, objetivo: salvo.objetivo,
+               restricoes: (salvo.restricoes || []).slice(), consentimento: true, editando: true };
+    }
+    return { nome: "", refeitorio: "", empresa: "", setor: "", objetivo: "",
+             restricoes: [], consentimento: false, editando: false };
+  }
+
+  function comecarCadastro(editando, campo){
+    rascunho = novoRascunho(editando);
+    campoEdicao = editando && cadastroSalvo() && Object.prototype.hasOwnProperty.call(ROTULOS_CADASTRO, campo) ? campo : null;
+    passoAtual = campoEdicao ? PASSOS.findIndex(function(p){ return p.campo === campoEdicao || p.segundo === campoEdicao; }) : 0;
+    historico.length = 0;
+    mostrar("cadastro", false);
+  }
+
+  function passoDoCadastro(){
+    var passo = PASSOS[passoAtual];
+    if (campoEdicao && passo.tipo === "dupla"){
+      return Object.assign({}, passo, {tipo:"texto", campo:campoEdicao,
+        titulo:"Editar " + ROTULOS_CADASTRO[campoEdicao].toLowerCase(),
+        rotulo:ROTULOS_CADASTRO[campoEdicao], exemplo:campoEdicao === passo.segundo ? passo.exemplo2 : passo.exemplo});
+    }
+    return passo;
+  }
+
+  function cancelarEdicaoDireta(){
+    campoEdicao = null;
+    rascunho = null;
+    mostrar("perfil", false);
+  }
+
+  function passoCompleto(){
+    var p = passoDoCadastro();
+    if (p.tipo === "texto") return !!String(rascunho[p.campo] || "").trim();
+    if (p.tipo === "dupla"){
+      return !!String(rascunho[p.campo] || "").trim() && !!String(rascunho[p.segundo] || "").trim();
+    }
+    if (p.tipo === "objetivo") return !!rascunho.objetivo;
+    if (p.tipo === "alergias") return true;      // "nenhuma" e uma resposta valida
+    return rascunho.consentimento;
+  }
+
+  // Botao de escolha unica ou multipla, com a mesma caixa de marcar que as
+  // opcoes do bot ja usam.
+  function escolha(titulo, detalhe, marcada, aoClicar){
+    var b = el("button", "opcao" + (marcada ? " marcada" : ""));
+    b.setAttribute("aria-pressed", marcada ? "true" : "false");
+    var txt = el("div", "txt");
+    txt.appendChild(el("b", "", escapar(titulo)));
+    if (detalhe) txt.appendChild(el("span", "", escapar(detalhe)));
+    b.appendChild(txt);
+    var marca = el("span", "caixa");
+    marca.appendChild(icone("i-liberado"));
+    b.appendChild(marca);
+    b.addEventListener("click", aoClicar);
+    return b;
+  }
+
+  function telaCadastro(){
+    if (!rascunho){ rascunho = novoRascunho(!!cadastroSalvo()); passoAtual = 0; }
+    var p = passoDoCadastro();
+
+    topo.className = "topo simples";
+    topo.textContent = "";
+    var barra = el("div", "barra");
+    barra.appendChild(botaoIcone("i-voltar", "Voltar", function(){
+      if (campoEdicao){ cancelarEdicaoDireta(); return; }
+      if (passoAtual > 0){ passoAtual--; redesenhar(); return; }
+      var voltarPara = rascunho.editando ? "perfil" : "boas_vindas";
+      rascunho = null;
+      mostrar(voltarPara, false);
+    }));
+    var titulo = el("div", "titulo");
+    titulo.appendChild(el("h1", "", campoEdicao ? "Editar " + ROTULOS_CADASTRO[campoEdicao].toLowerCase() : (rascunho.editando ? "Editar cadastro" : "Seu cadastro")));
+    titulo.appendChild(el("p", "", campoEdicao ? "Salve quando terminar" : "Passo " + (passoAtual + 1) + " de " + PASSOS.length));
+    barra.appendChild(titulo);
+    topo.appendChild(barra);
+
+    var trilho = el("div", "progresso-cadastro");
+    var feito = el("div", "feito");
+    feito.style.width = ((passoAtual + 1) / PASSOS.length * 100) + "%";
+    trilho.appendChild(feito);
+    if (!campoEdicao) tela.appendChild(trilho);
+
+    tela.appendChild(el("h1", "h1", escapar(p.titulo)));
+    if (p.apoio) tela.appendChild(el("p", "sub", escapar(p.apoio)));
+
+    if (p.tipo === "texto" || p.tipo === "dupla"){
+      tela.appendChild(campoTexto(p.campo, p.rotulo, p.exemplo));
+      if (p.tipo === "dupla") tela.appendChild(campoTexto(p.segundo, p.rotulo2, p.exemplo2));
+    } else if (p.tipo === "objetivo"){
+      var lista = el("div", "pilha");
+      lista.style.marginTop = "18px";
+      ((DADOS && DADOS.objetivos) || []).forEach(function(o){
+        lista.appendChild(escolha(
+          o.nome,
+          "Alvo do almoço: " + o.alvo.kcal + " kcal · " + o.alvo.ptn + " g de proteína",
+          rascunho.objetivo === o.nome,
+          function(){ rascunho.objetivo = o.nome; redesenhar(); }
+        ));
+      });
+      tela.appendChild(lista);
+      tela.appendChild(el("p", "legenda",
+        "Alvo ilustrativo. Quem define quantidade individual é o nutricionista responsável — " +
+        "se você mandar a sua ficha, o app passa a seguir ela."));
+    } else if (p.tipo === "alergias"){
+      var caixa = el("div", "pilha");
+      caixa.style.marginTop = "18px";
+      ((DADOS && DADOS.alergenicos) || []).forEach(function(a){
+        var ligada = rascunho.restricoes.indexOf(a.codigo) >= 0;
+        caixa.appendChild(escolha(a.nome, "", ligada, function(){
+          var n = rascunho.restricoes.indexOf(a.codigo);
+          if (n >= 0) rascunho.restricoes.splice(n, 1); else rascunho.restricoes.push(a.codigo);
+          redesenhar();
+        }));
+      });
+      tela.appendChild(caixa);
+      tela.appendChild(el("p", "legenda", rascunho.restricoes.length
+        ? "Se a sua restrição não está na lista, fale no balcão: eu só consigo conferir o que a " +
+          "ficha técnica do prato declara."
+        : "Você pode seguir sem marcar nada."));
+    } else {
+      var termo = el("div", "cartao");
+      termo.style.marginTop = "18px";
+      termo.appendChild(el("p", "paragrafo",
+        "Preciso guardar seu nome, onde você almoça, empresa, setor, suas restrições e o que " +
+        "você registrar que comeu."));
+      termo.appendChild(el("p", "paragrafo",
+        "<b>Sua empresa não vê nada disso sobre você.</b> Nem o que você come, nem o seu " +
+        "objetivo, nem as suas restrições. A Apetit só enxerga quantas pessoas usam, por setor, " +
+        "e mesmo assim setor com menos de 5 pessoas nem aparece."));
+      termo.appendChild(el("p", "legenda",
+        "Você vê tudo e apaga tudo quando quiser, no seu cadastro."));
+      tela.appendChild(termo);
+
+      var aceite = escolha("Li e concordo",
+        "Sem isso o app não guarda nada — e também não funciona.",
+        rascunho.consentimento,
+        function(){ rascunho.consentimento = !rascunho.consentimento; redesenhar(); });
+      aceite.style.marginTop = "12px";
+      tela.appendChild(aceite);
+
+      var resumo = el("dl", "campos");
+      resumo.style.marginTop = "18px";
+      [["Nome", rascunho.nome], ["Refeitório", rascunho.refeitorio],
+       ["Empresa", rascunho.empresa], ["Setor", rascunho.setor],
+       ["Objetivo", rascunho.objetivo],
+       ["Restrições", nomesDasRestricoes(rascunho.restricoes).join(", ") || "Nenhuma"]
+      ].forEach(function(par){
+        var linha = el("div", "campo");
+        linha.appendChild(el("dt", "", escapar(par[0])));
+        linha.appendChild(el("dd", "", escapar(par[1] || "—")));
+        resumo.appendChild(linha);
+      });
+      tela.appendChild(resumo);
+    }
+
+    if (campoEdicao && estado.registro) tela.appendChild(el("p", "legenda", "A alteração vale para as próximas escolhas. O almoço já registrado mantém os dados da confirmação."));
+    var ultimo = !!campoEdicao || passoAtual === PASSOS.length - 1;
+    var avancar = el("button", "cta forte");
+    avancar.appendChild(el("b", "", ultimo
+      ? (rascunho.editando ? "Salvar alterações" : "Criar meu cadastro")
+      : "Continuar"));
+    avancar.appendChild(icone(ultimo ? "i-liberado" : "i-seta", ultimo ? "" : "seta"));
+    if (!passoCompleto()) avancar.disabled = true;
+    avancar.addEventListener("click", function(){
+      if (!passoCompleto()) return;
+      if (!ultimo){ passoAtual++; redesenhar(); return; }
+      salvarCadastro();
+    });
+    acoes.appendChild(avancar);
+    if (campoEdicao) acoes.appendChild(botaoMontagem("Cancelar", cancelarEdicaoDireta));
+  }
+
+  // O rotulo fica visivel, e nao so no `placeholder`: o `placeholder` some
+  // quando a pessoa digita, e dois campos preenchidos lado a lado deixariam de
+  // dizer qual e a empresa e qual e o setor.
+  function campoTexto(campo, rotulo, exemplo){
+    var caixa = el("div", "campo-texto");
+    var nome = el("label", "", escapar(rotulo || campo));
+    nome.setAttribute("for", "campo-" + campo);
+    caixa.appendChild(nome);
+    var entrada = document.createElement("input");
+    entrada.type = "text";
+    entrada.id = "campo-" + campo;
+    entrada.value = rascunho[campo] || "";
+    entrada.placeholder = exemplo || "";
+    entrada.autocomplete = "off";
+    // Sem `redesenhar()` a cada tecla: a tela inteira seria remontada e o
+    // teclado do celular fecharia no meio da palavra.
+    entrada.addEventListener("input", function(){
+      rascunho[campo] = entrada.value;
+      var botao = acoes.querySelector(".cta");
+      if (botao) botao.disabled = !passoCompleto();
+    });
+    caixa.appendChild(entrada);
+    return caixa;
+  }
+
+  function salvarCadastro(){
+    var dados = {
+      nome: String(rascunho.nome || "").trim(),
+      refeitorio: String(rascunho.refeitorio || "").trim(),
+      empresa: String(rascunho.empresa || "").trim(),
+      setor: String(rascunho.setor || "").trim(),
+      objetivo: rascunho.objetivo,
+      restricoes: rascunho.restricoes.slice(),
+      consentimento: true,
+      // Desde quando o aceite vale. E o que a tela de privacidade mostra, e
+      // editar o cadastro nao recomeca a contagem: quem aceitou, aceitou.
+      aceite: (cadastroSalvo() || {}).aceite || new Date().toISOString()
+    };
+    var editando = rascunho.editando;
+    if (campoEdicao){
+      var atual = cadastroSalvo();
+      if (!atual){
+        campoEdicao = null; rascunho = null;
+        mostrar("boas_vindas", false);
+        recado("O cadastro foi removido. Crie um cadastro para continuar.");
+        return;
+      }
+      // Atualiza somente o campo editado e preserva o aceite e os demais dados.
+      var valor = dados[campoEdicao];
+      dados = Object.assign({}, atual);
+      dados[campoEdicao] = valor;
+    }
+    var onde = guardarCadastro(dados);
+    rascunho = null;
+    campoEdicao = null;
+    historico.length = 0;
+    // Cadastro novo comeca do zero: nada do exemplo continua valendo.
+    if (!editando) zerarSessao();
+    mostrar(editando ? "perfil" : "inicio", false);
+    if (editando){ recado("Cadastro atualizado."); return; }
+    recado(onde === "aparelho"
+      ? "Pronto, " + dados.nome + ". Seu cadastro está guardado neste aparelho."
+      : "Pronto, " + dados.nome + ". Aqui na prévia o cadastro vale enquanto esta " +
+        "página estiver aberta.");
+  }
+
+  function apagarCadastro(){
+    esquecer(CADASTRO);
+  }
+
+  // A primeira tela de quem nunca abriu o app. Ela nao empurra o cadastro sem
+  // alternativa: o link do piloto e compartilhado, e quem so quer olhar precisa
+  // conseguir olhar — com o exemplo da Mariana, dito com esse nome, para
+  // ninguem confundir dado de exemplo com dado seu.
+  function telaBoasVindas(){
+    topo.className = "topo marca";
+    topo.textContent = "";
+    var barra = el("div", "barra");
+    var titulo = el("div", "titulo");
+    titulo.appendChild(el("h1", "", "Apetit"));
+    barra.appendChild(titulo);
+    topo.appendChild(barra);
+    topo.appendChild(el("p", "apoio", "Alimenta o que te faz bem"));
+
+    tela.appendChild(el("h1", "h1", "Bem-vindo ao refeitório"));
+    tela.appendChild(el("p", "sub",
+      "Eu te mostro o cardápio do dia, aviso o que você não pode comer e " +
+      "acompanho o seu almoço. Para isso preciso saber quem você é."));
+
+    var cartao = el("div", "cartao");
+    cartao.style.marginTop = "20px";
+    cartao.appendChild(el("p", "paragrafo",
+      "São seis perguntas rápidas: nome, onde você almoça, empresa e setor, " +
+      "seu objetivo e as suas alergias."));
+    cartao.appendChild(el("p", "legenda",
+      "Sua empresa não vê o que você come. A Apetit só enxerga quantas pessoas " +
+      "usam, por setor."));
+    tela.appendChild(cartao);
+
+    // Dito antes de a pessoa preencher seis passos, e nao depois: descobrir no
+    // fim que nada seria guardado e pior do que saber no comeco.
+    if (!guardaNoAparelho()){
+      var aviso = el("div", "aviso wrn");
+      aviso.style.marginTop = "14px";
+      aviso.appendChild(icone("i-info"));
+      aviso.appendChild(el("span", "", "<b>Você está numa prévia embutida.</b> " +
+        "Aqui o navegador não deixa gravar nada: o cadastro vale enquanto esta " +
+        "página estiver aberta. Abrindo o link numa aba própria, ele fica guardado."));
+      tela.appendChild(aviso);
+    }
+
+    var criar = el("button", "cta forte");
+    criar.appendChild(el("b", "", "Criar meu cadastro"));
+    criar.appendChild(icone("i-seta", "seta"));
+    criar.addEventListener("click", function(){ comecarCadastro(false); });
+    acoes.appendChild(criar);
+
+    var olhar = el("button", "cta leve");
+    olhar.appendChild(icone("i-info"));
+    olhar.appendChild(el("b", "", "Só olhar, com o exemplo da Mariana"));
+    olhar.addEventListener("click", function(){
+      historico.length = 0;
+      mostrar("inicio", false);
+    });
+    acoes.appendChild(olhar);
+  }
+
+  // ---------- meus dados, e meu dia ----------
+  //
+  // Das ~70 telas que saem do texto do bot, so tres traziam o nome do exemplo,
+  // e duas ja viraram nativas (inicio e perfil). Sobrava `meus_dados` — logo a
+  // tela que promete dizer **tudo o que o app guarda sobre voce**. Mostrar ali
+  // o nome, a empresa e as alergias de outra pessoa nao e detalhe de
+  // demonstracao: e a tela da promessa desmentindo a promessa.
+  //
+  // `meu_dia` nao traz o nome, mas traz as refeicoes da Mariana, que e a mesma
+  // coisa por outro caminho. As duas passam a ler o cadastro de quem esta
+  // usando o app.
+  //
+  // As palavras sao as do bot (`meus_dados` em `bot.py`), porque a promessa
+  // precisa ser a mesma nas duas portas de entrada.
+  function telaMeusDados(){
+    cabecalhoInterno("Apetit", "Privacidade");
+    var p = pessoa();
+    var h = meuHistorico();
+    var salvo = cadastroSalvo();
+
+    tela.appendChild(el("h1", "h1", "Tudo o que eu guardo sobre você"));
+    if (!salvo){
+      var nota = el("div", "aviso wrn");
+      nota.appendChild(icone("i-info"));
+      nota.appendChild(el("span", "", "<b>Estes são os dados de exemplo da Mariana.</b> " +
+        "Você ainda não tem cadastro neste aparelho."));
+      tela.appendChild(nota);
+    }
+
+    var dados = el("dl", "campos");
+    dados.style.marginTop = "16px";
+    [["Nome", p.nome], ["Refeitório", p.refeitorio], ["Empresa", p.empresa],
+     ["Setor", p.setor], ["Objetivo", p.objetivo],
+     ["Restrições", (p.restricoes || []).join(", ") || "Nenhuma"],
+     ["Aceite", salvo && salvo.aceite ? dataCurta(salvo.aceite) : (salvo ? "sim" : "—")]
+    ].forEach(function(par){
+      var linha = el("div", "campo");
+      linha.appendChild(el("dt", "", escapar(par[0])));
+      linha.appendChild(el("dd", "", escapar(par[1] || "—")));
+      dados.appendChild(linha);
+    });
+    tela.appendChild(dados);
+
+    var contas = el("dl", "campos");
+    contas.style.marginTop = "12px";
+    [["Dias com refeição registrada", (h.meu_dia.dias || []).length],
+     ["Pratos guardados", (p.favoritos || []).length],
+     ["Pontos", estado.pontos],
+     ["Avaliações do refeitório", estado.avaliado ? 1 : 0]
+    ].forEach(function(par){
+      var linha = el("div", "campo");
+      linha.appendChild(el("dt", "", escapar(par[0])));
+      linha.appendChild(el("dd", "", String(par[1])));
+      contas.appendChild(linha);
+    });
+    tela.appendChild(contas);
+
+    var promessa = el("div", "cartao");
+    promessa.style.marginTop = "18px";
+    promessa.appendChild(el("p", "paragrafo",
+      "<b>Sua empresa não vê nada disso sobre você.</b>"));
+    promessa.appendChild(el("p", "paragrafo",
+      "A única coisa que sai daqui é a avaliação do refeitório — e ela vai sem o seu " +
+      "nome, sem a sua empresa e sem o seu setor, junto com a de todo mundo. A Apetit " +
+      "vê como o refeitório está indo, nunca quem disse o quê."));
+    tela.appendChild(promessa);
+
+    if (salvo){
+      var apagar = el("button", "cta fantasma");
+      apagar.appendChild(icone("i-proibido"));
+      apagar.appendChild(el("b", "", "Apagar tudo"));
+      apagar.addEventListener("click", confirmarApagar);
+      acoes.appendChild(apagar);
+    }
+  }
+
+  function dataCurta(iso){
+    var d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleDateString("pt-BR") + ", " +
+           d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function telaMeuDia(){
+    cabecalhoInterno("Apetit", DADOS ? DADOS.dia_amigavel : "");
+    var dias = meuHistorico().meu_dia.dias || [];
+
+    tela.appendChild(el("h1", "h1", "Meu dia"));
+    tela.appendChild(el("p", "sub", estado.registrado
+      ? "Almoço de hoje registrado."
+      : "Você ainda não registrou o almoço de hoje."));
+
+    if (!estado.registrado){
+      var ir = el("button", "cta forte");
+      ir.appendChild(icone("i-tigela"));
+      ir.appendChild(el("b", "", "Quanto pegar hoje"));
+      ir.appendChild(icone("i-seta", "seta"));
+      ir.addEventListener("click", function(){ mostrar("quanto"); });
+      acoes.appendChild(ir);
+    }
+
+    secaoSimples("Seu histórico");
+    if (!dias.length){
+      tela.appendChild(vazio("Nada registrado ainda.",
+        cadastroSalvo()
+          ? "O que você registrar aparece aqui, do mais recente para o mais antigo."
+          : "Este exemplo ainda não tem refeições no período.", "i-calendario"));
+      return;
+    }
+    dias.forEach(function(d){
+      var cartao = el("div", "cartao");
+      cartao.style.marginTop = "10px";
+      var cabeca = el("div", "cabeca-secao");
+      cabeca.appendChild(el("h2", "", escapar(d.data_amigavel || d.data)));
+      if (d.kcal != null){
+        cabeca.appendChild(el("span", "", escapar(d.kcal) + " kcal · " + escapar(d.ptn) + " g ptn"));
+      }
+      cartao.appendChild(cabeca);
+      (d.itens || []).forEach(function(i){
+        var linha = el("div", "linha-porcao");
+        linha.appendChild(el("span", "nome", escapar(i.nome)));
+        linha.appendChild(el("span", "medida", escapar(i.medida === "a vontade" ? "À vontade" : (i.medida || String(i.quantidade)))));
+        cartao.appendChild(linha);
+      });
+      if (d.incompleto){
+        cartao.appendChild(el("p", "legenda",
+          "Algum prato deste dia não tinha informação nutricional, então o total está incompleto."));
+      }
+      tela.appendChild(cartao);
+    });
+  }
+
+  function secaoSimples(nome){
+    var c = el("div", "cabeca-secao");
+    c.appendChild(el("h2", "", escapar(nome)));
+    tela.appendChild(c);
+  }
+
+  // ---------- 6. perfil ----------
+
+  // ---------- o veredito de alergenico, do lado do navegador ----------
+  //
+  // O cadastro e do proprio funcionario e mora so no aparelho, entao o
+  // navegador precisa decidir o veredito sozinho. Isso poe a regra dos tres
+  // estados em dois lugares — aqui e em `apetit/allergens.py` — que e
+  // exatamente o jeito de os dois discordarem um dia sem ninguem ver.
+  //
+  // A trava e `dados.conformidade`: o Python calcula o veredito de cada prato
+  // para varias combinacoes de alergia, e `scripts/conferir_vereditos.py` roda
+  // este codigo num navegador de verdade e falha se um unico prato divergir.
+  //
+  // A regra e curta porque o modelo e curto: contem bloqueia, pode conter e
+  // sem declaracao pedem confirmacao, e so "nao contem" libera. Ausencia de
+  // informacao nunca vira liberacao.
+  var PESO_VEREDITO = { bloqueio: 3, atencao: 2, liberado: 1, sem_restricao: 0 };
+
+  function vereditoDaDeclaracao(estado){
+    if (estado === "contem") return "bloqueio";
+    if (estado === "nao_contem") return "liberado";
+    return "atencao";                     // pode_conter e nao_declarado
+  }
+
+  function vereditoPara(item, restricoes){
+    if (!restricoes || !restricoes.length) return "sem_restricao";
+    var pior = "liberado";
+    restricoes.forEach(function(codigo){
+      var v = vereditoDaDeclaracao((item.declaracoes || {})[codigo] || "nao_declarado");
+      if (PESO_VEREDITO[v] > PESO_VEREDITO[pior]) pior = v;
+    });
+    return pior;
+  }
+
+  // O texto do motivo, montado das mesmas partes que o bot usa.
+  function motivoPara(item, restricoes){
+    var nomes = {};
+    ((DADOS && DADOS.alergenicos) || []).forEach(function(a){ nomes[a.codigo] = a.nome; });
+    var contem = [], pode = [], sem = [];
+    (restricoes || []).forEach(function(c){
+      var estado = (item.declaracoes || {})[c] || "nao_declarado";
+      if (estado === "contem") contem.push(nomes[c] || c);
+      else if (estado === "pode_conter") pode.push(nomes[c] || c);
+      else if (estado === "nao_declarado") sem.push(nomes[c] || c);
+    });
+    if (contem.length){
+      return "Este prato contém " + contem.join(", ").toLowerCase() +
+             ", que você evita. Não recomendo pedir.";
+    }
+    var partes = [];
+    if (pode.length) partes.push("pode conter " + pode.join(", ").toLowerCase());
+    if (sem.length) partes.push("não tem declaração sobre " + sem.join(", ").toLowerCase());
+    if (partes.length){
+      return "Não consigo confirmar que este prato é seguro para você: " +
+             partes.join(" e ") + ". Confirme no balcão antes de se servir.";
+    }
+    if (!restricoes || !restricoes.length) return "Você não tem restrição cadastrada.";
+    return "Nenhum alergênico da sua ficha aparece neste prato.";
+  }
+
+  function etiquetaPara(item, restricoes){
+    var nomes = {};
+    ((DADOS && DADOS.alergenicos) || []).forEach(function(a){ nomes[a.codigo] = a.nome; });
+    var contem = [], pode = [], sem = [];
+    (restricoes || []).forEach(function(c){
+      var estado = (item.declaracoes || {})[c] || "nao_declarado";
+      if (estado === "contem") contem.push(nomes[c] || c);
+      else if (estado === "pode_conter") pode.push(nomes[c] || c);
+      else if (estado === "nao_declarado") sem.push(nomes[c] || c);
+    });
+    if (contem.length) return "Não pode: " + contem.join(", ");
+    if (pode.length) return "Pode conter " + pode.join(", ").toLowerCase();
+    if (sem.length) return "Confirme alergênicos";
+    return "";
+  }
+
+  // ---------- foto de perfil ----------
+  //
+  // A foto fica **so no aparelho**, em `localStorage`, e nunca sai dele: nao ha
+  // servidor nesta demonstracao, e num app de refeitorio o rosto do funcionario
+  // e o dado mais identificavel que existe. Guardar no celular de quem tirou
+  // mantem a promessa que o resto do app faz — a empresa nao ve.
+  //
+  // A imagem e reduzida a um quadrado de 256px antes de guardar. Foto de
+  // celular tem 3-5 MB e o `localStorage` cabe ~5 MB: sem reduzir, a primeira
+  // foto estouraria a cota e derrubaria tudo que estava guardado junto.
+  var FOTO = "apetit-foto";
+  var LADO = 256;
+
+  function fotoGuardada(){
+    return lido(FOTO) || "";
+  }
+  function guardarFoto(dados){
+    return guardar(FOTO, dados);
+  }
+  function apagarFoto(){
+    esquecer(FOTO);
+  }
+
+  // Recorte quadrado pelo centro: o avatar e redondo, e esticar a foto para
+  // caber deformaria o rosto.
+  function reduzirFoto(arquivo){
+    return new Promise(function(resolve, reject){
+      if (!/^image\//.test(arquivo.type)) { reject(new Error("nao-e-imagem")); return; }
+      var url = URL.createObjectURL(arquivo);
+      var img = new Image();
+      img.onload = function(){
+        URL.revokeObjectURL(url);
+        try {
+          var lado = Math.min(img.naturalWidth, img.naturalHeight);
+          var tela = document.createElement("canvas");
+          tela.width = tela.height = LADO;
+          tela.getContext("2d").drawImage(
+            img, (img.naturalWidth - lado) / 2, (img.naturalHeight - lado) / 2,
+            lado, lado, 0, 0, LADO, LADO);
+          resolve(tela.toDataURL("image/jpeg", 0.82));
+        } catch (erro) { reject(new Error("nao-deu-para-ler")); }
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error("nao-deu-para-ler")); };
+      img.src = url;
+    });
+  }
+
+  function desenhaAvatar(p){
+    var no = el("button", "avatar");
+    no.setAttribute("aria-label", fotoGuardada() ? "Trocar a foto do perfil" : "Colocar uma foto no perfil");
+    var foto = fotoGuardada();
+    if (foto){
+      var img = document.createElement("img");
+      img.src = foto;
+      img.alt = "";
+      no.appendChild(img);
+    } else {
+      no.appendChild(el("span", "", escapar(p.iniciais || "?")));
+    }
+    var selo = el("span", "camera");
+    selo.appendChild(icone("i-camera"));
+    no.appendChild(selo);
+    no.addEventListener("click", function(){ document.getElementById("arquivo-foto").click(); });
+    return no;
+  }
+
+  document.getElementById("arquivo-foto").addEventListener("change", function(){
+    var entrada = this;
+    var arquivo = entrada.files && entrada.files[0];
+    entrada.value = "";
+    if (!arquivo) return;
+    reduzirFoto(arquivo).then(function(dados){
+      var onde = guardarFoto(dados);
+      redesenhar();
+      recado(onde === "aparelho"
+        ? "Foto atualizada. Ela fica só neste aparelho."
+        : "Foto atualizada. Aqui na prévia ela vale enquanto esta página estiver aberta.");
+    }).catch(function(erro){
+      recado(erro.message === "nao-e-imagem"
+        ? "Esse arquivo não é uma imagem. Escolha uma foto."
+        : "Não consegui abrir essa imagem. Tente outra foto.");
+    });
+  });
+
+  function telaPerfil(){
+    cabecalhoInterno("Apetit", "");
+    var p = pessoa();
+
+    var cabeca = el("div", "perfil-topo");
+    cabeca.appendChild(desenhaAvatar(p));
+    var quem = el("div", "quem");
+    quem.appendChild(el("b", "", escapar(p.nome || "")));
+    quem.appendChild(el("span", "", escapar([p.empresa, p.setor].filter(Boolean).join(" · "))));
+    cabeca.appendChild(quem);
+    tela.appendChild(cabeca);
+
+    secao("Dados pessoais");
+    // Sem e-mail aqui: o cadastro do aparelho nao pede endereco. Ele existe do
+    // outro lado, para entrar no app, que e outra coisa.
+    // Campo que o cadastro nao coleta nao vira linha vazia na tela.
+    if (cadastroSalvo()){
+      var pessoais = el("div", "pilha");
+      ["nome", "refeitorio", "empresa", "setor"].forEach(function(campo){ pessoais.appendChild(campoEditavel(campo, p[campo])); });
+      tela.appendChild(pessoais);
+    } else campos([["Nome", p.nome], ["Refeitório", p.refeitorio],
+            ["Empresa", p.empresa], ["Setor", p.setor]]);
+
+    secao("Objetivo");
+    var alvo = p.alvo || {};
+    if (cadastroSalvo()) tela.appendChild(campoEditavel("objetivo", p.objetivo));
+    else campos([["Objetivo", p.objetivo]]);
+    campos([["Alvo do almoço", alvo.kcal ? alvo.kcal + " kcal · " + alvo.ptn + " g ptn" : null]]);
+    var explicaAlvo=el("details","discreto");
+    explicaAlvo.appendChild(el("summary","","Sobre seu objetivo"));
+    explicaAlvo.appendChild(el("p","","O alvo é ilustrativo. A faixa individual deve ser definida pelo nutricionista. Envie sua ficha para seguir as orientações dele."));
+    tela.appendChild(explicaAlvo);
+
+    secao("Restrições alimentares");
+    var restricoes = (p.restricoes || []).concat(p.restricoes_livres || []);
+    if (cadastroSalvo()){
+      tela.appendChild(campoEditavel("restricoes", restricoes.join(", ") || "Nenhuma cadastrada"));
+    } else if (restricoes.length){
+      var tags = el("div", "tags");
+      restricoes.forEach(function(r){
+        var t = el("span", "tag");
+        t.appendChild(icone("i-proibido"));
+        t.appendChild(el("span", "", escapar(r)));
+        tags.appendChild(t);
+      });
+      tela.appendChild(tags);
+    } else {
+      tela.appendChild(vazio("Nenhuma restrição cadastrada.", "", "i-escudo"));
+    }
+    if ((p.evitar || []).length){
+      var evitar = el("div", "tags");
+      evitar.style.marginTop = "10px";
+      p.evitar.forEach(function(r){
+        var t = el("span", "tag calma");
+        t.appendChild(icone("i-proibido"));
+        t.appendChild(el("span", "", escapar(r)));
+        evitar.appendChild(t);
+      });
+      tela.appendChild(evitar);
+      tela.appendChild(el("p", "legenda", "Prefere evitar: bloqueia no nome do prato, sem virar aviso de alergia."));
+    }
+
+    secao("Preferências e acompanhamento");
+    var atalhos=el("div","lista-atalhos");
+    ACOMPANHAMENTO.forEach(function(a){if(alvoDe(a)) atalhos.appendChild(atalho(a));});
+    tela.appendChild(atalhos);
+
+    // As chavinhas de aviso ficavam aqui tambem, e nao guardavam nada: mexiam
+    // num objeto em memoria que morria na proxima tela. Duas telas para a mesma
+    // preferencia, e a desta era a que nao funcionava. Agora existe uma, na
+    // tela de avisos, e ela guarda no aparelho.
+
+    // Quem pode por a foto tem que poder tirar, e no mesmo lugar onde ela esta.
+    if (fotoGuardada()){
+      var tirar = el("button", "cta fantasma");
+      tirar.style.marginTop = "12px";
+      tirar.appendChild(icone("i-proibido"));
+      tirar.appendChild(el("b", "", "Remover a foto do perfil"));
+      tirar.addEventListener("click", function(){
+        apagarFoto();
+        redesenhar();
+        recado("Foto removida deste aparelho.");
+      });
+      tela.appendChild(tirar);
+    }
+    tela.appendChild(el("p", "legenda", guardaNoAparelho()
+      ? "A foto fica só neste aparelho. Ela não é enviada para a Apetit nem para a sua empresa."
+      : "A foto não sai daqui. Nesta prévia ela nem chega a ser gravada: vale só " +
+        "enquanto a página estiver aberta."));
+
+    secao("Cadastro");
+    var conta = el("div", "pilha");
+    // O cadastro e editavel aqui, na tela onde ele esta escrito. Enquanto nao
+    // existe um, o mesmo lugar oferece criar: quem entrou pelo exemplo ve os
+    // dados da Mariana e precisa de um caminho para trocar por si.
+    var temCadastro = !!cadastroSalvo();
+    conta.appendChild(itemDeConta(
+      temCadastro ? "Editar meu cadastro" : "Criar o meu cadastro",
+      temCadastro ? "i-lapis" : "i-pessoa",
+      function(){ comecarCadastro(temCadastro); }
+    ));
+    conta.appendChild(itemDeConta("Meus dados e privacidade", "i-cadeado",
+      function(){ mostrar("meus_dados"); }));
+    if (temCadastro){
+      conta.appendChild(itemDeConta("Apagar meu cadastro deste aparelho", "i-proibido",
+        function(){ confirmarApagar(); }));
+    }
+    tela.appendChild(conta);
+    if (temCadastro){
+      tela.appendChild(el("p", "legenda", guardaNoAparelho()
+        ? "Seu cadastro fica neste aparelho, como a foto. Nada dele é enviado para " +
+          "a sua empresa."
+        : "Nada do seu cadastro é enviado para a sua empresa. Nesta prévia ele " +
+          "também não é gravado: vale enquanto esta página estiver aberta."));
+    }
+
+    // A area de gestao nao aparece para funcionario. No app de verdade quem
+    // libera e `ADMIN_IDS` no servidor; aqui, sem servidor, a chave fica
+    // visivel e dita — esconder atras de um gesto secreto daria a impressao de
+    // que o controle e o gesto, e nao a lista de quem pode.
+    secao("Acesso");
+    var chave = el("button", "interruptor");
+    chave.setAttribute("aria-pressed", estado.gestao ? "true" : "false");
+    var txt = el("div", "txt");
+    txt.appendChild(el("b", "", "Sou da gestão da Apetit"));
+    txt.appendChild(el("span", "", "Mostra a visão agregada do piloto. No app real, " +
+      "quem libera é a lista de administradores no servidor."));
+    chave.appendChild(txt);
+    chave.appendChild(el("span", "chave"));
+    chave.addEventListener("click", function(){
+      estado.gestao = !estado.gestao;
+      try { localStorage.setItem("apetit-gestao", estado.gestao ? "sim" : "nao"); } catch (e) {}
+      redesenhar();
+    });
+    tela.appendChild(chave);
+
+    if (estado.gestao){
+      var b = el("button", "item");
+      b.style.marginTop = "12px";
+      b.appendChild(chip("i-barras"));
+      b.appendChild(el("b", "", "Visão da Apetit"));
+      b.appendChild(icone("i-seta", "seta"));
+      b.addEventListener("click", function(){ mostrar("gestao"); });
+      tela.appendChild(b);
+    }
+
+    function secao(nome){
+      var c = el("div", "cabeca-secao");
+      c.appendChild(el("h2", "", escapar(nome)));
+      tela.appendChild(c);
+    }
+    function campos(pares){
+      var dl = el("dl", "campos");
+      pares.forEach(function(par){
+        if (!par[1]) return;
+        var linha = el("div", "campo");
+        linha.appendChild(el("dt", "", escapar(par[0])));
+        linha.appendChild(el("dd", "", escapar(par[1])));
+        dl.appendChild(linha);
+      });
+      tela.appendChild(dl);
+    }
+  }
+
+  function campoEditavel(campo, valor){
+    var b = el("button", "campo-edicao");
+    b.dataset.editarCampo = campo;
+    b.setAttribute("aria-label", "Editar " + ROTULOS_CADASTRO[campo].toLowerCase());
+    b.appendChild(el("span", "rotulo", escapar(ROTULOS_CADASTRO[campo])));
+    b.appendChild(el("span", "valor", escapar(valor || "—")));
+    b.appendChild(icone("i-lapis"));
+    b.addEventListener("click", function(){ comecarCadastro(true, campo); });
+    return b;
+  }
+
+  function itemDeConta(nome, ic, aoClicar){
+    var b = el("button", "item");
+    b.appendChild(chip(ic, true));
+    b.appendChild(el("b", "", escapar(nome)));
+    b.appendChild(icone("i-seta", "seta"));
+    b.addEventListener("click", aoClicar);
+    return b;
+  }
+
+  // Apagar o cadastro e irreversivel e nao tem desfazer: a folha pergunta antes,
+  // e diz o que vai embora com ele.
+  function confirmarApagar(){
+    abrirFolha(function(c){
+      c.appendChild(el("h2", "", "Apagar o seu cadastro?"));
+      c.appendChild(el("p", "", "Vão embora deste aparelho o seu nome, refeitório, " +
+        "empresa, setor, objetivo e as suas restrições. Não tem como desfazer."));
+      c.appendChild(el("p", "", "O app volta a mostrar o exemplo da Mariana, e você " +
+        "pode se cadastrar de novo quando quiser."));
+      var apagar = el("button", "cta forte");
+      apagar.appendChild(icone("i-proibido"));
+      apagar.appendChild(el("b", "", "Apagar o meu cadastro"));
+      apagar.addEventListener("click", function(){
+        apagarCadastro();
+        if (typeof folha.close === "function") folha.close();
+        historico.length = 0;
+        zerarSessao();
+        mostrar("boas_vindas", false);
+        recado("Cadastro apagado deste aparelho.");
+      });
+      c.appendChild(apagar);
+    });
+  }
+
+  // ---------- 6b. acompanhamento: ficha, favoritos, avisos, ajuda ----------
+  //
+  // Estas quatro telas vinham da transcricao do bot: um bloco de texto com os
+  // botoes embaixo, capturado do Telegram. Era fiel ao bot e errado como app —
+  // a tela de favoritos nao sabia o que a pessoa tinha guardado, e a de avisos
+  // mostrava caixinhas que nao guardavam escolha nenhuma.
+
+  var MINHA_FICHA = "apetit-ficha";
+  var MINHAS_PREFS = "apetit-avisos";
+
+  function fichaSalva(){
+    try { return JSON.parse(lido(MINHA_FICHA) || "null"); } catch (e) { return null; }
+  }
+
+  function numeroSolto(valor){
+    var n = parseFloat(String(valor).replace(",", "."));
+    return isFinite(n) && n > 0 ? n : null;
+  }
+
+  function telaFicha(){
+    cabecalhoInterno("Apetit", "Ficha do nutricionista");
+    var minha = fichaSalva();
+    tela.appendChild(el("h1", "h1", "Minha ficha nutricional"));
+
+    // Ficha que veio de PDF costuma ser plano alimentar: alimento e medida, sem
+    // caloria nenhuma. Mostrar "— kcal / — g" para ela seria dizer que a leitura
+    // falhou, quando na verdade a ficha nao tem esses numeros.
+    if (minha && (minha.plano || []).length){
+      tela.appendChild(el("p", "sub", "Plano alimentar guardado neste aparelho."));
+      var itensPlano = el("div", "pilha");
+      itensPlano.style.marginTop = "14px";
+      minha.plano.forEach(function(i){
+        var linha = el("div", "item");
+        linha.appendChild(chip("i-folha", true));
+        linha.appendChild(el("span", "item-texto", "<b>" + escapar(i.nome) + "</b>" +
+          (i.medida ? "<small>" + escapar(i.medida) + "</small>" : "")));
+        itensPlano.appendChild(linha);
+      });
+      tela.appendChild(itensPlano);
+
+      var nota = el("div", "aviso wrn");
+      nota.appendChild(icone("i-info"));
+      nota.appendChild(el("span", "", "<b>A sugestão de porções ainda usa o seu objetivo.</b> " +
+        "Comparar este plano com o cardápio do dia depende do servidor da Apetit, " +
+        "que ainda não está ligado neste teste."));
+      tela.appendChild(nota);
+
+      var tirar = el("button", "cta fantasma");
+      tirar.appendChild(icone("i-proibido"));
+      tirar.appendChild(el("b", "", "Remover a ficha"));
+      tirar.addEventListener("click", function(){
+        esquecer(MINHA_FICHA);
+        mostrar("ficha", false);
+        recado("Ficha removida deste aparelho.");
+      });
+      acoes.appendChild(tirar);
+      return;
+    }
+
+    if (minha){
+      tela.appendChild(el("p", "sub", "Guardada neste aparelho."));
+      var numeros = el("dl", "campos");
+      numeros.style.marginTop = "14px";
+      [["Calorias do almoço", minha.kcal ? Math.round(minha.kcal) + " kcal" : "—"],
+       ["Proteína do almoço", minha.ptn ? Math.round(minha.ptn) + " g" : "—"],
+       ["Profissional", minha.profissional || "—"],
+       ["Confirmada em", minha.em ? dataCurta(minha.em) : "—"]
+      ].forEach(function(par){
+        var linha = el("div", "campo");
+        linha.appendChild(el("dt", "", escapar(par[0])));
+        linha.appendChild(el("dd", "", escapar(par[1])));
+        numeros.appendChild(linha);
+      });
+      tela.appendChild(numeros);
+
+      // A comparacao com o objetivo generico e informacao de graca: os dois
+      // numeros ja existem, e ver a diferenca e o que explica por que a ficha
+      // importa. Nao e conta nova nem prescricao nova.
+      var generico = alvoDoObjetivo(pessoa().objetivo) || {};
+      if (minha.kcal && generico.kcal){
+        var dif = Math.round(minha.kcal - generico.kcal);
+        var cartaoDif = el("div", "cartao");
+        cartaoDif.style.marginTop = "16px";
+        cartaoDif.appendChild(el("p", "paragrafo",
+          "Sua ficha pede <b>" + Math.round(minha.kcal) + " kcal</b> no almoço. O objetivo " +
+          "<b>" + escapar(pessoa().objetivo || "genérico") + "</b> mira " +
+          Math.round(generico.kcal) + " kcal — " +
+          (dif === 0 ? "praticamente o mesmo."
+                     : (dif > 0 ? dif + " kcal a mais." : Math.abs(dif) + " kcal a menos."))));
+        tela.appendChild(cartaoDif);
+      }
+
+      // Honestidade sobre o que a ficha ainda nao faz. A sugestao de porcao sai
+      // de uma tabela que o Python calculou para os quatro objetivos; um alvo
+      // de ficha nao esta nela, e inventar a conta aqui no navegador seria uma
+      // segunda versao da regra de porcao — a pior duplicacao possivel num app
+      // que existe para dizer quanto comer.
+      var aviso = el("div", "aviso wrn");
+      aviso.appendChild(icone("i-info"));
+      aviso.appendChild(el("span", "", "<b>A sugestão de porções ainda usa o seu objetivo, " +
+        "não a ficha.</b> Seguir os números do nutricionista prato a prato depende do " +
+        "servidor da Apetit, que ainda não está ligado neste teste."));
+      tela.appendChild(aviso);
+
+      var trocar = el("button", "cta fantasma");
+      trocar.appendChild(icone("i-ficha"));
+      trocar.appendChild(el("b", "", "Trocar os números"));
+      trocar.addEventListener("click", function(){ mostrar("ficha_manual"); });
+      acoes.appendChild(trocar);
+
+      var remover = el("button", "cta fantasma");
+      remover.appendChild(icone("i-proibido"));
+      remover.appendChild(el("b", "", "Remover a ficha"));
+      remover.addEventListener("click", function(){
+        esquecer(MINHA_FICHA);
+        mostrar("ficha", false);
+        recado("Ficha removida deste aparelho.");
+      });
+      acoes.appendChild(remover);
+      return;
+    }
+
+    tela.appendChild(el("p", "sub",
+      "Se você faz acompanhamento com nutricionista, o app pode mostrar os números dele."));
+
+    var explica = el("div", "cartao");
+    explica.style.marginTop = "16px";
+    explica.appendChild(el("p", "paragrafo",
+      "<b>O arquivo não fica guardado.</b> O app tira os números, você confere, e o " +
+      "documento é descartado. Ficha de nutricionista costuma trazer peso, diagnóstico e " +
+      "histórico — disso o app não precisa."));
+    explica.appendChild(el("p", "paragrafo",
+      "Se a sua ficha for foto ou papel, dá para digitar os números."));
+    tela.appendChild(explica);
+
+    var pdf = el("button", "cta forte");
+    pdf.appendChild(icone("i-arquivo"));
+    pdf.appendChild(el("b", "", "Mandar a ficha em PDF"));
+    pdf.addEventListener("click", function(){
+      document.getElementById("arquivo-pdf").click();
+    });
+    acoes.appendChild(pdf);
+
+    var manual = el("button", "cta fantasma");
+    manual.appendChild(icone("i-lapis"));
+    manual.appendChild(el("b", "", "Digitar os números"));
+    manual.addEventListener("click", function(){ mostrar("ficha_manual"); });
+    acoes.appendChild(manual);
+  }
+
+  function telaFichaManual(){
+    cabecalhoInterno("Apetit", "Ficha do nutricionista");
+    var minha = fichaSalva() || {};
+    tela.appendChild(el("h1", "h1", "Os números da sua ficha"));
+    tela.appendChild(el("p", "sub", "Só do almoço. Deixe em branco o que a ficha não traz."));
+
+    var form = el("div", "pilha");
+    form.style.marginTop = "16px";
+    var campos = [
+      ["kcal", "Calorias do almoço (kcal)", "Ex.: 700", minha.kcal || ""],
+      ["ptn", "Proteína do almoço (g)", "Ex.: 35", minha.ptn || ""],
+      ["profissional", "Nome do profissional (opcional)", "Ex.: Dra. Ana", minha.profissional || ""]
+    ];
+    var entradas = {};
+    campos.forEach(function(c){
+      // Mesma classe do cadastro (`campo-texto`): rotulo visivel acima da
+      // caixa. Sem rotulo, "700" e "35" preenchidos ficam indistinguiveis — foi
+      // o defeito que apareceu no cadastro com "empresa" e "setor".
+      var bloco = el("div", "campo-texto");
+      var rotulo = el("label", "", escapar(c[1]));
+      rotulo.setAttribute("for", "ficha-" + c[0]);
+      bloco.appendChild(rotulo);
+      var input = document.createElement("input");
+      input.id = "ficha-" + c[0];
+      input.type = c[0] === "profissional" ? "text" : "number";
+      if (c[0] !== "profissional"){ input.inputMode = "decimal"; input.min = "1"; }
+      input.placeholder = c[2];
+      input.value = c[3];
+      input.autocomplete = "off";
+      bloco.appendChild(input);
+      entradas[c[0]] = input;
+      form.appendChild(bloco);
+    });
+    tela.appendChild(form);
+
+    tela.appendChild(notaDeSimulacao(
+      "Os números ficam só neste aparelho. A Apetit e a sua empresa não recebem a sua ficha."));
+
+    var salvar = el("button", "cta forte");
+    salvar.appendChild(icone("i-liberado"));
+    salvar.appendChild(el("b", "", "Guardar a ficha"));
+    salvar.addEventListener("click", function(){
+      var kcal = numeroSolto(entradas.kcal.value);
+      var ptn = numeroSolto(entradas.ptn.value);
+      if (!kcal && !ptn){
+        recado("Preencha pelo menos as calorias ou a proteína.");
+        return;
+      }
+      // Numero de dia inteiro entrando como refeicao e o erro que machuca: uma
+      // ficha de 2.000 kcal lida como almoco mandaria a pessoa comer o dia todo
+      // num prato. Mesma faixa que `Prescription.implausivel` usa no Python.
+      if (kcal && kcal > 1500){
+        recado("Esse valor parece ser do dia inteiro, não de uma refeição. Confira na ficha.");
+        return;
+      }
+      guardar(MINHA_FICHA, JSON.stringify({
+        kcal: kcal, ptn: ptn,
+        profissional: entradas.profissional.value.trim(),
+        em: new Date().toISOString()
+      }));
+      mostrar("ficha", false);
+      recado("Ficha guardada neste aparelho.");
+    });
+    acoes.appendChild(salvar);
+
+    var voltar = el("button", "cta fantasma");
+    voltar.appendChild(el("b", "", "Cancelar"));
+    voltar.addEventListener("click", function(){ mostrar("ficha", false); });
+    acoes.appendChild(voltar);
+  }
+
+  function telaFavoritos(){
+    cabecalhoInterno("Apetit", "Preferidos");
+    var guardados = meuHistorico().favoritos || [];
+    tela.appendChild(el("h1", "h1", "Alimentos preferidos"));
+
+    if (!guardados.length){
+      var vazio = el("div", "estado-exemplo");
+      var ic = el("span", "estado-icone");
+      ic.appendChild(icone("i-coracao"));
+      vazio.appendChild(ic);
+      vazio.appendChild(el("div", "",
+        "<b>Você ainda não guardou nenhum prato.</b>" +
+        "<p>Depois de montar o prato, toque em <b>Guardar um prato</b>.</p>"));
+      vazio.style.marginTop = "16px";
+      tela.appendChild(vazio);
+
+      var montar = el("button", "cta forte");
+      montar.appendChild(icone("i-tigela"));
+      montar.appendChild(el("b", "", "Montar meu prato"));
+      montar.addEventListener("click", function(){ mostrar("montar"); });
+      acoes.appendChild(montar);
+      return;
+    }
+
+    tela.appendChild(el("p", "sub", guardados.length === 1
+      ? "1 prato guardado." : guardados.length + " pratos guardados."));
+    var lista = el("div", "pilha");
+    lista.style.marginTop = "14px";
+    guardados.forEach(function(f){
+      var nome = typeof f === "string" ? f : (f.nome || f.item_name || f.codigo || "");
+      var linha = el("div", "item");
+      linha.appendChild(chip("i-coracao", true));
+      linha.appendChild(el("span", "item-texto", "<b>" + escapar(nome) + "</b>"));
+      lista.appendChild(linha);
+    });
+    tela.appendChild(lista);
+    tela.appendChild(notaDeSimulacao(
+      "Os pratos guardados ficam neste aparelho. Sua empresa não vê o que você gosta."));
+  }
+
+  var PREFS_PADRAO = { resumo: true, lembrete: false };
+
+  function prefsAvisos(){
+    try {
+      var salvo = JSON.parse(lido(MINHAS_PREFS) || "null");
+      if (salvo) return { resumo: !!salvo.resumo, lembrete: !!salvo.lembrete };
+    } catch (e) {}
+    return { resumo: PREFS_PADRAO.resumo, lembrete: PREFS_PADRAO.lembrete };
+  }
+
+  function telaAvisos(){
+    cabecalhoInterno("Apetit", "Notificações");
+    var prefs = prefsAvisos();
+    tela.appendChild(el("h1", "h1", "Avisos"));
+    tela.appendChild(el("p", "sub", "Toque para ligar ou desligar. Dá para mudar quando quiser."));
+
+    var itens = [
+      ["resumo", "Resumo da minha semana", "Na sexta, quantos dias você registrou e o que conquistou. " +
+        "Só sobre você: não existe ranking e sua empresa não vê nada disso."],
+      ["lembrete", "Lembrete do almoço", "Um toque no seu ombro na hora do almoço, " +
+        "só nos dias em que você ainda não registrou."]
+    ];
+
+    var lista = el("div", "pilha");
+    lista.style.marginTop = "14px";
+    itens.forEach(function(item){
+      var chave = item[0];
+      var b = el("button", "item");
+      b.setAttribute("role", "switch");
+      b.setAttribute("aria-checked", prefs[chave] ? "true" : "false");
+      b.appendChild(chip(prefs[chave] ? "i-liberado" : "i-sino", !prefs[chave]));
+      b.appendChild(el("span", "item-texto",
+        "<b>" + escapar(item[1]) + "</b><small>" + escapar(item[2]) + "</small>"));
+      b.appendChild(el("span", "etiqueta", prefs[chave] ? "Ligado" : "Desligado"));
+      b.addEventListener("click", function(){
+        prefs[chave] = !prefs[chave];
+        guardar(MINHAS_PREFS, JSON.stringify(prefs));
+        mostrar("avisos", false);
+      });
+      lista.appendChild(b);
+    });
+    tela.appendChild(lista);
+
+    // O bot entregava aviso pelo Telegram. O app nao tem por onde: aviso em
+    // navegador precisa de permissao de notificacao e de um servidor que
+    // empurre, e nenhum dos dois existe ainda. Mostrar a chavinha sem dizer
+    // isso seria prometer um toque no ombro que nunca vem.
+    var limite = el("div", "aviso wrn");
+    limite.appendChild(icone("i-info"));
+    limite.appendChild(el("span", "", "<b>Ainda não sai aviso nenhum.</b> Sua escolha fica " +
+      "guardada neste aparelho, mas enviar o resumo e o lembrete depende de o app pedir " +
+      "permissão de notificação e de o servidor da Apetit estar ligado."));
+    tela.appendChild(limite);
+
+    tela.appendChild(el("p", "legenda", "O app nunca comenta o que você comeu."));
+  }
+
+  function telaAjuda(){
+    cabecalhoInterno("Apetit", "Ajuda");
+    tela.appendChild(el("h1", "h1", "Como usar"));
+
+    var explicacoes = [
+      ["quanto", "i-tigela", "Quanto pegar hoje",
+       "Quantas conchas e colheres pegar de cada coisa para chegar no seu objetivo, " +
+       "com o cardápio de hoje. Se você pegar o que ele sugeriu, toque em <b>Vou pegar isso</b>."],
+      ["montar", "i-talher", "Montar meu prato",
+       "O app te leva pela fila, uma categoria por vez. Você toca no que pegou e ele mostra " +
+       "como ficou o prato."],
+      ["cardapio", "i-calendario", "Cardápio de hoje",
+       "O que tem hoje, com aviso do que você não pode comer."],
+      ["meu_dia", "i-prancheta", "Meu dia",
+       "O que você registrou hoje e nos dias anteriores. Registrar de novo no mesmo dia " +
+       "substitui o registro anterior."],
+      ["favoritos", "i-coracao", "Preferidos", "Pratos que você gostou."],
+      ["progresso", "i-barras", "Meu progresso",
+       "Seus dias registrados na semana e as conquistas."],
+      ["ficha", "i-ficha", "Minha ficha nutricional",
+       "Os números do seu nutricionista, guardados só neste aparelho."],
+      ["avaliar", "i-estrela", "Avaliar o refeitório",
+       "Sua opinião sobre a comida e o atendimento. Vai sem o seu nome."],
+      ["meus_dados", "i-escudo", "Meus dados e privacidade",
+       "Tudo o que o app guarda sobre você, e o botão de apagar."]
+    ];
+
+    var lista = el("div", "pilha");
+    lista.style.marginTop = "16px";
+    explicacoes.forEach(function(e){
+      var b = el("button", "item");
+      b.appendChild(chip(e[1], true));
+      b.appendChild(el("span", "item-texto", "<b>" + escapar(e[2]) + "</b><small>" + e[3] + "</small>"));
+      b.appendChild(icone("i-seta", "seta"));
+      b.addEventListener("click", function(){ mostrar(e[0]); });
+      lista.appendChild(b);
+    });
+    tela.appendChild(lista);
+
+    var privacidade = el("div", "cartao");
+    privacidade.style.marginTop = "18px";
+    privacidade.appendChild(el("p", "paragrafo",
+      "<b>O aviso de alergênico não substitui conferir com a equipe do refeitório.</b> " +
+      "O app só consegue avisar sobre o que a ficha técnica do prato declara. Quando a " +
+      "ficha não declara, ele diz que não consegue confirmar — nunca que o prato é seguro."));
+    tela.appendChild(privacidade);
+  }
+
+  // ---------- 7. gestao ----------
+
+  // Os quatro relatorios saem de `DADOS.gestao`, calculado em Python pelas
+  // mesmas funcoes que o bot usa. O n minimo de cinco pessoas e a supressao de
+  // recorte pequeno chegam decididos: o numero suprimido nao vem no arquivo,
+  // entao nao existe tela capaz de imprimi-lo por descuido.
+
+  function pct(valor){
+    return valor === null || valor === undefined ? "—" : Math.round(valor) + "%";
+  }
+
+  function semDados(texto){
+    var vazio = el("div", "estado-exemplo");
+    var ic = el("span", "estado-icone");
+    ic.appendChild(icone("i-calendario"));
+    vazio.appendChild(ic);
+    vazio.appendChild(el("div", "", "<b>" + escapar(texto) + "</b>"));
+    vazio.style.marginTop = "16px";
+    tela.appendChild(vazio);
+  }
+
+  function notaAgregado(texto){
+    var n = el("p", "gestao-nota", texto);
+    tela.appendChild(n);
+  }
+
+  function linhasDe(pares){
+    var dl = el("dl", "campos");
+    dl.style.marginTop = "14px";
+    pares.forEach(function(par){
+      var linha = el("div", "campo");
+      linha.appendChild(el("dt", "", escapar(par[0])));
+      linha.appendChild(el("dd", "", escapar(String(par[1]))));
+      dl.appendChild(linha);
+    });
+    tela.appendChild(dl);
+    return dl;
+  }
+
+  function gestaoDados(){
+    return (DADOS && DADOS.gestao) || null;
+  }
+
+  // Estes numeros sao do piloto inventado que monta a demonstracao — quinze
+  // cadastros de exemplo, nenhum deles de gente de verdade. Dito em cada tela,
+  // e nao so no "sobre": quem abre um relatorio direto precisa saber o que esta
+  // lendo, e "75% de adesao" e o tipo de numero que vira slide.
+  //
+  // A area de gestao nao tem tranca: ela aparece por uma chave no proprio
+  // aparelho, e o arquivo que alimenta estas telas e publico. Isso e aceitavel
+  // enquanto o conteudo e inventado, e deixa de ser no dia em que for real.
+  function notaDeExemplo(){
+    var caixa = el("div", "aviso wrn");
+    caixa.appendChild(icone("i-info"));
+    caixa.appendChild(el("span", "", "<b>Números de demonstração.</b> Saem de um piloto " +
+      "inventado para estas telas existirem; não são dados de nenhuma empresa."));
+    tela.appendChild(caixa);
+  }
+
+  function telaPiloto(){
+    cabecalhoInterno("Apetit", "Gestão");
+    var g = gestaoDados();
+    tela.appendChild(el("h1", "h1", "Relatório do piloto"));
+    if (!g){ semDados("Relatório indisponível."); return; }
+    notaDeExemplo();
+    tela.appendChild(el("p", "sub",
+      g.periodo.desde_amigavel + " a " + g.periodo.ate_amigavel));
+
+    var p = g.piloto;
+    secaoSimples("Adesão");
+    linhasDe([
+      ["Convidados", p.convidados],
+      ["Cadastrados", p.cadastrados + (p.convidados ? "  (" + pct(p.cadastrados * 100 / p.convidados) + " dos convidados)" : "")],
+      ["Usaram de fato", p.ativos + (p.cadastrados ? "  (" + pct(p.ativos * 100 / p.cadastrados) + " de quem se cadastrou)" : "")],
+      ["Voltaram outro dia", p.voltaram + (p.ativos ? "  (" + pct(p.voltaram * 100 / p.ativos) + " de quem usou)" : "")]
+    ]);
+
+    secaoSimples("Uso");
+    linhasDe([
+      ["Refeições registradas", p.registros],
+      ["Dias por pessoa", (p.dias_por_pessoa || 0).toFixed(1)]
+    ]);
+
+    secaoSimples("O que as pessoas usam");
+    var funcoes = el("div", "pilha");
+    funcoes.style.marginTop = "12px";
+    (p.funcoes || []).forEach(function(f){
+      var linha = el("div", "item");
+      linha.appendChild(chip(f.saude ? "i-escudo" : "i-barras", true));
+      var valor = f.suprimido
+        ? "suprimido (menos de 5 pessoas)"
+        : f.pessoas + " pessoa(s) · " + f.usos + " vez(es)";
+      linha.appendChild(el("span", "item-texto",
+        "<b>" + escapar(f.nome) + "</b><small>" + escapar(valor) + "</small>"));
+      funcoes.appendChild(linha);
+    });
+    tela.appendChild(funcoes);
+
+    secaoSimples("Objetivo declarado");
+    linhasDe((p.objetivos || []).map(function(o){
+      return [o.nome, o.pessoas === null ? "suprimido" : o.pessoas + " pessoa(s)"];
+    }));
+
+    secaoSimples("Avaliação do refeitório");
+    linhasDe([
+      ["Avaliações", p.avaliacoes],
+      ["Comida boa", pct(p.comida_boa_pct)],
+      ["Atendimento bom", pct(p.atendimento_bom_pct)]
+    ]);
+
+    secaoSimples("Qualidade do dado do cardápio");
+    var total = p.itens_cardapio || 0;
+    linhasDe([
+      ["Itens no cardápio", total],
+      ["Com informação nutricional", total ? pct((total - p.itens_sem_macro) * 100 / total) : "—"],
+      ["Com alergênico declarado", total ? pct((total - p.itens_sem_alergenico) * 100 / total) : "—"]
+    ]);
+
+    notaAgregado("Nenhum funcionário é identificado nominalmente. Refeições e metas " +
+      "individuais não aparecem. Recortes com menos de cinco pessoas são suprimidos.");
+  }
+
+  function telaRelatorio(){
+    cabecalhoInterno("Apetit", "Gestão");
+    var g = gestaoDados();
+    tela.appendChild(el("h1", "h1", "Adesão por setor"));
+    if (!g){ semDados("Relatório indisponível."); return; }
+    notaDeExemplo();
+
+    var setores = g.setores || [];
+    if (!setores.length){ semDados("Nenhum setor com cadastro ainda."); return; }
+
+    var lista = el("div", "pilha");
+    lista.style.marginTop = "14px";
+    setores.forEach(function(s){
+      var linha = el("div", "item");
+      linha.appendChild(chip("i-grupo", true));
+      var quanto = s.suprimido
+        ? "suprimido — " + (s.motivo || "recorte pequeno")
+        : s.pessoas + " pessoa(s)";
+      linha.appendChild(el("span", "item-texto",
+        "<b>" + escapar([s.empresa, s.setor].filter(Boolean).join(" · ")) + "</b>" +
+        "<small>" + escapar(quanto) + "</small>"));
+      lista.appendChild(linha);
+    });
+    tela.appendChild(lista);
+
+    notaAgregado("Só adesão agregada. Consumo, objetivo e restrição de pessoa identificada " +
+      "não saem daqui — são dado de saúde do funcionário.");
+  }
+
+  function telaAtendimento(){
+    cabecalhoInterno("Apetit", "Gestão");
+    var g = gestaoDados();
+    tela.appendChild(el("h1", "h1", "Resultados das avaliações"));
+    if (!g){ semDados("Relatório indisponível."); return; }
+    notaDeExemplo();
+
+    var unidades = g.refeitorios || [];
+    if (!unidades.length){ semDados("Nenhuma avaliação no período."); return; }
+    tela.appendChild(el("p", "sub", "Quem precisa de atenção primeiro."));
+
+    unidades.forEach(function(u){
+      var card = el("div", "cartao");
+      card.style.marginTop = "14px";
+      card.appendChild(el("h2", "h2", escapar(u.unidade)));
+      if (u.suprimido){
+        card.appendChild(el("p", "paragrafo",
+          "Suprimido — " + escapar(u.motivo || "poucas avaliações no recorte")));
+      } else {
+        card.appendChild(el("p", "paragrafo",
+          u.avaliacoes + " avaliação(ões) · comida boa <b>" + pct(u.comida_boa_pct) +
+          "</b> · atendimento bom <b>" + pct(u.atendimento_bom_pct) + "</b>"));
+        if (u.faltou_algo) card.appendChild(el("p", "legenda",
+          "Faltou algo em " + u.faltou_algo + " avaliação(ões) (" + pct(u.faltou_pct) + ")."));
+        (u.marcacoes || []).forEach(function(m){
+          card.appendChild(el("p", "legenda", escapar(m.nome) + " — " + m.vezes + "x"));
+        });
+      }
+      tela.appendChild(card);
+    });
+
+    notaAgregado("A avaliação não carrega nome, empresa nem setor de quem respondeu.");
+  }
+
+  function telaCobertura(){
+    cabecalhoInterno("Apetit", "Gestão");
+    var g = gestaoDados();
+    tela.appendChild(el("h1", "h1", "Cobertura de alergênicos"));
+    if (!g){ semDados("Relatório indisponível."); return; }
+    notaDeExemplo();
+
+    var c = g.cobertura;
+    linhasDe([
+      ["Fichas no cardápio", c.total],
+      ["Com todos os alergênicos", c.completos + (c.total ? "  (" + pct(c.completos * 100 / c.total) + ")" : "")],
+      ["Parcialmente declaradas", c.parciais],
+      ["Sem nenhuma declaração", c.sem_nenhuma]
+    ]);
+
+    var promessa = el("div", "aviso wrn");
+    promessa.appendChild(icone("i-escudo"));
+    promessa.appendChild(el("span", "", "Enquanto a ficha não estiver completa, o app avisa o " +
+      "funcionário que <b>não consegue confirmar</b> — nunca que o prato é seguro."));
+    tela.appendChild(promessa);
+
+    if ((c.faltando || []).length){
+      secaoSimples("Declarar primeiro");
+      tela.appendChild(el("p", "legenda", "Os que mais aparecem no cardápio."));
+      var lista = el("div", "pilha");
+      lista.style.marginTop = "12px";
+      c.faltando.forEach(function(f){
+        var linha = el("div", "item");
+        linha.appendChild(chip("i-atencao", true));
+        linha.appendChild(el("span", "item-texto",
+          "<b>" + escapar(f.nome) + "</b><small>faltam " + f.faltam + " alergênico(s)</small>"));
+        lista.appendChild(linha);
+      });
+      tela.appendChild(lista);
+    }
+
+    notaAgregado("Para declarar em lote: scripts/alergenicos.py --exportar, " +
+      "preencher na planilha e --importar.");
+  }
+
+  function telaGestao(){
+    cabecalhoInterno("Apetit", "Gestão");
+    tela.appendChild(el("h1","h1","Visão da Apetit"));
+    tela.appendChild(el("p","sub","Dados que ajudam a construir um refeitório melhor."));
+    var grade=el("div","grade uma");
+    grade.style.marginTop="22px";
+    ADMIN.forEach(function(a){
+      var b=el("button","item");
+      b.appendChild(chip(a.icone));
+      b.appendChild(el("span","item-texto","<b>"+escapar(a.nome)+"</b><small>"+escapar(a.detalhe)+"</small>"));
+      b.appendChild(icone("i-seta","seta"));
+      b.addEventListener("click",function(){mostrar(a.id);});
+      grade.appendChild(b);
+    });
+    tela.appendChild(grade);
+    tela.appendChild(el("p","gestao-nota","Nenhum funcionário é identificado nominalmente nos relatórios. Refeições e metas individuais não aparecem. Recortes com menos de cinco pessoas são suprimidos."));
+  }
+
+  function telaEstados(){
+    cabecalhoInterno("Apetit", "Demonstração de componentes");
+    tela.appendChild(el("h1","h1","Estados da interface"));
+    tela.appendChild(el("p","sub","Exemplos de componentes e feedbacks."));
+    [["Carregando","loading","i-atualizar","Carregando…",""],
+     ["Vazio","","i-calendario","Nenhum registro ainda.","Suas informações aparecerão aqui."],
+     ["Erro","erro","i-atencao","Não foi possível carregar o cardápio.","Verifique a conexão e tente novamente."],
+     ["Sucesso","sucesso","i-liberado","Refeição registrada com sucesso!","Seu progresso foi atualizado."],
+     ["Offline","erro","i-info","Você está offline.","Algumas funcionalidades podem não estar disponíveis."]
+    ].forEach(function(e){
+      tela.appendChild(el("h2","h2",e[0]));
+      var card=el("div","estado-exemplo "+e[1]);
+      var ic=el("span","estado-icone");ic.appendChild(icone(e[2]));card.appendChild(ic);
+      card.appendChild(el("div","","<b>"+e[3]+"</b>"+(e[4]?"<p>"+e[4]+"</p>":"")));
+      tela.appendChild(card);
+    });
+  }
+
+  var NATIVAS = {
+    inicio: telaInicio, cardapio: telaCardapio, quanto: telaQuanto,
+    montar: telaMontar, montagem_resumo: telaMontagemResumo,
+    avaliar: telaAvaliar, progresso: telaProgresso, perfil: telaPerfil,
+    gestao: telaGestao, estados: telaEstados,
+    boas_vindas: telaBoasVindas, cadastro: telaCadastro,
+    meus_dados: telaMeusDados, meu_dia: telaMeuDia,
+    ficha: telaFicha, ficha_manual: telaFichaManual,
+    ficha_plano: telaFichaPlano, ficha_recado: telaFichaRecado,
+    favoritos: telaFavoritos, avisos: telaAvisos, ajuda: telaAjuda,
+    piloto: telaPiloto, relatorio: telaRelatorio,
+    atendimento: telaAtendimento, cobertura: telaCobertura
+  };
+
+  // Telas de antes de existir cadastro. A navegacao inferior nao aparece nelas:
+  // levar para "Progresso" quem ainda nao se cadastrou mostraria o progresso de
+  // outra pessoa.
+  var SEM_ABAS = { boas_vindas: true, cadastro: true };
+
+
+  // ---------- navegacao ----------
+  //
+  // O crawler do bot separa estados da mesma tela com sufixo ("progresso_",
+  // "quanto__"). Cinco troncos agora tem tela nativa, e qualquer sufixo deles
+  // cai na nativa: o botao capturado do bot continua funcionando, e a pessoa
+  // chega na tela boa em vez de na transcricao.
+  // A ordem importa: "ficha_manual" tem tela propria e precisa ser testada antes
+  // do tronco "ficha", senao o formulario nunca abre.
+  var TRONCOS = ["cardapio", "quanto", "avaliar", "progresso", "perfil",
+                 "ficha_manual", "ficha", "favoritos", "avisos", "ajuda",
+                 "piloto", "relatorio", "atendimento", "cobertura", "meu_dia"];
+
+  function destinoReal(id){
+    if (NATIVAS[id]) return id;
+    // Nenhum atalho antigo pode voltar ao montador gravado da Mariana.
+    if (/^(pick:|flow_|registrar(?:_|$))/.test(id)) return "montar";
+    // O passo a passo da ficha no bot virou uma tela com formulario: qualquer
+    // "ficha_campo:kcal", "ficha_escopo:dia" ou "ficha_ok" capturado cai nela.
+    if (/^ficha_(campo|escopo|ok|rever|pdf|cancelar|remover)/.test(id)) return "ficha";
+    // "fav:carne_assada" e "fav_lista" sao o favorito clicado no bot.
+    if (/^fav(?:_|:)/.test(id)) return "favoritos";
+    if (/^aviso:/.test(id)) return "avisos";
+    for (var i = 0; i < TRONCOS.length; i++){
+      if (id.indexOf(TRONCOS[i]) === 0) return TRONCOS[i];
+    }
+    // "aval_comida:3" e o clique de nota no bot; a avaliacao agora e nativa.
+    if (/^aval_/.test(id)) return "avaliar";
+    return id;
+  }
+
+  function mostrar(id, guardar){
+    var alvo = destinoReal(id);
+    var nativa = NATIVAS[alvo];
+    // Sem tela nativa nao ha o que mostrar. Antes existia um terceiro caso — a
+    // transcricao capturada do bot — e ele sumiu junto com o bot: todas as
+    // telas do app sao escritas aqui agora.
+    if (!nativa) return;
+    if (guardar !== false && atual !== alvo) historico.push(atual);
+    atual = alvo;
+
+    tela.textContent = "";
+    acoes.textContent = "";
+    tela.classList.remove("entrando");
+    void tela.offsetWidth;
+    tela.classList.add("entrando");
+
+    nativa();
+
+    abas.hidden = !!SEM_ABAS[alvo];
+    marcarAba(alvo);
+    tela.scrollTop = 0;
+    tela.focus({ preventScroll: true });
+  }
+
+  function redesenhar(){ mostrar(atual, false); }
+
+
+  function abaDe(id){
+    if (id === "inicio") return "inicio";
+    if (/^(montar|montagem_|pick:|quanto|cardapio)/.test(id)) return "cardapio";
+    if (/^(ficha|perfil|avisos|aviso:|favoritos|gestao|meus_dados|meu_dia)/.test(id)) return "perfil";
+    var achou = "";
+    ABAS.forEach(function(a){
+      if (a.id !== "inicio" && id.indexOf(a.id) === 0) achou = a.id;
+    });
+    return achou;
+  }
+
+  function marcarAba(id){
+    var ativa = abaDe(id);
+    abas.querySelectorAll(".aba").forEach(function(a){
+      if (a.dataset.aba === ativa) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+  }
+
+  // As abas sao montadas antes de os dados chegarem, e ficavam clicaveis nesse
+  // intervalo. Tocar em "Cardapio" ali levava para a tela vazia — "nenhum
+  // cardapio publicado para hoje" — quando na verdade ele so nao tinha
+  // carregado ainda. A janela era curta no desktop e passou de um segundo no
+  // celular modesto, depois que `dados.json` cresceu.
+  //
+  // Botao que responde antes da hora e pior que botao que espera: o primeiro
+  // mente sobre o cardapio do dia.
+  ABAS.forEach(function(a){
+    var b = el("button", "aba");
+    b.dataset.aba = a.id;
+    b.disabled = true;
+    b.appendChild(icone(a.icone));
+    b.appendChild(el("span", "", escapar(a.nome)));
+    b.addEventListener("click", function(){
+      var alvo = alvoDe(a);
+      if (!alvo) return;
+      historico.length = 0;
+      mostrar(alvo, a.id !== "inicio");
+    });
+    abas.appendChild(b);
+  });
+
+  function liberarAbas(){
+    abas.querySelectorAll(".aba").forEach(function(b){ b.disabled = false; });
+  }
+
+
+  // ---------- instalar na tela inicial ----------
+  var faixaInstalar = document.getElementById("faixa-instalar");
+  var btnInstalar = document.getElementById("btn-instalar");
+  var textoInstalar = document.getElementById("instalar-texto");
+  var evtInstalar = null;
+
+  function jaInstalado(){
+    return window.matchMedia("(display-mode: standalone)").matches ||
+           window.navigator.standalone === true;
+  }
+  function guardou(){
+    try { return localStorage.getItem("apetit-instalar") === "nao"; } catch (e) { return false; }
+  }
+
+  window.addEventListener("beforeinstallprompt", function(e){
+    e.preventDefault();
+    evtInstalar = e;
+    if (!jaInstalado() && !guardou()) faixaInstalar.classList.add("on");
+  });
+
+  btnInstalar.addEventListener("click", function(){
+    if (evtInstalar){
+      evtInstalar.prompt();
+      evtInstalar.userChoice.then(function(){ evtInstalar = null; faixaInstalar.classList.remove("on"); });
+    }
+  });
+  document.getElementById("btn-depois").addEventListener("click", function(){
+    faixaInstalar.classList.remove("on");
+    try { localStorage.setItem("apetit-instalar", "nao"); } catch (e) {}
+  });
+
+  // O iPhone nao dispara beforeinstallprompt: la a instalacao e manual, e a
+  // unica coisa util que o app pode fazer e dizer onde fica o botao.
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !jaInstalado() && !guardou()){
+    textoInstalar.innerHTML = "Para instalar: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>.";
+    btnInstalar.style.display = "none";
+    faixaInstalar.classList.add("on");
+  }
+
+  if ("serviceWorker" in navigator){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").catch(function(){ /* segue sem offline */ });
+    });
+  }
+
+
+
+  // ---------- ler a ficha que a pessoa anexar ----------
+  //
+  // O bot le PDF em Python. Aqui, para a pessoa poder testar com a ficha dela
+  // sem o bot no ar, a mesma leitura roda no navegador — e as regras vem de
+  // `regras.json`, gerado do proprio `apetit/prescription.py`. Duplicar regex
+  // em dois idiomas seria o caminho mais curto para as duas leituras
+  // discordarem justamente no documento de alguem.
+  var REGRAS = (window.__APETIT__ || {}).regras || null;
+  if (!REGRAS){
+    fetch("regras.json").then(function(r){ return r.json(); })
+      .then(function(d){ REGRAS = d; }).catch(function(){ /* segue sem anexo */ });
+  }
+
+  function re(padrao, flags){
+    // Python nomeia grupo com (?P<x>...); JS usa (?<x>...).
+    return new RegExp(String(padrao).replace(/\(\?P</g, "(?<"), flags || "");
+  }
+
+  async function lerPdf(arquivo){
+    if (!window.pdfjsLib) throw new Error("leitor-indisponivel");
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    var buffer = await arquivo.arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    var partes = [];
+    for (var n = 1; n <= pdf.numPages; n++){
+      var pagina = await pdf.getPage(n);
+      var conteudo = await pagina.getTextContent();
+      // Um item por linha aproxima o que o pypdf devolve, que e o formato que
+      // as regras esperam.
+      partes.push(conteudo.items.map(function(i){ return i.str; }).join("\n"));
+    }
+    return partes.join("\n");
+  }
+
+  function planoDoTexto(texto){
+    if (!REGRAS) return [];
+    texto = texto.replace(re(REGRAS.rodape, "gs"), "\n");
+    var cabecalho = re("^\\s*" + REGRAS.refeicoes + "\\s*$", "gmi");
+    var marcas = [], m;
+    while ((m = cabecalho.exec(texto)) !== null){
+      marcas.push({ nome: m[1], inicio: m.index, fim: cabecalho.lastIndex });
+    }
+    var almoco = null;
+    for (var i = 0; i < marcas.length; i++){
+      if (!/almo[çc]o/i.test(marcas[i].nome)) continue;
+      var ate = (i + 1 < marcas.length) ? marcas[i+1].inicio : texto.length;
+      almoco = texto.slice(marcas[i].fim, ate);
+      break;
+    }
+    if (almoco === null) return [];
+    var corte = almoco.indexOf("•");
+    return itensDoBloco(corte > 0 ? almoco.slice(0, corte) : almoco);
+  }
+
+  function itensDoBloco(bloco){
+    bloco = bloco.replace(/\s*\n\s*/g, " ").trim();
+    var ancora = re(REGRAS.ancora, "gi");
+    var quantidade = re(REGRAS.quantidade, "s");
+    var itens = [], pos = 0, m;
+    while ((m = ancora.exec(bloco)) !== null){
+      var trecho = bloco.slice(pos, m.index).trim();
+      pos = ancora.lastIndex;
+      if (!trecho) continue;
+
+      var nome = trecho, qtd = null, medida = "";
+      var partido = quantidade.exec(trecho);
+      if (partido && partido.groups && partido.groups.nome.trim()){
+        nome = partido.groups.nome.trim();
+        qtd = partido.groups.qtd;
+        medida = partido.groups.medida.trim();
+      }
+      var peso = "";
+      if (m[3]){ medida = "a vontade"; qtd = null; }
+      else if (m[1]){ peso = m[1] + " " + m[2].toLowerCase(); }
+      else if (m[4]){ peso = m[4] + " ml"; }
+
+      nome = nome.replace(/^[\s\-•]+|[\s\-•]+$/g, "");
+      if (nome) itens.push({ nome: nome, qtd: qtd, medida: medida, peso: peso });
+    }
+    return itens;
+  }
+
+  function medidaDe(item){
+    if (item.medida === "a vontade") return "à vontade";
+    var partes = [];
+    if (item.qtd) partes.push((item.qtd + " " + item.medida).trim());
+    else if (item.medida) partes.push(item.medida);
+    if (item.peso) partes.push("(" + item.peso + ")");
+    return partes.join(" ");
+  }
+
+  // O plano lido do PDF e o recado de leitura, guardados aqui para as telas
+  // nativas desenharem. Eram duas entradas sinteticas em `TELAS`, montadas em
+  // JavaScript e renderizadas pelo desenhista de transcricao do bot — o ultimo
+  // lugar do app que ainda dependia daquele formato.
+  var planoLido = null, recadoDaFicha = null;
+
+  function telaDoPlano(itens, nomeArquivo){
+    planoLido = { itens: itens, arquivo: nomeArquivo };
+    mostrar("ficha_plano");
+  }
+
+  function telaFichaPlano(){
+    cabecalhoInterno("Apetit", "Ficha do nutricionista");
+    var dados = planoLido || { itens: [], arquivo: "" };
+
+    if (dados.arquivo){
+      var faixa = el("div", "aviso okk");
+      faixa.appendChild(icone("i-arquivo"));
+      faixa.appendChild(el("span", "", "<b>" + escapar(dados.arquivo) + "</b> — lido"));
+      tela.appendChild(faixa);
+    }
+
+    tela.appendChild(el("h1", "h1", "Seu nutricionista pediu isso no almoço"));
+    tela.appendChild(el("p", "sub", "Confira antes de valer."));
+
+    var lista = el("div", "pilha");
+    lista.style.marginTop = "14px";
+    dados.itens.forEach(function(i){
+      var medida = medidaDe(i);
+      var linha = el("div", "item");
+      linha.appendChild(chip("i-folha", true));
+      linha.appendChild(el("span", "item-texto",
+        "<b>" + escapar(i.nome) + "</b>" + (medida ? "<small>" + escapar(medida) + "</small>" : "")));
+      lista.appendChild(linha);
+    });
+    tela.appendChild(lista);
+
+    var explica = el("div", "cartao");
+    explica.style.marginTop = "16px";
+    explica.appendChild(el("p", "paragrafo",
+      "Sua ficha é um plano alimentar: ela lista alimento e medida, não caloria."));
+    explica.appendChild(el("p", "legenda",
+      "O documento não fica guardado — só esta lista."));
+    tela.appendChild(explica);
+
+    var guardar_ = el("button", "cta forte");
+    guardar_.appendChild(icone("i-liberado"));
+    guardar_.appendChild(el("b", "", "É isso, pode guardar"));
+    guardar_.addEventListener("click", function(){
+      guardar(MINHA_FICHA, JSON.stringify({
+        kcal: null, ptn: null, profissional: "",
+        plano: dados.itens.map(function(i){
+          return { nome: i.nome, medida: medidaDe(i) };
+        }),
+        em: new Date().toISOString()
+      }));
+      mostrar("ficha", false);
+      recado("Ficha guardada neste aparelho.");
+    });
+    acoes.appendChild(guardar_);
+
+    var outra = el("button", "cta fantasma");
+    outra.appendChild(icone("i-arquivo"));
+    outra.appendChild(el("b", "", "Anexar outra ficha"));
+    outra.addEventListener("click", function(){
+      document.getElementById("arquivo-pdf").click();
+    });
+    acoes.appendChild(outra);
+  }
+
+  function telaDeAviso(tituloAviso, corpo){
+    recadoDaFicha = { titulo: tituloAviso, corpo: corpo };
+    mostrar("ficha_recado");
+  }
+
+  function telaFichaRecado(){
+    cabecalhoInterno("Apetit", "Ficha do nutricionista");
+    var r = recadoDaFicha || { titulo: "", corpo: "" };
+    tela.appendChild(el("h1", "h1", escapar(r.titulo)));
+    var caixa = el("div", "cartao");
+    caixa.style.marginTop = "14px";
+    // O corpo e escrito aqui no arquivo, com <b> e <i> de propósito; nao vem
+    // de fora.
+    String(r.corpo).split("\n\n").forEach(function(p){
+      if (p.trim()) caixa.appendChild(el("p", "paragrafo", p));
+    });
+    tela.appendChild(caixa);
+
+    var outra = el("button", "cta forte");
+    outra.appendChild(icone("i-arquivo"));
+    outra.appendChild(el("b", "", "Tentar outro arquivo"));
+    outra.addEventListener("click", function(){
+      document.getElementById("arquivo-pdf").click();
+    });
+    acoes.appendChild(outra);
+
+    var digitar = el("button", "cta fantasma");
+    digitar.appendChild(icone("i-lapis"));
+    digitar.appendChild(el("b", "", "Digitar os números"));
+    digitar.addEventListener("click", function(){ mostrar("ficha_manual"); });
+    acoes.appendChild(digitar);
+  }
+
+  var entrada = document.getElementById("arquivo-pdf");
+  entrada.addEventListener("change", async function(){
+    var arquivo = entrada.files && entrada.files[0];
+    entrada.value = "";
+    if (!arquivo) return;
+
+    telaDeAviso("Lendo " + arquivo.name + "…", "Só um instante.");
+    try {
+      var texto = await lerPdf(arquivo);
+      var itens = planoDoTexto(texto);
+      if (itens.length){ telaDoPlano(itens, arquivo.name); return; }
+      telaDeAviso(
+        "Não achei um almoço nessa ficha",
+        "Eu procuro uma seção de <b>Almoço</b> com os alimentos e as medidas.\n\n" +
+        "Se a ficha for foto ou digitalização, o arquivo tem a imagem do texto e " +
+        "não o texto — eu não tento adivinhar letra de imagem, porque errar aqui " +
+        "vira orientação errada a partir de um documento clínico.\n\n" +
+        "Nesse caso, digite os números."
+      );
+    } catch (erro) {
+      telaDeAviso(
+        "Não consegui abrir esse arquivo",
+        erro && erro.message === "leitor-indisponivel"
+          ? "O leitor de PDF não carregou aqui. Use o exemplo pronto para ver o " +
+            "caminho, ou digite os números."
+          : "Ele pode estar protegido por senha ou corrompido. Tente outro arquivo " +
+            "ou digite os números."
+      );
+    }
+  });
+
+
+
+  // ---------- estados de carga ----------
+  function esqueleto(){
+    cabecalhoInicio();
+    tela.textContent = "";
+    [188, 58, 58, 22, 64, 64].forEach(function(altura, n){
+      var bloco = el("div", "esqueleto");
+      bloco.style.height = altura + "px";
+      bloco.style.marginTop = n ? "14px" : "0";
+      if (altura === 22) bloco.style.width = "45%";
+      tela.appendChild(bloco);
+    });
+  }
+
+  function falhou(){
+    cabecalhoInicio();
+    tela.textContent = "";
+    var c = el("div", "vazio");
+    c.appendChild(icone("i-atencao"));
+    c.appendChild(el("b", "", "Não foi possível carregar o cardápio."));
+    c.appendChild(el("span", "", "Verifique a conexão e tente de novo. Se você abriu o arquivo " +
+      "direto do disco, use um servidor: python -m http.server na pasta demo/."));
+    tela.appendChild(c);
+
+    var tentar = el("button", "cta forte");
+    tentar.style.marginTop = "16px";
+    tentar.appendChild(icone("i-atualizar"));
+    tentar.appendChild(el("b", "", "Tentar novamente"));
+    tentar.addEventListener("click", carregar);
+    tela.appendChild(tentar);
+  }
+
+  // ---------- carga ----------
+  //
+  // Servido por HTTP, o app busca os arquivos. Empacotado numa pagina so — e
+  // o que acontece quando ele vira um link para alguem testar —, os mesmos
+  // dados ja chegam embutidos em `window.__APETIT__`. Um caminho de codigo,
+  // dois jeitos de entregar.
+  // ---------- de onde vem o cardapio ----------
+  //
+  // O arquivo local e uma fotografia: foi gerado uma vez e publicado junto com
+  // a pagina. Serve para a demonstracao e serve de rede quando o servidor nao
+  // responde, mas *nao e o cardapio de hoje* — e num app de alergia essa
+  // diferenca nao e detalhe de implementacao. Alguem planejando o almoco contra
+  // o cardapio da semana passada esta conferindo alergenico do prato errado.
+  //
+  // Por isso o app nunca apresenta a fotografia como se fosse a de hoje: quando
+  // o dado nao veio do servidor, ou veio de outro dia, a tela diz.
+
+  function enderecoDaApi(){
+    // Ordem: o que a pessoa configurou no aparelho (para testar), depois o que a
+    // pagina declara. Vazio significa que nao ha servidor — e o app inteiro
+    // continua funcionando com a fotografia, que e como o piloto testa hoje.
+    var doAparelho = lido("apetit-api");
+    if (doAparelho) return doAparelho.replace(/\/+$/, "");
+    var marca = document.querySelector('meta[name="apetit-api"]');
+    var declarado = marca ? (marca.getAttribute("content") || "").trim() : "";
+    return declarado.replace(/\/+$/, "");
+  }
+
+  function hojeISO(){
+    var d = new Date();
+    return d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0");
+  }
+
+  function unidadeAtual(local){
+    var salvo = cadastroSalvo();
+    if (salvo && salvo.refeitorio) return salvo.refeitorio;
+    return (local && local.unidade) || "";
+  }
+
+  function buscarDoServidor(local){
+    var base = enderecoDaApi();
+    var unidade = unidadeAtual(local);
+    if (!base || !unidade) return Promise.resolve(null);
+    var url = base + "/api/dia?unidade=" + encodeURIComponent(unidade) +
+              "&dia=" + encodeURIComponent(hojeISO());
+    // Um limite de tempo curto: sem ele, um servidor que aceita a conexao e nao
+    // responde deixa a pessoa olhando o esqueleto — pior que mostrar a
+    // fotografia avisando que e fotografia.
+    var corta = new Promise(function(_, rejeita){
+      setTimeout(function(){ rejeita(new Error("tempo")); }, 6000);
+    });
+    return Promise.race([
+      fetch(url, { headers: { "Accept": "application/json" } }).then(function(r){
+        if (!r.ok) throw new Error("http " + r.status);
+        return r.json();
+      }),
+      corta
+    ]).catch(function(){ return null; });
+  }
+
+  function marcarProcedencia(dados, doServidor){
+    if (!dados) return dados;
+    dados.__fonte__ = doServidor ? "servidor" : "arquivo";
+    // "De hoje" e sobre a data do cardapio, e nao sobre ter vindo da rede: um
+    // servidor pode devolver o cardapio de ontem, e uma fotografia gerada hoje
+    // de manha esta correta. Quem manda e a data.
+    dados.__do_dia__ = dados.dia === hojeISO();
+    return dados;
+  }
+
+  // O aviso que aparece em toda tela que fala de comida. Null quando o cardapio
+  // e de hoje: nesse caso nao ha o que ressalvar, e um aviso permanente ensina
+  // a pessoa a ignorar avisos.
+  function avisoDeFonte(){
+    if (!DADOS || DADOS.__do_dia__) return null;
+    var caixa = el("div", "aviso wrn");
+    caixa.appendChild(icone("i-info"));
+    var quando = DADOS.dia_amigavel || DADOS.dia || "";
+    caixa.appendChild(el("span", "", DADOS.__fonte__ === "servidor"
+      ? "<b>Este não é o cardápio de hoje.</b> O servidor respondeu com o cardápio de " +
+        escapar(quando) + ". Confira no refeitório antes de se servir."
+      : "<b>Este não é o cardápio de hoje.</b> É o cardápio de " + escapar(quando) +
+        ", guardado neste aparelho. Confira no refeitório antes de se servir."));
+    return caixa;
+  }
+
+  function porFonte(){
+    var aviso = avisoDeFonte();
+    if (aviso) tela.appendChild(aviso);
+  }
+
+  function carregar(){
+    esqueleto();
+    // Um arquivo so agora. O segundo era `telas.json`, com as telas capturadas
+    // do bot; com todas as telas escritas aqui, ele deixou de existir.
+    var embutido = window.__APETIT__;
+    var local = embutido
+      ? Promise.resolve(embutido.dados || null)
+      : fetch("dados.json").then(function(r){
+          if (!r.ok) throw new Error("dados");
+          return r.json();
+        });
+
+    local.then(function(fotografia){
+      // O servidor so e consultado depois de a fotografia estar em maos: assim
+      // um servidor fora do ar nunca deixa o app sem cardapio nenhum.
+      return buscarDoServidor(fotografia).then(function(doDia){
+        if (doDia && (doDia.cardapio || []).length){
+          // O servidor manda o que e **do dia** e igual para a unidade inteira.
+          // O que e do exemplo — perfil, historico, relatorios — so existe na
+          // fotografia, e continua vindo dela.
+          DADOS = marcarProcedencia(Object.assign({}, fotografia || {}, doDia), true);
+        } else {
+          DADOS = marcarProcedencia(fotografia, false);
+        }
+        liberarAbas();
+        estado.pontos = meuHistorico().progresso.pontos;
+        // Primeira vez: cadastro. Depois, direto para o app — a boas-vindas some
+        // e nao volta a atrapalhar quem ja se cadastrou.
+        mostrar(cadastroSalvo() ? "inicio" : "boas_vindas", false);
+      });
+    }).catch(falhou);
+  }
+
+  carregar();
+
+})();
+
+</script>
+</body>
+</html>
