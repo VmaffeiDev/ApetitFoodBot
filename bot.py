@@ -18,7 +18,7 @@ nutricionista sem reescrita.
 import io
 import logging
 import os
-from datetime import UTC, date, datetime, time, timedelta, timezone
+from datetime import date, time, timedelta, timezone
 from html import escape
 from pathlib import Path
 
@@ -37,10 +37,9 @@ from telegram.ext import (
 from apetit.allergens import ALLERGENS, Restriction, RestrictionKind, Verdict
 from apetit.allergen_sheet import coverage_summary
 from apetit.allergy_text import describe, recognize
-from apetit.portions import measure_label, suggest_plate
+from apetit.portions import measure_label
 from apetit.catalog import (
     allergen_coverage,
-    check_menu_for_employee,
     connect,
     import_menu_rows,
     init_schema,
@@ -104,6 +103,15 @@ from apetit.humanize import (
     plate_reading,
     week_summary,
 )
+from apetit.diario import (
+    alvo_de,
+    cardapio_de,
+    descrever_restricoes,
+    origem_do_alvo,
+    sugestao_de,
+)
+from apetit.diario import hoje as diario_hoje
+from apetit.diario import inicio_da_semana as diario_inicio_da_semana
 from apetit.profile import (
     TARGET_PADRAO as profile_target_padrao,
 )
@@ -193,13 +201,11 @@ def db():
     return conn
 
 
-def today() -> str:
-    return datetime.now(UTC).date().isoformat()
-
-
-def week_start(day: str) -> str:
-    d = date.fromisoformat(day)
-    return (d - timedelta(days=d.weekday())).isoformat()
+# Datas e alvos moram em `apetit/diario.py`: sao regra de negocio, e um
+# servidor que nao fala com o Telegram precisa delas sem arrastar a biblioteca
+# do Telegram junto. Reexportados porque `bot.today` ja era usado.
+today = diario_hoje
+week_start = diario_inicio_da_semana
 
 
 def tg_id(update: Update) -> int | None:
@@ -251,37 +257,17 @@ def prescription_for(pessoa: Employee) -> Prescription | None:
 
 
 def target_for(pessoa: Employee, ficha: Prescription | None = None) -> dict:
-    """Alvo do almoco: o do nutricionista quando existe, o do objetivo quando nao.
-
-    A ficha confirmada ganha do objetivo generico — ela e o numero de um
-    profissional, o outro e ilustrativo. Campo que a ficha nao traz continua
-    vindo do objetivo: sem proteina nao ha como pontuar o dia, e deixar o alvo
-    pela metade quebraria o resto do app. `target_source` diz de onde veio cada
-    numero, para a tela nao apresentar palpite como prescricao.
-
-    Ficha implausivel (numero do dia inteiro entrando como refeicao) e ignorada
-    aqui de proposito: melhor cair no alvo generico que sugerir 1.800 kcal num
-    prato so.
-
-    Sem `ficha`, busca a da pessoa: quem tem ficha tem ficha em toda tela, e
-    esquecer de passar em uma delas faria o mesmo prato ser lido contra dois
-    alvos diferentes.
-    """
-    if ficha is None:
-        ficha = prescription_for(pessoa)
-    alvo = dict(TARGETS.get(pessoa.goal, TARGET_PADRAO))
-    if ficha and ficha.tem_alvo and not ficha.implausivel():
-        alvo.update(ficha.alvo_almoco())
-    return alvo
+    """Alvo do almoco. A regra vive em `apetit/diario.py`; aqui so abre o banco."""
+    if ficha is not None:
+        return alvo_de(pessoa, ficha)
+    conn = db()
+    try:
+        return alvo_de(pessoa, conn=conn)
+    finally:
+        conn.close()
 
 
-def target_source(pessoa: Employee, ficha: Prescription | None) -> dict[str, str]:
-    """De onde veio cada numero do alvo: "ficha" ou "objetivo"."""
-    origem = {"kcal": "objetivo", "ptn": "objetivo"}
-    if ficha and ficha.tem_alvo and not ficha.implausivel():
-        for campo in ficha.alvo_almoco():
-            origem[campo] = "ficha"
-    return origem
+target_source = origem_do_alvo
 
 
 # --------------------------------------------------------------------------
@@ -556,34 +542,14 @@ async def require_registration(update: Update, context: ContextTypes.DEFAULT_TYP
 # Cardapio
 # --------------------------------------------------------------------------
 
-def describe_restrictions(pessoa: Employee) -> str:
-    partes = [ALLERGENS[r.allergen] for r in pessoa.restrictions]
-    partes += [f"{termo} (alergia, sem conferencia automatica)" for termo in pessoa.free_restrictions]
-    partes += [f"{termo} (prefiro evitar)" for termo in pessoa.avoid_foods]
-    return ", ".join(partes) or "nenhuma"
+describe_restrictions = descrever_restricoes
 
 
 def load_menu(pessoa: Employee, dia: str) -> list[dict]:
-    """O cardapio do dia ja conferido contra o que a pessoa nao pode comer.
-
-    O que o nutricionista mandou evitar entra pelo mesmo caminho do "prefiro
-    evitar": bloqueia quando o termo aparece no nome do prato, sem virar aviso
-    de alergenico. E o tratamento correto — e uma orientacao profissional, nao
-    um risco de reacao alergica, e tratar como alergia encheria o cardapio de
-    ⚠️ onde nao ha perigo nenhum.
-    """
+    """O cardapio do dia conferido contra a pessoa. A regra vive em `diario`."""
     conn = db()
     try:
-        ficha = load_prescription(conn, pessoa.telegram_id)
-        evitar = list(dict.fromkeys(pessoa.avoid_foods + (ficha.proibidos if ficha else [])))
-        return check_menu_for_employee(
-            conn,
-            dia,
-            pessoa.restrictions,
-            unit=pessoa.apetit_unit,
-            unverifiable=pessoa.free_restrictions,
-            avoid_terms=evitar,
-        )
+        return cardapio_de(conn, pessoa, dia)
     finally:
         conn.close()
 
@@ -641,29 +607,12 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bo
 
 
 def build_suggestion(pessoa: Employee, dia: str):
-    """A sugestao de porcoes do dia, ou None quando nao ha cardapio para ela.
-
-    Fica fora do handler porque a tela mostra a sugestao e o botao de salvar
-    precisa recalcular a mesma coisa. Recalcular e de proposito: guardar a
-    sugestao na sessao deixaria um botao de ontem gravando o prato de ontem.
-    """
-    alvo = target_for(pessoa)
-    # So entra na sugestao o que a pessoa pode comer: sugerir quantidade de um
-    # prato bloqueado seria pior que nao sugerir nada.
-    liberados = [
-        {
-            "code": i["item_code"],
-            "category": i["category"],
-            "name": i["name"],
-            "kcal": i["kcal"],
-            "ptn_g": i["ptn_g"],
-        }
-        for i in load_menu(pessoa, dia)
-        if i["check"].verdict is not Verdict.BLOQUEIO
-    ]
-    if not liberados:
-        return None
-    return suggest_plate(liberados, alvo["kcal"], alvo["ptn"])
+    """A sugestao de porcoes do dia. A regra vive em `apetit/diario.py`."""
+    conn = db()
+    try:
+        return sugestao_de(conn, pessoa, dia)
+    finally:
+        conn.close()
 
 
 async def show_portions(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:

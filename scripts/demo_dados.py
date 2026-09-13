@@ -38,6 +38,9 @@ from apetit.humanize import (  # noqa: E402
     friendly_date, order_categories, week_summary,
 )
 from apetit import payload  # noqa: E402
+from apetit.diario import (  # noqa: E402
+    alvo_de, cardapio_de, descrever_restricoes, inicio_da_semana, sugestao_de,
+)
 from apetit.nudges import LEMBRETE_ALMOCO, RESUMO_SEMANAL  # noqa: E402
 from apetit.profile import Employee, load_employee, save_employee  # noqa: E402
 from apetit.portions import FREE_CATEGORIES, MEASURES, MEDIDA_PADRAO, measure_label  # noqa: E402
@@ -47,6 +50,20 @@ from apetit.tracking import (  # noqa: E402
     score_day, total_points,
 )
 from scripts.demo_telas import DIA, USUARIO, preparar_banco  # noqa: E402
+
+# Uma conexao para o script inteiro. Abrir uma por chamada — `cardapio_de(banco(),
+# ...)` — vazava um descritor a cada uso; some quando o processo sai, mas e o
+# tipo de coisa que vira defeito de verdade no dia em que este codigo virar
+# servidor.
+_CONEXAO = None
+
+
+def banco():
+    global _CONEXAO
+    if _CONEXAO is None:
+        _CONEXAO = bot.db()
+    return _CONEXAO
+
 
 MARCA = {"bloqueio": "bloqueio", "atencao": "atencao", "liberado": "liberado", "sem_restricao": "liberado"}
 
@@ -121,7 +138,7 @@ def conformidade(pessoa) -> list[dict]:
     try:
         codigos = [
             linha["item_code"]
-            for linha in bot.load_menu(pessoa, DIA)
+            for linha in cardapio_de(banco(), pessoa, DIA)
         ]
         declaradas = {c: item_allergens(conn, c) for c in codigos}
     finally:
@@ -146,10 +163,10 @@ def conformidade(pessoa) -> list[dict]:
 
 def porcoes(pessoa) -> dict:
     """Quanto pegar, com a medida separada do nome do prato."""
-    sugestao = bot.build_suggestion(pessoa, DIA)
+    sugestao = sugestao_de(banco(), pessoa, DIA)
     if not sugestao or not sugestao.portions:
         return {}
-    alvo = bot.target_for(pessoa)
+    alvo = alvo_de(pessoa, conn=banco())
     return {
         "itens": [
             {
@@ -176,7 +193,7 @@ def bloqueados_para(pessoa, restricoes: list[str]) -> list[str]:
     """Os pratos que essa lista de alergias bloqueia no cardapio do dia."""
     quem = replace(pessoa, restrictions=[Restriction(c) for c in restricoes])
     return sorted(
-        i["item_code"] for i in bot.load_menu(quem, DIA)
+        i["item_code"] for i in cardapio_de(banco(), quem, DIA)
         if i["check"].verdict is Verdict.BLOQUEIO
     )
 
@@ -238,7 +255,7 @@ def progresso(pessoa) -> dict:
     finally:
         conn.close()
     rotulos = {r.code: r.label for r in RULES}
-    inicio = bot.week_start(DIA)
+    inicio = inicio_da_semana(DIA)
     na_semana = sum(1 for d in dias if inicio <= d <= DIA)
     return {
         "pontos": pontos,
@@ -317,7 +334,7 @@ def perfil(pessoa) -> dict:
         "empresa": pessoa.client_company,
         "setor": pessoa.sector,
         "objetivo": pessoa.goal,
-        "alvo": bot.target_for(pessoa),
+        "alvo": alvo_de(pessoa, conn=banco()),
         "restricoes": [ALLERGENS.get(r.allergen, r.allergen) for r in pessoa.restrictions],
         # O nome e para ler; o codigo e para decidir. Quem abre a demonstracao
         # sem se cadastrar ve o cardapio pelos olhos deste exemplo, e para isso
@@ -344,7 +361,7 @@ def registro_previsto(pessoa, codigos=None) -> dict:
     pontuacao — que um dia discordaria desta.
     """
     if codigos is None:
-        sugestao = bot.build_suggestion(pessoa, DIA)
+        sugestao = sugestao_de(banco(), pessoa, DIA)
         if not sugestao or not sugestao.portions:
             return {}
         codigos = [p.code for p in sugestao.portions for _ in range(p.quantity)]
@@ -356,7 +373,7 @@ def registro_previsto(pessoa, codigos=None) -> dict:
         antes = total_points(conn, pessoa.telegram_id)
         log_consumption(conn, pessoa.telegram_id, DIA, codigos)
         regras = score_day(conn, pessoa.telegram_id, DIA,
-                           protein_target_g=bot.target_for(pessoa)["ptn"])
+                           protein_target_g=alvo_de(pessoa, conn=banco())["ptn"])
         depois = total_points(conn, pessoa.telegram_id)
         dia = next(d for d in history_by_day(conn, pessoa.telegram_id, days=36500)
                    if d.service_date == DIA)
@@ -396,7 +413,7 @@ def opcoes_montagem(pessoa) -> list[dict]:
     mantém a indicação à vontade do motor, sem inventar unidades adicionais.
     """
     saida = []
-    for item in sorted(bot.load_menu(pessoa, DIA), key=lambda i: i["item_code"]):
+    for item in sorted(cardapio_de(banco(), pessoa, DIA), key=lambda i: i["item_code"]):
         categoria = item["category"]
         maximo = 1 if categoria in FREE_CATEGORIES else MEASURES.get(categoria, MEDIDA_PADRAO)[2]
         saida.append({"codigo": item["item_code"], "maximo": maximo,
@@ -469,7 +486,7 @@ def main() -> int:
         preparar_banco(Path(tmp.name), receitas)
         bot.today = lambda: DIA
         pessoa = bot.current_employee(_FakeUpdate(USUARIO))
-        conn_demo = bot.db()
+        conn_demo = banco()
         try:
             dados = {
                 # O que e do dia e igual para todo mundo da unidade sai de
@@ -486,7 +503,7 @@ def main() -> int:
                     "empresa": pessoa.client_company,
                     "setor": pessoa.sector,
                     "objetivo": pessoa.goal,
-                    "restricoes": bot.describe_restrictions(pessoa),
+                    "restricoes": descrever_restricoes(pessoa),
                 },
                 "montagens": com_exemplo(payload.do_dia(conn_demo, pessoa.apetit_unit, DIA)["montagens"], pessoa),
                 "conformidade": conformidade(pessoa),
@@ -501,6 +518,10 @@ def main() -> int:
         finally:
             conn_demo.close()
     finally:
+        global _CONEXAO
+        if _CONEXAO is not None:
+            _CONEXAO.close()
+            _CONEXAO = None
         Path(tmp.name).unlink(missing_ok=True)
 
     saida.write_text(json.dumps(dados, ensure_ascii=False, indent=1), encoding="utf-8")
