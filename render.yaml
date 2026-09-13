@@ -1,14 +1,14 @@
 # Blueprint do Render. Em Render > New > Blueprint, apontando para o repositorio,
 # isto cria o servico ja com o disco persistente.
 #
-# E um "worker", nao um "web": o bot sobe em polling e nao precisa de porta nem
-# de URL publica. Servico web no plano gratuito ainda dorme por inatividade, e
-# bot dormindo perde mensagem.
+# E um "web", e nao um "worker": o servidor atende HTTP. Era worker quando o
+# processo era um bot em polling, que nao precisava de porta.
 services:
-  - type: worker
-    name: apetitfoodbot
+  - type: web
+    name: apetit
     runtime: docker
     dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/saude
     # O disco e o que faz o banco sobreviver ao deploy. Sem ele o SQLite some
     # a cada publicacao, levando cadastro, historico e avaliacoes junto.
     disk:
@@ -16,12 +16,24 @@ services:
       mountPath: /data
       sizeGB: 1
     envVars:
-      # Token do BotFather. sync:false = o Render pergunta na criacao e guarda
-      # como segredo, em vez de deixar versionado aqui.
-      - key: TELEGRAM_BOT_TOKEN
+      # Pepper do codigo de entrada. Precisa ficar FORA do banco: e ele que
+      # impede que um banco vazado entregue as contas. `sync: false` = o Render
+      # pergunta na criacao e guarda como segredo, em vez de versionar aqui.
+      # Gere com: python -c "import secrets; print(secrets.token_urlsafe(48))"
+      - key: APETIT_SEGREDO
         sync: false
-      # Telegram ID de quem publica cardapio e ve relatorio. Vazio = ninguem.
-      - key: ADMIN_TELEGRAM_IDS
+      # Token de quem publica cardapio. Vazio = a rota recusa tudo.
+      - key: APETIT_PUBLICAR_TOKEN
+        sync: false
+      # Por onde o codigo de entrada sai. Sem HOST e FROM, a rota de entrar
+      # responde indisponivel em vez de fingir que enviou.
+      - key: APETIT_SMTP_HOST
+        sync: false
+      - key: APETIT_SMTP_USER
+        sync: false
+      - key: APETIT_SMTP_PASSWORD
+        sync: false
+      - key: APETIT_SMTP_FROM
         sync: false
       - key: APETIT_DB_PATH
         value: /data/apetit.db
