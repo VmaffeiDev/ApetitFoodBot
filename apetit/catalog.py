@@ -9,6 +9,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
+from . import identidade
 from .allergens import ALLERGENS, Declaration, Restriction, check_item, coverage
 from .csv_import import read_rows
 from .model import Issue, MenuEntry
@@ -307,6 +308,10 @@ def init_schema(conn: sqlite3.Connection) -> None:
     _migrate_consumption_snapshot(conn)
     conn.executescript(SCHEMA)
     conn.commit()
+    # As tabelas de quem entra moram em `apetit/identidade.py`, junto da regra
+    # que as usa. Criadas aqui porque um banco pela metade — cardapio sim,
+    # identidade nao — seria um banco em que ninguem consegue entrar.
+    identidade.criar_tabelas(conn)
 
 
 def import_menu_csv(

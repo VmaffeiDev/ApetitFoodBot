@@ -33,10 +33,13 @@ import os
 import sqlite3
 from datetime import UTC, datetime
 
+from tornado.ioloop import IOLoop
 from tornado.web import Application, HTTPError, RequestHandler
 
+from . import identidade
 from .catalog import import_menu_rows
 from .csv_import import read_rows
+from .entrega_email import montar as montar_remetente
 from .payload import do_dia
 
 logger = logging.getLogger(__name__)
@@ -72,6 +75,23 @@ class Base(RequestHandler):
     def responder(self, corpo: dict, status: int = 200) -> None:
         self.set_status(status)
         self.finish(json.dumps(corpo, ensure_ascii=False))
+
+    def corpo_json(self) -> dict:
+        """O corpo como JSON, e `{}` quando nao e JSON.
+
+        Dicionario vazio e nao erro 400 porque quem valida e a rota: ela sabe
+        qual campo falta e da um recado que diz o que fazer, em vez de "JSON
+        invalido".
+        """
+        try:
+            dados = json.loads(self.request.body or b"{}")
+        except ValueError:
+            return {}
+        return dados if isinstance(dados, dict) else {}
+
+    def portador(self) -> str:
+        enviado = self.request.headers.get("Authorization", "")
+        return enviado[7:].strip() if enviado.lower().startswith("bearer ") else ""
 
     def write_error(self, status_code: int, **kwargs) -> None:
         motivo = "Nao foi possivel atender."
@@ -218,27 +238,198 @@ class Cardapio(Base):
         return valor
 
 
+# --------------------------------------------------------------------------
+# Entrar: e-mail, codigo, sessao
+# --------------------------------------------------------------------------
+
+# A mesma resposta para e-mail da lista, e-mail de fora e pedido repetido. O
+# texto e no condicional ("se esse e-mail estiver na lista") porque a resposta
+# nao pode confirmar que esta — isso responderia "quem trabalha ai?" a quem so
+# tinha uma lista de enderecos para chutar.
+RESPOSTA_ENTRAR = {
+    "pedido": True,
+    "recado": "Se esse e-mail estiver na lista do refeitorio, o codigo chegou na caixa de entrada.",
+}
+
+
+class Entrar(Base):
+    """Recebe o e-mail e manda o codigo, sem dizer se o e-mail existe.
+
+    **O que esta rota nao resolve:** o tempo. Endereco de fora da lista volta em
+    microssegundos; endereco de dentro espera o SMTP. Quem medir o tempo das
+    duas respostas consegue distinguir. Para um piloto de quinze pessoas numa
+    empresa conhecida, o endereco ja e adivinhavel pelo padrao da casa
+    (nome.sobrenome@empresa), e esconder isso custaria fila de entrega e um
+    caminho a mais para errar. Fica registrado como limitacao conhecida, e nao
+    como problema resolvido.
+    """
+
+    def initialize(self, abrir, token: str = "", segredo: str = "", enviar=None) -> None:
+        super().initialize(abrir, token)
+        self.segredo = segredo
+        self.enviar = enviar
+
+    async def post(self) -> None:
+        if not self.segredo or not self.enviar:
+            raise HTTPError(503, log_message="Entrada por codigo nao esta configurada.")
+        email = self.corpo_json().get("email", "")
+        try:
+            limpo = identidade.normalizar(email)
+        except ValueError:
+            # E-mail sem formato de e-mail nao e informacao sobre a lista: pode
+            # dizer que esta errado, porque a resposta nao revela quem entra.
+            raise HTTPError(400, log_message="Esse e-mail nao parece um e-mail.") from None
+
+        # Numa thread: `smtplib` e bloqueante, e travar o IOLoop faria o
+        # cardapio de todo mundo esperar o servidor de e-mail de um.
+        #
+        # O banco abre *dentro* da thread: uma conexao de SQLite pertence a
+        # thread que a criou, e passar a de fora estoura com "created in a
+        # thread can only be used in that same thread" — que aqui apareceria
+        # como "pedi o codigo e nao chegou", sem erro visivel na resposta.
+        def trabalho() -> identidade.Pedido:
+            conn = self.abrir()
+            try:
+                return identidade.pedir_codigo(conn, limpo, self.segredo, self.enviar)
+            finally:
+                conn.close()
+
+        try:
+            pedido = await IOLoop.current().run_in_executor(None, trabalho)
+        except Exception:
+            logger.exception("falha entregando codigo para %s", limpo)
+            # Mesma resposta: "o e-mail falhou" tambem contaria que o endereco
+            # esta na lista. O erro fica no log do servidor, onde e util.
+            self.responder(RESPOSTA_ENTRAR)
+            return
+
+        logger.info("pedido de codigo para %s: entregue=%s %s",
+                    limpo, pedido.entregue, pedido.motivo)
+        self.responder(RESPOSTA_ENTRAR)
+
+
+class Codigo(Base):
+    """Confere o codigo e devolve o token da sessao."""
+
+    def initialize(self, abrir, token: str = "", segredo: str = "", enviar=None) -> None:
+        super().initialize(abrir, token)
+        self.segredo = segredo
+
+    def post(self) -> None:
+        if not self.segredo:
+            raise HTTPError(503, log_message="Entrada por codigo nao esta configurada.")
+        dados = self.corpo_json()
+        try:
+            limpo = identidade.normalizar(dados.get("email", ""))
+        except ValueError:
+            raise HTTPError(400, log_message="Esse e-mail nao parece um e-mail.") from None
+
+        conn = self.abrir()
+        try:
+            entrada = identidade.conferir_codigo(
+                conn, limpo, str(dados.get("codigo", "")), self.segredo,
+            )
+            unidade = ""
+            if entrada.ok:
+                linha = conn.execute(
+                    "SELECT apetit_unit FROM pessoa_email WHERE email = ?", (limpo,)
+                ).fetchone()
+                unidade = linha["apetit_unit"] if linha else ""
+        finally:
+            conn.close()
+
+        if not entrada.ok:
+            # Um recado so para todos os motivos: dizer "expirou" e nao "errado"
+            # ajudaria quem esta chutando a saber se ainda vale a pena.
+            logger.info("codigo recusado para %s: %s", limpo, entrada.motivo)
+            raise HTTPError(401, log_message="Codigo invalido ou expirado. Peca outro.")
+
+        self.responder({
+            "token": entrada.token,
+            "pessoa_id": entrada.pessoa_id,
+            "email": entrada.email,
+            "unidade": unidade,
+            "dias": identidade.VALIDADE_SESSAO_DIAS,
+        })
+
+
+class Eu(Base):
+    """Quem e o dono deste token. Serve para o app saber se a sessao vale ainda."""
+
+    def get(self) -> None:
+        conn = self.abrir()
+        try:
+            dono = identidade.de_sessao(conn, self.portador())
+            if not dono:
+                raise HTTPError(401, log_message="Sessao expirada. Entre de novo.")
+            linha = conn.execute(
+                "SELECT apetit_unit FROM pessoa_email WHERE email = ?", (dono["email"],)
+            ).fetchone()
+            self.responder({
+                "pessoa_id": dono["pessoa_id"],
+                "email": dono["email"],
+                "unidade": linha["apetit_unit"] if linha else "",
+                "expira_em": dono["expira_em"],
+            })
+        finally:
+            conn.close()
+
+
+class Sair(Base):
+    """Encerra a sessao deste aparelho, e so dele."""
+
+    def post(self) -> None:
+        conn = self.abrir()
+        try:
+            identidade.encerrar(conn, self.portador())
+        finally:
+            conn.close()
+        # Sempre 200: "esse token nao existia" nao muda nada para quem saiu, e
+        # responder diferente contaria se o token era valido.
+        self.responder({"saiu": True})
+
+
 class Saude(Base):
     def get(self) -> None:
         self.responder({"ok": True, "dia": hoje(), "publicacao": bool(self.token)})
 
 
-def criar_app(abrir, token: str = "") -> Application:
+def criar_app(abrir, token: str = "", segredo: str = "", enviar=None) -> Application:
     """As rotas, com a funcao que abre o banco injetada.
 
     Injetada e nao importada para o teste poder apontar para um banco
     descartavel — e para este modulo nao decidir onde o banco mora.
+
+    `enviar` tambem e injetado: assim o teste exercita a entrada por codigo
+    inteira sem mandar um e-mail de verdade, e este modulo nao precisa saber o
+    que e SMTP.
     """
     if not token:
         logger.warning(
             "APETIT_PUBLICAR_TOKEN vazio: a rota de publicar fica recusando tudo. "
             "Publicar pelo Telegram continua funcionando."
         )
+    if not segredo:
+        logger.warning(
+            "APETIT_SEGREDO vazio: a entrada por codigo fica indisponivel. "
+            "Sem ele, um banco vazado entregaria as contas — melhor a porta "
+            "ausente que destrancada."
+        )
+    if segredo and not enviar:
+        logger.warning(
+            "Sem SMTP configurado (APETIT_SMTP_HOST/APETIT_SMTP_FROM): o codigo "
+            "nao tem como sair, e a rota de entrar responde indisponivel."
+        )
     contexto = {"abrir": abrir, "token": token}
+    entrada = {**contexto, "segredo": segredo, "enviar": enviar}
     return Application([
         (r"/api/saude", Saude, contexto),
         (r"/api/dia", Dia, contexto),
         (r"/api/cardapio", Cardapio, contexto),
+        (r"/api/entrar", Entrar, entrada),
+        (r"/api/codigo", Codigo, entrada),
+        (r"/api/eu", Eu, contexto),
+        (r"/api/sair", Sair, contexto),
     ])
 
 
@@ -255,7 +446,12 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     caminho = os.getenv("APETIT_DB_PATH", "apetit.db")
     porta = int(os.getenv("PORT", "8000"))
-    app = criar_app(lambda: abrir_padrao(caminho), os.getenv("APETIT_PUBLICAR_TOKEN", ""))
+    app = criar_app(
+        lambda: abrir_padrao(caminho),
+        os.getenv("APETIT_PUBLICAR_TOKEN", ""),
+        segredo=os.getenv("APETIT_SEGREDO", ""),
+        enviar=montar_remetente(identidade.VALIDADE_CODIGO_MIN),
+    )
     app.listen(porta)
     logger.info("API do Apetit na porta %s, banco em %s", porta, caminho)
     asyncio.get_event_loop().run_forever()
