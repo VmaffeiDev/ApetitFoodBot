@@ -210,29 +210,6 @@ async def rodar_caminho(caminho: list[str]) -> tuple[str, list]:
     return update.last, update.buttons
 
 
-def escolhidos(caminho: list[str]) -> frozenset[str]:
-    """Os alimentos ja marcados no "monta o prato", por este caminho.
-
-    A deduplicacao por conteudo sozinha nao serve para um fluxo com estado. A
-    tela do passo 2 e identica tendo ou nao marcado a carne no passo 1 — mas o
-    "Terminei de montar" dela leva a pratos diferentes. Deduplicando so pelo
-    texto, quem marcava a carne e seguia adiante terminava com **o prato
-    vazio**, e o app parecia ter perdido a escolha.
-
-    Entao a assinatura leva junto o que ja foi escolhido: telas iguais com
-    escolhas iguais sao a mesma tela; telas iguais com escolhas diferentes,
-    nao. E a distincao minima que preserva o futuro sem explodir a varredura em
-    todas as ordens possiveis de chegar ate ali.
-    """
-    if not caminho or not (caminho[-1] == "montar"
-                           or caminho[-1].startswith(("pick:", "flow_"))):
-        # Fora do fluxo a distincao nao paga: ela multiplicaria as outras
-        # setenta telas por cada combinacao de escolha, e o arquivo que as 15
-        # pessoas baixam no refeitorio passaria de um megabyte.
-        return frozenset()
-    return frozenset(p for p in caminho if p.startswith("pick:"))
-
-
 async def varrer() -> dict:
     """Varre o bot como grafo, nao como arvore.
 
@@ -240,9 +217,15 @@ async def varrer() -> dict:
     ao menu venha de onde vier, e explorar o menu de novo a cada caminho faria
     a varredura explodir em combinacoes que mostram sempre a mesma coisa. Cada
     tela distinta e visitada uma vez e ganha um id estavel.
+
+    Isso nao serve para um fluxo com estado — no "monta o prato", a tela do
+    passo 2 e igual tendo ou nao marcado a carne no passo 1, mas o fim do fluxo
+    nao e —, e por isso aquele fluxo deixou de sair daqui: ele e nativo, e sai
+    dos resultados que `demo_dados.py` exporta do motor. Captura de texto serve
+    para tela que so mostra; fluxo que acumula escolha precisa do dominio.
     """
     telas: dict[str, dict] = {}
-    por_conteudo: dict[tuple, str] = {}
+    por_conteudo: dict[str, str] = {}
     # Em que tela cada caminho vai dar — inclusive os caminhos que a
     # deduplicacao descartou, porque um botao pode levar por ali.
     id_por_caminho: dict[tuple[str, ...], str] = {}
@@ -263,18 +246,17 @@ async def varrer() -> dict:
             continue
         if not texto:
             continue
-        assinatura = (texto, escolhidos(caminho))
-        if assinatura in por_conteudo:
+        if texto in por_conteudo:
             # Mesma tela alcancada por outro caminho. Ela nao vira uma entrada
             # nova, mas o caminho precisa ficar registrado: e por ele que os
             # botoes de quem chega ate aqui vao se orientar.
-            id_por_caminho[chave] = por_conteudo[assinatura]
+            id_por_caminho[chave] = por_conteudo[texto]
             continue
 
         ident = "inicio" if not caminho else caminho[-1]
         while ident in telas:
             ident += "_"
-        por_conteudo[assinatura] = ident
+        por_conteudo[texto] = ident
         id_por_caminho[chave] = ident
         telas[ident] = {
             "texto": texto,

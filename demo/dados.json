@@ -2114,230 +2114,6 @@
    }
   }
  ],
- "meu_dia": {
-  "dias": [
-   {
-    "data": "2025-08-29",
-    "data_amigavel": "sexta-feira, 29 de agosto",
-    "kcal": 292,
-    "ptn": 35,
-    "incompleto": false,
-    "itens": [
-     {
-      "nome": "Arroz parboilizado",
-      "quantidade": 1
-     },
-     {
-      "nome": "File de frango grelhado",
-      "quantidade": 1
-     },
-     {
-      "nome": "Mix de alface",
-      "quantidade": 1
-     }
-    ]
-   }
-  ]
- },
- "progresso": {
-  "pontos": 25,
-  "dias_na_semana": 0,
-  "resumo_semana": "Voce ainda nao registrou nenhuma refeicao esta semana.",
-  "conquistas": [
-   {
-    "nome": "Atingiu a meta de proteina do dia",
-    "vezes": 1
-   },
-   {
-    "nome": "Registrou a refeicao",
-    "vezes": 1
-   },
-   {
-    "nome": "Incluiu salada ou fruta no prato",
-    "vezes": 1
-   }
-  ]
- },
- "semana": [
-  {
-   "data": "2025-08-26",
-   "sigla": "Ter",
-   "hoje": false,
-   "registrado": false,
-   "kcal": null,
-   "ptn": null
-  },
-  {
-   "data": "2025-08-27",
-   "sigla": "Qua",
-   "hoje": false,
-   "registrado": false,
-   "kcal": null,
-   "ptn": null
-  },
-  {
-   "data": "2025-08-28",
-   "sigla": "Qui",
-   "hoje": false,
-   "registrado": false,
-   "kcal": null,
-   "ptn": null
-  },
-  {
-   "data": "2025-08-29",
-   "sigla": "Sex",
-   "hoje": false,
-   "registrado": true,
-   "kcal": 292,
-   "ptn": 35
-  },
-  {
-   "data": "2025-09-01",
-   "sigla": "Seg",
-   "hoje": true,
-   "registrado": false,
-   "kcal": null,
-   "ptn": null
-  }
- ],
- "perfil": {
-  "nome": "Mariana",
-  "iniciais": "M",
-  "refeitorio": "SM",
-  "empresa": "Industria Exemplo",
-  "setor": "Producao",
-  "objetivo": "Manter o equilibrio",
-  "alvo": {
-   "kcal": 700,
-   "ptn": 30
-  },
-  "restricoes": [
-   "Leite e derivados",
-   "Ovos"
-  ],
-  "restricoes_codigos": [
-   "leite",
-   "ovos"
-  ],
-  "restricoes_livres": [],
-  "evitar": [],
-  "favoritos": [],
-  "avisos": [
-   {
-    "codigo": "resumo_semanal",
-    "nome": "Resumo da semana",
-    "detalhe": "Sexta, 16h. Só sobre você: não existe ranking.",
-    "ligado": true
-   },
-   {
-    "codigo": "lembrete_almoco",
-    "nome": "Lembrete do almoço",
-    "detalhe": "Dia útil, 11h, só se você ainda não registrou.",
-    "ligado": false
-   }
-  ]
- },
- "avaliacao": {
-  "escala": [
-   {
-    "nota": 3,
-    "rotulo": "Bom"
-   },
-   {
-    "nota": 2,
-    "rotulo": "Regular"
-   },
-   {
-    "nota": 1,
-    "rotulo": "Ruim"
-   }
-  ],
-  "faltas": [
-   {
-    "codigo": "acabou",
-    "rotulo": "Acabou antes de eu chegar"
-   },
-   {
-    "codigo": "pouca_quantidade",
-    "rotulo": "Pouca quantidade"
-   },
-   {
-    "codigo": "sem_opcao_restricao",
-    "rotulo": "Nada que eu pudesse comer"
-   },
-   {
-    "codigo": "faltou_utensilio",
-    "rotulo": "Faltou talher, prato ou copo"
-   },
-   {
-    "codigo": "faltou_bebida",
-    "rotulo": "Faltou bebida"
-   },
-   {
-    "codigo": "comida_fria",
-    "rotulo": "Comida fria"
-   }
-  ]
- },
- "registro_previsto": {
-  "pontos_antes": 25,
-  "pontos_depois": 50,
-  "ganho": 25,
-  "conquistas": [
-   {
-    "nome": "Registrou a refeicao",
-    "pontos": 10
-   },
-   {
-    "nome": "Incluiu salada ou fruta no prato",
-    "pontos": 5
-   },
-   {
-    "nome": "Atingiu a meta de proteina do dia",
-    "pontos": 10
-   }
-  ],
-  "refeicao": {
-   "data": "2025-09-01",
-   "data_amigavel": "segunda-feira, 1 de setembro",
-   "kcal": 703,
-   "ptn": 33,
-   "incompleto": false,
-   "itens": [
-    {
-     "codigo": "arroz_parboilizado",
-     "nome": "Arroz parboilizado",
-     "quantidade": 2,
-     "medida": "2 colheres"
-    },
-    {
-     "codigo": "carne_assada_ao_molho",
-     "nome": "Carne assada ao molho",
-     "quantidade": 2,
-     "medida": "2 porcoes"
-    },
-    {
-     "codigo": "feijao_preto",
-     "nome": "Feijao preto",
-     "quantidade": 1,
-     "medida": "1 concha"
-    },
-    {
-     "codigo": "macarrao_alho_e_oleo",
-     "nome": "Macarrao alho e oleo",
-     "quantidade": 1,
-     "medida": "1 colher"
-    },
-    {
-     "codigo": "sal_mix_de_alface",
-     "nome": "Mix de alface",
-     "quantidade": 1,
-     "medida": "a vontade"
-    }
-   ]
-  }
- },
- "plano_exemplo": [],
  "montagens": [
   {
    "codigos": [
@@ -11952,5 +11728,229 @@
     ]
    }
   }
- ]
+ ],
+ "meu_dia": {
+  "dias": [
+   {
+    "data": "2025-08-29",
+    "data_amigavel": "sexta-feira, 29 de agosto",
+    "kcal": 292,
+    "ptn": 35,
+    "incompleto": false,
+    "itens": [
+     {
+      "nome": "Arroz parboilizado",
+      "quantidade": 1
+     },
+     {
+      "nome": "File de frango grelhado",
+      "quantidade": 1
+     },
+     {
+      "nome": "Mix de alface",
+      "quantidade": 1
+     }
+    ]
+   }
+  ]
+ },
+ "progresso": {
+  "pontos": 25,
+  "dias_na_semana": 0,
+  "resumo_semana": "Voce ainda nao registrou nenhuma refeicao esta semana.",
+  "conquistas": [
+   {
+    "nome": "Atingiu a meta de proteina do dia",
+    "vezes": 1
+   },
+   {
+    "nome": "Registrou a refeicao",
+    "vezes": 1
+   },
+   {
+    "nome": "Incluiu salada ou fruta no prato",
+    "vezes": 1
+   }
+  ]
+ },
+ "semana": [
+  {
+   "data": "2025-08-26",
+   "sigla": "Ter",
+   "hoje": false,
+   "registrado": false,
+   "kcal": null,
+   "ptn": null
+  },
+  {
+   "data": "2025-08-27",
+   "sigla": "Qua",
+   "hoje": false,
+   "registrado": false,
+   "kcal": null,
+   "ptn": null
+  },
+  {
+   "data": "2025-08-28",
+   "sigla": "Qui",
+   "hoje": false,
+   "registrado": false,
+   "kcal": null,
+   "ptn": null
+  },
+  {
+   "data": "2025-08-29",
+   "sigla": "Sex",
+   "hoje": false,
+   "registrado": true,
+   "kcal": 292,
+   "ptn": 35
+  },
+  {
+   "data": "2025-09-01",
+   "sigla": "Seg",
+   "hoje": true,
+   "registrado": false,
+   "kcal": null,
+   "ptn": null
+  }
+ ],
+ "perfil": {
+  "nome": "Mariana",
+  "iniciais": "M",
+  "refeitorio": "SM",
+  "empresa": "Industria Exemplo",
+  "setor": "Producao",
+  "objetivo": "Manter o equilibrio",
+  "alvo": {
+   "kcal": 700,
+   "ptn": 30
+  },
+  "restricoes": [
+   "Leite e derivados",
+   "Ovos"
+  ],
+  "restricoes_codigos": [
+   "leite",
+   "ovos"
+  ],
+  "restricoes_livres": [],
+  "evitar": [],
+  "favoritos": [],
+  "avisos": [
+   {
+    "codigo": "resumo_semanal",
+    "nome": "Resumo da semana",
+    "detalhe": "Sexta, 16h. Só sobre você: não existe ranking.",
+    "ligado": true
+   },
+   {
+    "codigo": "lembrete_almoco",
+    "nome": "Lembrete do almoço",
+    "detalhe": "Dia útil, 11h, só se você ainda não registrou.",
+    "ligado": false
+   }
+  ]
+ },
+ "avaliacao": {
+  "escala": [
+   {
+    "nota": 3,
+    "rotulo": "Bom"
+   },
+   {
+    "nota": 2,
+    "rotulo": "Regular"
+   },
+   {
+    "nota": 1,
+    "rotulo": "Ruim"
+   }
+  ],
+  "faltas": [
+   {
+    "codigo": "acabou",
+    "rotulo": "Acabou antes de eu chegar"
+   },
+   {
+    "codigo": "pouca_quantidade",
+    "rotulo": "Pouca quantidade"
+   },
+   {
+    "codigo": "sem_opcao_restricao",
+    "rotulo": "Nada que eu pudesse comer"
+   },
+   {
+    "codigo": "faltou_utensilio",
+    "rotulo": "Faltou talher, prato ou copo"
+   },
+   {
+    "codigo": "faltou_bebida",
+    "rotulo": "Faltou bebida"
+   },
+   {
+    "codigo": "comida_fria",
+    "rotulo": "Comida fria"
+   }
+  ]
+ },
+ "registro_previsto": {
+  "pontos_antes": 25,
+  "pontos_depois": 50,
+  "ganho": 25,
+  "conquistas": [
+   {
+    "nome": "Registrou a refeicao",
+    "pontos": 10
+   },
+   {
+    "nome": "Incluiu salada ou fruta no prato",
+    "pontos": 5
+   },
+   {
+    "nome": "Atingiu a meta de proteina do dia",
+    "pontos": 10
+   }
+  ],
+  "refeicao": {
+   "data": "2025-09-01",
+   "data_amigavel": "segunda-feira, 1 de setembro",
+   "kcal": 703,
+   "ptn": 33,
+   "incompleto": false,
+   "itens": [
+    {
+     "codigo": "arroz_parboilizado",
+     "nome": "Arroz parboilizado",
+     "quantidade": 2,
+     "medida": "2 colheres"
+    },
+    {
+     "codigo": "carne_assada_ao_molho",
+     "nome": "Carne assada ao molho",
+     "quantidade": 2,
+     "medida": "2 porcoes"
+    },
+    {
+     "codigo": "feijao_preto",
+     "nome": "Feijao preto",
+     "quantidade": 1,
+     "medida": "1 concha"
+    },
+    {
+     "codigo": "macarrao_alho_e_oleo",
+     "nome": "Macarrao alho e oleo",
+     "quantidade": 1,
+     "medida": "1 colher"
+    },
+    {
+     "codigo": "sal_mix_de_alface",
+     "nome": "Mix de alface",
+     "quantidade": 1,
+     "medida": "a vontade"
+    }
+   ]
+  }
+ },
+ "plano_exemplo": []
 }

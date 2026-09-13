@@ -858,7 +858,9 @@ reorganização visual não muda os vereditos nem as regras de pontuação.
 
 Esta seção descreve a captura do bot. No app, a montagem agora é nativa e lê
 o cadastro atual, conforme a seção seguinte; as telas capturadas continuam
-servindo aos demais caminhos da demonstração.
+servindo aos demais caminhos da demonstração. O defeito abaixo já não afeta o
+montador — mas a correção da ligação entre botão e tela vale para todos os
+outros fluxos capturados, e por isso fica registrada.
 
 Um relato de teste: selecionar um alimento no passo 1 pulava direto para o
 passo 6. O defeito estava na captura, nao no app. As telas eram ligadas aos
@@ -888,14 +890,20 @@ Junto vieram dois vizinhos:
   Agora, se a limpeza esvaziar a tela, os descartados que levam a algum lugar
   voltam: limpar a tela nunca pode custar o caminho para sair dela.
 
-E um defeito que o teste do fluxo revelou: quem marcava a carne no passo 1
-terminava com **o prato vazio**. A deduplicacao era so pelo texto, e a tela do
-passo 2 e identica tendo ou nao marcado a carne — mas o "Terminei de montar"
-dela leva a pratos diferentes. Deduplicar por texto num fluxo com estado perde
-o futuro. A assinatura agora leva junto os alimentos ja escolhidos, e **so
-dentro do fluxo**: fora dele a distincao multiplicaria as outras setenta telas
-por cada combinacao de escolha, e o arquivo passaria de um megabyte. Dentro, o
-custo medido e 9 KB -> 19 KB comprimidos, que e o que a pessoa baixa.
+E um defeito que o teste do fluxo revelou, com uma licao que sobreviveu a
+correcao: quem marcava a carne no passo 1 terminava com **o prato vazio**. A
+deduplicacao e so pelo texto, e a tela do passo 2 e identica tendo ou nao
+marcado a carne — mas o "Terminei de montar" dela leva a pratos diferentes.
+**Deduplicar por conteudo perde o futuro num fluxo com estado.**
+
+Chegamos a distinguir as telas pelos alimentos ja escolhidos, o que resolvia ao
+custo de 385 telas a mais (9 KB -> 19 KB comprimidos). A montagem nativa da
+secao seguinte tornou aquilo desnecessario, e o codigo saiu: `montar` resolve
+para a tela nativa, entao as 385 viraram peso morto inalcancavel. A varredura
+voltou a 96 telas e 78 KB.
+
+Fica a regra: **captura de texto serve para tela que so mostra; fluxo que
+acumula escolha precisa do dominio.**
 
 ### Montagem e histórico do app com o mesmo registro
 
