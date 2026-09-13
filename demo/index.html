@@ -484,6 +484,7 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .secao{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--texto-3);margin:22px 0 -4px}
 .tela > .secao:first-child{margin-top:0}
 .paragrafo{margin:0;font-size:var(--t-body);color:var(--texto)}
+.cartao > .paragrafo + .paragrafo{margin-top:12px}
 .paragrafo b{font-weight:700}
 .nota{margin:0;font-size:13px;color:var(--texto-2);line-height:1.55}
 .prosa{background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);padding:16px}
@@ -508,7 +509,23 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
   display:grid;place-items:center;color:transparent}
 .opcao.marcada .caixa{background:var(--vermelho);border-color:var(--vermelho);color:#fff}
 .opcao .caixa .icone{width:12px;height:12px;stroke-width:3}
+.opcao .txt{flex:1;min-width:0}
+.opcao .txt b{display:block;font-size:14px;font-weight:600}
+.opcao .txt span{display:block;font-size:12px;font-weight:400;color:var(--texto-2);margin-top:3px;line-height:1.45}
 .cabeca-tela{font-size:26px;font-weight:800;line-height:1.22;letter-spacing:-.03em}
+
+/* ---------- cadastro ---------- */
+.progresso-cadastro{height:4px;border-radius:2px;background:var(--card-3);overflow:hidden;margin-bottom:20px}
+.progresso-cadastro .feito{height:100%;background:var(--vermelho);border-radius:2px;
+  transition:width var(--medio) var(--curva)}
+.campo-texto{margin-top:14px}
+.campo-texto label{display:block;font-size:12px;font-weight:600;color:var(--texto-2);margin-bottom:6px}
+/* 16px nao e capricho: abaixo disso o Safari do iPhone da zoom ao focar o
+   campo, e a tela inteira sai de lugar no meio do cadastro. */
+.campo-texto input{width:100%;min-height:56px;font:inherit;font-size:16px;color:var(--texto);
+  background:var(--card);border:1px solid var(--linha-2);border-radius:var(--r-card);padding:0 16px}
+.campo-texto input::placeholder{color:var(--texto-3)}
+.campo-texto input:focus{border-color:var(--vermelho-alto);outline:2px solid var(--vermelho-alto);outline-offset:1px}
 
 /* ---------- acoes no rodape ---------- */
 .acoes{flex:none;display:flex;flex-direction:column;gap:7px;padding:10px var(--pad);max-height:38dvh;overflow-y:auto;
@@ -524,6 +541,10 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 
 /* ---------- navegacao inferior ---------- */
 .abas{flex:none;display:flex;background:var(--fundo);border-top:1px solid var(--linha-2);padding:7px 8px 6px;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+/* No cadastro a navegacao sai: um toque numa aba abandonaria o rascunho sem
+   avisar. O `display:flex` acima vence o `[hidden]` do navegador, por isso a
+   regra explicita. */
+.abas[hidden]{display:none}
 .aba{flex:1;min-width:0;min-height:55px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
   padding:7px 3px;background:transparent;border:0;cursor:pointer;font-size:10px;color:var(--texto-3)}
 .aba .icone{width:21px;height:21px}
@@ -694,6 +715,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     filtroCardapio: "todos", periodoProgresso: "semana"
   };
   try { estado.gestao = localStorage.getItem("apetit-gestao") === "sim"; } catch (e) {}
+  // `lido`, `guardar` e `esquecer` ficam mais abaixo; a leitura acima acontece
+  // antes de tudo e por isso fala direto com o navegador.
 
   var ABAS = [
     { id: "inicio",    icone: "i-casa",       nome: "Início" },
@@ -1106,7 +1129,9 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   function abrirSobre(){
     abrirFolha(function(c){
       c.appendChild(el("h2", "", "Sobre esta demonstração"));
-      c.appendChild(el("p", "", "Você está usando o app como a <b>Mariana</b>. " +
+      c.appendChild(el("p", "", (cadastroSalvo()
+        ? "Você está usando o app com o <b>seu cadastro</b>, guardado neste aparelho. "
+        : "Você está usando o app como a <b>Mariana</b>, o cadastro de exemplo. ") +
         "As telas foram geradas rodando o código real do bot — não são maquete."));
 
       var compartilharApp = el("button", "cta leve");
@@ -1122,7 +1147,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       c.appendChild(verEstados);
       c.appendChild(el("h3", "", "Quem você é"));
       var dl = el("dl", "");
-      var p = (DADOS && DADOS.perfil) || {};
+      var p = pessoa();
       [["Refeitório", p.refeitorio], ["Empresa", p.empresa], ["Setor", p.setor],
        ["Objetivo", p.objetivo], ["Alergias", (p.restricoes || []).join(", ")]
       ].forEach(function(par){
@@ -1319,19 +1344,60 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     if (!pilha.childElementCount) tela.appendChild(vazio("Nenhum prato nesta categoria.", "Escolha outra categoria para continuar.", "i-talher"));
     tela.appendChild(el("p", "fotos-nota", "Fotos ilustrativas. Confira os avisos antes de se servir."));
 
-    var contagem = (DADOS && DADOS.contagem) || {};
-    if (contagem.atencao){
-      var aviso = el("div", "aviso wrn");
-      aviso.appendChild(icone("i-atencao"));
-      aviso.appendChild(el("span", "", "<b>" + contagem.atencao + " pratos sem declaração " +
-        "de alergênico.</b> Não consigo garantir que são seguros para você — pergunte no balcão."));
-      tela.appendChild(aviso);
+    // O contador vem dos pratos que estao na tela, avaliados contra a lista de
+    // quem esta usando o app — nao do numero que o Python calculou para o
+    // exemplo. Dizer "3 pratos sem declaracao" a quem nao declarou alergia
+    // seria contar um aviso que nao e dela.
+    var restricoes = restricoesAtuais();
+    if (restricoes.length){
+      var pendentes = 0;
+      grupos.forEach(function(g){
+        g.itens.forEach(function(i){ if (vereditoPara(i, restricoes) === "atencao") pendentes++; });
+      });
+      if (pendentes){
+        var aviso = el("div", "aviso wrn");
+        aviso.appendChild(icone("i-atencao"));
+        aviso.appendChild(el("span", "", "<b>" + pendentes + (pendentes === 1
+          ? " prato sem declaração completa" : " pratos sem declaração completa") +
+          " dos alergênicos que você evita.</b> Não consigo garantir que são seguros " +
+          "para você — pergunte no balcão."));
+        tela.appendChild(aviso);
+      }
+    } else {
+      // Sem restricao cadastrada o app nao tem o que conferir, e nao pode deixar
+      // o silencio parecer aprovacao.
+      var neutro = el("div", "aviso okk");
+      neutro.appendChild(icone("i-escudo"));
+      neutro.appendChild(el("span", "", "<b>Você não tem alergia cadastrada.</b> " +
+        "Por isso não marquei nenhum prato — não é o mesmo que dizer que todos " +
+        "estão liberados para você."));
+      tela.appendChild(neutro);
     }
   }
 
+  // O veredito nao vem pronto do prato: ele e calculado agora, contra a lista de
+  // restricoes de quem esta usando o app. Sem isso, alguem que se cadastrasse
+  // com outra alergia veria as cores da Mariana.
+  function avaliado(i){
+    var restricoes = restricoesAtuais();
+    return {
+      veredito: vereditoPara(i, restricoes),
+      etiqueta: etiquetaPara(i, restricoes),
+      motivo: motivoPara(i, restricoes)
+    };
+  }
+
+  var CLASSE_VEREDITO = { bloqueio: "blk", liberado: "okk", atencao: "wrn", sem_restricao: "" };
+
   function linhaDoPrato(i, grupo){
-    var no = el("button", "prato " + (i.veredito === "bloqueio" ? "blk"
-             : i.veredito === "liberado" ? "okk" : "wrn"));
+    var a = avaliado(i);
+    var no = el("button", "prato " + CLASSE_VEREDITO[a.veredito]);
+    // O codigo e o veredito ficam no proprio no: e o que
+    // `scripts/conferir_vereditos.py` le para comparar prato por prato com o
+    // que o Python calculou. Conferir a cor na tela, e nao a funcao por dentro,
+    // e o que garante que a pessoa viu o aviso certo.
+    no.dataset.codigo = i.codigo || "";
+    no.dataset.veredito = a.veredito;
     no.appendChild(fotoPrato(i.nome, ICONE_CATEGORIA[grupo.codigo]));
 
     var corpo = el("div", "corpo");
@@ -1341,12 +1407,12 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     if (i.papel) selos.appendChild(el("span", "papel", escapar(i.papel)));
     // O peso e informacao neutra; a cor fica reservada para o que e seguranca.
     if (i.peso && i.peso !== "sem informacao") selos.appendChild(selo(i.peso));
-    if (i.veredito === "bloqueio"){
-      selos.appendChild(selo("Não pode: " + nomesDoBloqueio(i), "vermelho", "i-proibido"));
-    } else if (i.veredito === "liberado"){
+    if (a.veredito === "bloqueio"){
+      selos.appendChild(selo(a.etiqueta, "vermelho", "i-proibido"));
+    } else if (a.veredito === "liberado"){
       selos.appendChild(selo("Liberado", "verde", "i-liberado"));
-    } else {
-      selos.appendChild(selo("Confirme alergênicos", "laranja", "i-atencao"));
+    } else if (a.veredito === "atencao"){
+      selos.appendChild(selo(a.etiqueta || "Confirme alergênicos", "laranja", "i-atencao"));
     }
     corpo.appendChild(selos);
     no.appendChild(corpo);
@@ -1355,28 +1421,22 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     return no;
   }
 
-  function nomesDoBloqueio(i){
-    // A etiqueta ja vem pronta do dominio ("contem ovos"): aqui so sobra o que
-    // vem depois do verbo, para o selo caber na linha.
-    var m = /^(?:contem|tem)\s+(.*)$/i.exec(i.etiqueta || "");
-    var nomes = m ? m[1] : (i.etiqueta || "alergênico");
-    return nomes.charAt(0).toUpperCase() + nomes.slice(1);
-  }
-
   function abrirPrato(i, grupo){
+    var a = avaliado(i);
     abrirFolha(function(c){
       c.appendChild(el("h2", "", escapar(i.nome)));
       c.appendChild(el("p", "", escapar(grupo.categoria + (i.papel ? " · " + i.papel : ""))));
 
       var selos = el("div", "tags");
-      if (i.veredito === "bloqueio") selos.appendChild(etiquetaGrande("Não pode", "i-proibido"));
-      else if (i.veredito === "liberado") selos.appendChild(etiquetaGrande("Liberado", "i-liberado", "calma"));
-      else selos.appendChild(etiquetaGrande("Confirme no balcão", "i-atencao", "calma"));
+      if (a.veredito === "bloqueio") selos.appendChild(etiquetaGrande("Não pode", "i-proibido"));
+      else if (a.veredito === "liberado") selos.appendChild(etiquetaGrande("Liberado", "i-liberado", "calma"));
+      else if (a.veredito === "atencao") selos.appendChild(etiquetaGrande("Confirme no balcão", "i-atencao", "calma"));
+      else selos.appendChild(etiquetaGrande("Sem restrição cadastrada", "i-escudo", "calma"));
       c.appendChild(selos);
 
-      if (i.motivo){
+      if (a.motivo){
         c.appendChild(el("h3", "", "Por quê"));
-        c.appendChild(el("p", "", escapar(i.motivo)));
+        c.appendChild(el("p", "", escapar(a.motivo)));
       }
       if (i.kcal != null || i.ptn != null){
         c.appendChild(el("h3", "", "Por porção servida"));
@@ -1420,7 +1480,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     macros.appendChild(el("span", "", escapar(p.ptn) + " g de proteína"));
     var objetivo = el("div", "objetivo-resumo");
     objetivo.appendChild(icone("i-alvo"));
-    objetivo.appendChild(el("div", "", "Objetivo<b>" + escapar(((DADOS || {}).perfil || {}).objetivo || "") + "</b>"));
+    objetivo.appendChild(el("div", "", "Objetivo<b>" + escapar(pessoa().objetivo || "") + "</b>"));
     macros.appendChild(objetivo);
     ficha.appendChild(macros);
     resumo.appendChild(ficha);
@@ -1717,7 +1777,474 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     return partes;
   }
 
+  // ---------- onde as coisas ficam guardadas ----------
+  //
+  // Num quadro embutido — e e assim que a previa chega para quem so recebeu o
+  // link — o navegador bloqueia o `localStorage` do endereco de dentro. Sem
+  // alternativa, o cadastro morreria no ultimo passo, e com uma mensagem sobre
+  // espaco em disco que nem e o motivo.
+  //
+  // Entao ha dois lugares: o aparelho, quando da, e a memoria da aba, quando
+  // nao da. O app funciona nos dois. O que muda e o que ele pode prometer — e
+  // ele diz qual dos dois esta valendo, em vez de deixar a pessoa descobrir ao
+  // fechar a pagina.
+  var naMemoria = {};
+
+  function guardar(chave, valor){
+    try { localStorage.setItem(chave, valor); return "aparelho"; }
+    catch (e) { naMemoria[chave] = valor; return "memoria"; }
+  }
+  function lido(chave){
+    try {
+      var v = localStorage.getItem(chave);
+      if (v != null) return v;
+    } catch (e) {}
+    return naMemoria[chave] != null ? naMemoria[chave] : null;
+  }
+  function esquecer(chave){
+    delete naMemoria[chave];
+    try { localStorage.removeItem(chave); } catch (e) {}
+  }
+  // Uma escrita de teste responde o que `typeof localStorage` nao responde: no
+  // quadro embutido o objeto existe e so o uso e que falha.
+  function guardaNoAparelho(){
+    try {
+      localStorage.setItem("apetit-teste", "1");
+      localStorage.removeItem("apetit-teste");
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---------- cadastro ----------
+  //
+  // Na primeira vez o funcionario se cadastra do zero; depois o cadastro fica
+  // guardado e ele edita quando quiser. Os passos e a ordem sao os mesmos do
+  // bot (`ask_name` ate `ask_consent` em `bot.py`), para as duas portas de
+  // entrada pedirem a mesma coisa, na mesma sequencia, com as mesmas palavras
+  // no termo.
+  //
+  // Fica em `localStorage`, como a foto: esta demonstracao nao tem servidor, e
+  // inventar um "salvo na nuvem" seria prometer o que nao existe. No app de
+  // verdade quem guarda e o banco do bot, com o mesmo `Employee`.
+  var CADASTRO = "apetit-cadastro";
+
+  function cadastroSalvo(){
+    try { return JSON.parse(lido(CADASTRO) || "null"); } catch (e) { return null; }
+  }
+  function guardarCadastro(dados){
+    return guardar(CADASTRO, JSON.stringify(dados));
+  }
+
+  // O cadastro guardado manda no que as telas mostram. Sem ele, vale o exemplo
+  // exportado do dominio, que e como a demonstracao nasce para quem so quer ver.
+  function pessoa(){
+    var salvo = cadastroSalvo();
+    var exemplo = (DADOS && DADOS.perfil) || {};
+    if (!salvo) return exemplo;
+    return {
+      nome: salvo.nome,
+      iniciais: iniciaisDe(salvo.nome),
+      refeitorio: salvo.refeitorio,
+      empresa: salvo.empresa,
+      setor: salvo.setor,
+      objetivo: salvo.objetivo,
+      alvo: alvoDoObjetivo(salvo.objetivo),
+      restricoes: nomesDasRestricoes(salvo.restricoes),
+      restricoes_codigos: salvo.restricoes || [],
+      restricoes_livres: [],
+      evitar: [],
+      favoritos: exemplo.favoritos || [],
+      avisos: exemplo.avisos || []
+    };
+  }
+
+  function restricoesAtuais(){
+    var salvo = cadastroSalvo();
+    if (salvo) return salvo.restricoes || [];
+    return (DADOS && DADOS.perfil && DADOS.perfil.restricoes_codigos) || [];
+  }
+
+  function iniciaisDe(nome){
+    return String(nome || "").trim().split(/\s+/).slice(0, 2)
+      .map(function(p){ return p.charAt(0); }).join("").toUpperCase() || "?";
+  }
+  function alvoDoObjetivo(objetivo){
+    var achado = ((DADOS && DADOS.objetivos) || []).filter(function(o){ return o.nome === objetivo; })[0];
+    return achado ? achado.alvo : {};
+  }
+  function nomesDasRestricoes(codigos){
+    var nomes = {};
+    ((DADOS && DADOS.alergenicos) || []).forEach(function(a){ nomes[a.codigo] = a.nome; });
+    return (codigos || []).map(function(c){ return nomes[c] || c; });
+  }
+
+  // rascunho do cadastro em andamento
+  var rascunho = null;
+  var passoAtual = 0;
+
+  var PASSOS = [
+    { campo: "nome",       titulo: "Como você quer ser chamado?",
+      apoio: "É esse nome que vai aparecer no seu app. Não precisa ser o nome completo.",
+      tipo: "texto", rotulo: "Nome", exemplo: "Mariana" },
+    { campo: "refeitorio", titulo: "Onde você almoça?",
+      apoio: "A unidade da Apetit que serve o seu refeitório.",
+      tipo: "texto", rotulo: "Refeitório", exemplo: "SM" },
+    { campo: "empresa",    titulo: "Onde você trabalha?",
+      apoio: "A empresa e o setor. Isso ajuda a Apetit a ver a adesão por setor — nunca o que você come.",
+      tipo: "dupla", segundo: "setor",
+      rotulo: "Empresa", exemplo: "Indústria Exemplo",
+      rotulo2: "Setor", exemplo2: "Produção" },
+    { campo: "objetivo",   titulo: "O que você quer do app?",
+      apoio: "Isso só ajusta as dicas que eu te dou. Dá para mudar quando quiser.",
+      tipo: "objetivo" },
+    { campo: "restricoes", titulo: "Você tem alguma alergia ou intolerância?",
+      apoio: "Marque o que se aplica. Eu aviso no cardápio o que você não pode comer — e nunca afirmo que um prato é seguro sem alguém ter conferido.",
+      tipo: "alergias" },
+    { campo: "consentimento", titulo: "Antes de terminar",
+      apoio: "", tipo: "termo" }
+  ];
+
+  function novoRascunho(editando){
+    var salvo = cadastroSalvo();
+    if (editando && salvo){
+      return { nome: salvo.nome, refeitorio: salvo.refeitorio, empresa: salvo.empresa,
+               setor: salvo.setor, objetivo: salvo.objetivo,
+               restricoes: (salvo.restricoes || []).slice(), consentimento: true, editando: true };
+    }
+    return { nome: "", refeitorio: "", empresa: "", setor: "", objetivo: "",
+             restricoes: [], consentimento: false, editando: false };
+  }
+
+  function comecarCadastro(editando){
+    rascunho = novoRascunho(editando);
+    passoAtual = 0;
+    historico.length = 0;
+    mostrar("cadastro", false);
+  }
+
+  function passoCompleto(){
+    var p = PASSOS[passoAtual];
+    if (p.tipo === "texto") return !!String(rascunho[p.campo] || "").trim();
+    if (p.tipo === "dupla"){
+      return !!String(rascunho[p.campo] || "").trim() && !!String(rascunho[p.segundo] || "").trim();
+    }
+    if (p.tipo === "objetivo") return !!rascunho.objetivo;
+    if (p.tipo === "alergias") return true;      // "nenhuma" e uma resposta valida
+    return rascunho.consentimento;
+  }
+
+  // Botao de escolha unica ou multipla, com a mesma caixa de marcar que as
+  // opcoes do bot ja usam.
+  function escolha(titulo, detalhe, marcada, aoClicar){
+    var b = el("button", "opcao" + (marcada ? " marcada" : ""));
+    b.setAttribute("aria-pressed", marcada ? "true" : "false");
+    var txt = el("div", "txt");
+    txt.appendChild(el("b", "", escapar(titulo)));
+    if (detalhe) txt.appendChild(el("span", "", escapar(detalhe)));
+    b.appendChild(txt);
+    var marca = el("span", "caixa");
+    marca.appendChild(icone("i-liberado"));
+    b.appendChild(marca);
+    b.addEventListener("click", aoClicar);
+    return b;
+  }
+
+  function telaCadastro(){
+    if (!rascunho){ rascunho = novoRascunho(!!cadastroSalvo()); passoAtual = 0; }
+    var p = PASSOS[passoAtual];
+
+    topo.className = "topo simples";
+    topo.textContent = "";
+    var barra = el("div", "barra");
+    barra.appendChild(botaoIcone("i-voltar", "Voltar", function(){
+      if (passoAtual > 0){ passoAtual--; redesenhar(); return; }
+      var voltarPara = rascunho.editando ? "perfil" : "boas_vindas";
+      rascunho = null;
+      mostrar(voltarPara, false);
+    }));
+    var titulo = el("div", "titulo");
+    titulo.appendChild(el("h1", "", rascunho.editando ? "Editar cadastro" : "Seu cadastro"));
+    titulo.appendChild(el("p", "", "Passo " + (passoAtual + 1) + " de " + PASSOS.length));
+    barra.appendChild(titulo);
+    topo.appendChild(barra);
+
+    var trilho = el("div", "progresso-cadastro");
+    var feito = el("div", "feito");
+    feito.style.width = ((passoAtual + 1) / PASSOS.length * 100) + "%";
+    trilho.appendChild(feito);
+    tela.appendChild(trilho);
+
+    tela.appendChild(el("h1", "h1", escapar(p.titulo)));
+    if (p.apoio) tela.appendChild(el("p", "sub", escapar(p.apoio)));
+
+    if (p.tipo === "texto" || p.tipo === "dupla"){
+      tela.appendChild(campoTexto(p.campo, p.rotulo, p.exemplo));
+      if (p.tipo === "dupla") tela.appendChild(campoTexto(p.segundo, p.rotulo2, p.exemplo2));
+    } else if (p.tipo === "objetivo"){
+      var lista = el("div", "pilha");
+      lista.style.marginTop = "18px";
+      ((DADOS && DADOS.objetivos) || []).forEach(function(o){
+        lista.appendChild(escolha(
+          o.nome,
+          "Alvo do almoço: " + o.alvo.kcal + " kcal · " + o.alvo.ptn + " g de proteína",
+          rascunho.objetivo === o.nome,
+          function(){ rascunho.objetivo = o.nome; redesenhar(); }
+        ));
+      });
+      tela.appendChild(lista);
+      tela.appendChild(el("p", "legenda",
+        "Alvo ilustrativo. Quem define quantidade individual é o nutricionista responsável — " +
+        "se você mandar a sua ficha, o app passa a seguir ela."));
+    } else if (p.tipo === "alergias"){
+      var caixa = el("div", "pilha");
+      caixa.style.marginTop = "18px";
+      ((DADOS && DADOS.alergenicos) || []).forEach(function(a){
+        var ligada = rascunho.restricoes.indexOf(a.codigo) >= 0;
+        caixa.appendChild(escolha(a.nome, "", ligada, function(){
+          var n = rascunho.restricoes.indexOf(a.codigo);
+          if (n >= 0) rascunho.restricoes.splice(n, 1); else rascunho.restricoes.push(a.codigo);
+          redesenhar();
+        }));
+      });
+      tela.appendChild(caixa);
+      tela.appendChild(el("p", "legenda", rascunho.restricoes.length
+        ? "Se a sua restrição não está na lista, fale no balcão: eu só consigo conferir o que a " +
+          "ficha técnica do prato declara."
+        : "Você pode seguir sem marcar nada."));
+    } else {
+      var termo = el("div", "cartao");
+      termo.style.marginTop = "18px";
+      termo.appendChild(el("p", "paragrafo",
+        "Preciso guardar seu nome, onde você almoça, empresa, setor, suas restrições e o que " +
+        "você registrar que comeu."));
+      termo.appendChild(el("p", "paragrafo",
+        "<b>Sua empresa não vê nada disso sobre você.</b> Nem o que você come, nem o seu " +
+        "objetivo, nem as suas restrições. A Apetit só enxerga quantas pessoas usam, por setor, " +
+        "e mesmo assim setor com menos de 5 pessoas nem aparece."));
+      termo.appendChild(el("p", "legenda",
+        "Você vê tudo e apaga tudo quando quiser, no seu cadastro."));
+      tela.appendChild(termo);
+
+      var aceite = escolha("Li e concordo",
+        "Sem isso o app não guarda nada — e também não funciona.",
+        rascunho.consentimento,
+        function(){ rascunho.consentimento = !rascunho.consentimento; redesenhar(); });
+      aceite.style.marginTop = "12px";
+      tela.appendChild(aceite);
+
+      var resumo = el("dl", "campos");
+      resumo.style.marginTop = "18px";
+      [["Nome", rascunho.nome], ["Refeitório", rascunho.refeitorio],
+       ["Empresa", rascunho.empresa], ["Setor", rascunho.setor],
+       ["Objetivo", rascunho.objetivo],
+       ["Restrições", nomesDasRestricoes(rascunho.restricoes).join(", ") || "Nenhuma"]
+      ].forEach(function(par){
+        var linha = el("div", "campo");
+        linha.appendChild(el("dt", "", escapar(par[0])));
+        linha.appendChild(el("dd", "", escapar(par[1] || "—")));
+        resumo.appendChild(linha);
+      });
+      tela.appendChild(resumo);
+    }
+
+    var ultimo = passoAtual === PASSOS.length - 1;
+    var avancar = el("button", "cta forte");
+    avancar.appendChild(el("b", "", ultimo
+      ? (rascunho.editando ? "Salvar alterações" : "Criar meu cadastro")
+      : "Continuar"));
+    avancar.appendChild(icone(ultimo ? "i-liberado" : "i-seta", ultimo ? "" : "seta"));
+    if (!passoCompleto()) avancar.disabled = true;
+    avancar.addEventListener("click", function(){
+      if (!passoCompleto()) return;
+      if (!ultimo){ passoAtual++; redesenhar(); return; }
+      salvarCadastro();
+    });
+    acoes.appendChild(avancar);
+  }
+
+  // O rotulo fica visivel, e nao so no `placeholder`: o `placeholder` some
+  // quando a pessoa digita, e dois campos preenchidos lado a lado deixariam de
+  // dizer qual e a empresa e qual e o setor.
+  function campoTexto(campo, rotulo, exemplo){
+    var caixa = el("div", "campo-texto");
+    var nome = el("label", "", escapar(rotulo || campo));
+    nome.setAttribute("for", "campo-" + campo);
+    caixa.appendChild(nome);
+    var entrada = document.createElement("input");
+    entrada.type = "text";
+    entrada.id = "campo-" + campo;
+    entrada.value = rascunho[campo] || "";
+    entrada.placeholder = exemplo || "";
+    entrada.autocomplete = "off";
+    // Sem `redesenhar()` a cada tecla: a tela inteira seria remontada e o
+    // teclado do celular fecharia no meio da palavra.
+    entrada.addEventListener("input", function(){
+      rascunho[campo] = entrada.value;
+      var botao = acoes.querySelector(".cta");
+      if (botao) botao.disabled = !passoCompleto();
+    });
+    caixa.appendChild(entrada);
+    return caixa;
+  }
+
+  function salvarCadastro(){
+    var dados = {
+      nome: String(rascunho.nome || "").trim(),
+      refeitorio: String(rascunho.refeitorio || "").trim(),
+      empresa: String(rascunho.empresa || "").trim(),
+      setor: String(rascunho.setor || "").trim(),
+      objetivo: rascunho.objetivo,
+      restricoes: rascunho.restricoes.slice(),
+      consentimento: true
+    };
+    var editando = rascunho.editando;
+    var onde = guardarCadastro(dados);
+    rascunho = null;
+    historico.length = 0;
+    mostrar(editando ? "perfil" : "inicio", false);
+    if (editando){ recado("Cadastro atualizado."); return; }
+    recado(onde === "aparelho"
+      ? "Pronto, " + dados.nome + ". Seu cadastro está guardado neste aparelho."
+      : "Pronto, " + dados.nome + ". Aqui na prévia o cadastro vale enquanto esta " +
+        "página estiver aberta.");
+  }
+
+  function apagarCadastro(){
+    esquecer(CADASTRO);
+  }
+
+  // A primeira tela de quem nunca abriu o app. Ela nao empurra o cadastro sem
+  // alternativa: o link do piloto e compartilhado, e quem so quer olhar precisa
+  // conseguir olhar — com o exemplo da Mariana, dito com esse nome, para
+  // ninguem confundir dado de exemplo com dado seu.
+  function telaBoasVindas(){
+    topo.className = "topo marca";
+    topo.textContent = "";
+    var barra = el("div", "barra");
+    var titulo = el("div", "titulo");
+    titulo.appendChild(el("h1", "", "Apetit"));
+    barra.appendChild(titulo);
+    topo.appendChild(barra);
+    topo.appendChild(el("p", "apoio", "Alimenta o que te faz bem"));
+
+    tela.appendChild(el("h1", "h1", "Bem-vindo ao refeitório"));
+    tela.appendChild(el("p", "sub",
+      "Eu te mostro o cardápio do dia, aviso o que você não pode comer e " +
+      "acompanho o seu almoço. Para isso preciso saber quem você é."));
+
+    var cartao = el("div", "cartao");
+    cartao.style.marginTop = "20px";
+    cartao.appendChild(el("p", "paragrafo",
+      "São seis perguntas rápidas: nome, onde você almoça, empresa e setor, " +
+      "seu objetivo e as suas alergias."));
+    cartao.appendChild(el("p", "legenda",
+      "Sua empresa não vê o que você come. A Apetit só enxerga quantas pessoas " +
+      "usam, por setor."));
+    tela.appendChild(cartao);
+
+    // Dito antes de a pessoa preencher seis passos, e nao depois: descobrir no
+    // fim que nada seria guardado e pior do que saber no comeco.
+    if (!guardaNoAparelho()){
+      var aviso = el("div", "aviso wrn");
+      aviso.style.marginTop = "14px";
+      aviso.appendChild(icone("i-info"));
+      aviso.appendChild(el("span", "", "<b>Você está numa prévia embutida.</b> " +
+        "Aqui o navegador não deixa gravar nada: o cadastro vale enquanto esta " +
+        "página estiver aberta. Abrindo o link numa aba própria, ele fica guardado."));
+      tela.appendChild(aviso);
+    }
+
+    var criar = el("button", "cta forte");
+    criar.appendChild(el("b", "", "Criar meu cadastro"));
+    criar.appendChild(icone("i-seta", "seta"));
+    criar.addEventListener("click", function(){ comecarCadastro(false); });
+    acoes.appendChild(criar);
+
+    var olhar = el("button", "cta leve");
+    olhar.appendChild(icone("i-info"));
+    olhar.appendChild(el("b", "", "Só olhar, com o exemplo da Mariana"));
+    olhar.addEventListener("click", function(){
+      historico.length = 0;
+      mostrar("inicio", false);
+    });
+    acoes.appendChild(olhar);
+  }
+
   // ---------- 6. perfil ----------
+
+  // ---------- o veredito de alergenico, do lado do navegador ----------
+  //
+  // O cadastro e do proprio funcionario e mora so no aparelho, entao o
+  // navegador precisa decidir o veredito sozinho. Isso poe a regra dos tres
+  // estados em dois lugares — aqui e em `apetit/allergens.py` — que e
+  // exatamente o jeito de os dois discordarem um dia sem ninguem ver.
+  //
+  // A trava e `dados.conformidade`: o Python calcula o veredito de cada prato
+  // para varias combinacoes de alergia, e `scripts/conferir_vereditos.py` roda
+  // este codigo num navegador de verdade e falha se um unico prato divergir.
+  //
+  // A regra e curta porque o modelo e curto: contem bloqueia, pode conter e
+  // sem declaracao pedem confirmacao, e so "nao contem" libera. Ausencia de
+  // informacao nunca vira liberacao.
+  var PESO_VEREDITO = { bloqueio: 3, atencao: 2, liberado: 1, sem_restricao: 0 };
+
+  function vereditoDaDeclaracao(estado){
+    if (estado === "contem") return "bloqueio";
+    if (estado === "nao_contem") return "liberado";
+    return "atencao";                     // pode_conter e nao_declarado
+  }
+
+  function vereditoPara(item, restricoes){
+    if (!restricoes || !restricoes.length) return "sem_restricao";
+    var pior = "liberado";
+    restricoes.forEach(function(codigo){
+      var v = vereditoDaDeclaracao((item.declaracoes || {})[codigo] || "nao_declarado");
+      if (PESO_VEREDITO[v] > PESO_VEREDITO[pior]) pior = v;
+    });
+    return pior;
+  }
+
+  // O texto do motivo, montado das mesmas partes que o bot usa.
+  function motivoPara(item, restricoes){
+    var nomes = {};
+    ((DADOS && DADOS.alergenicos) || []).forEach(function(a){ nomes[a.codigo] = a.nome; });
+    var contem = [], pode = [], sem = [];
+    (restricoes || []).forEach(function(c){
+      var estado = (item.declaracoes || {})[c] || "nao_declarado";
+      if (estado === "contem") contem.push(nomes[c] || c);
+      else if (estado === "pode_conter") pode.push(nomes[c] || c);
+      else if (estado === "nao_declarado") sem.push(nomes[c] || c);
+    });
+    if (contem.length){
+      return "Este prato contém " + contem.join(", ").toLowerCase() +
+             ", que você evita. Não recomendo pedir.";
+    }
+    var partes = [];
+    if (pode.length) partes.push("pode conter " + pode.join(", ").toLowerCase());
+    if (sem.length) partes.push("não tem declaração sobre " + sem.join(", ").toLowerCase());
+    if (partes.length){
+      return "Não consigo confirmar que este prato é seguro para você: " +
+             partes.join(" e ") + ". Confirme no balcão antes de se servir.";
+    }
+    if (!restricoes || !restricoes.length) return "Você não tem restrição cadastrada.";
+    return "Nenhum alergênico da sua ficha aparece neste prato.";
+  }
+
+  function etiquetaPara(item, restricoes){
+    var nomes = {};
+    ((DADOS && DADOS.alergenicos) || []).forEach(function(a){ nomes[a.codigo] = a.nome; });
+    var contem = [], pode = [], sem = [];
+    (restricoes || []).forEach(function(c){
+      var estado = (item.declaracoes || {})[c] || "nao_declarado";
+      if (estado === "contem") contem.push(nomes[c] || c);
+      else if (estado === "pode_conter") pode.push(nomes[c] || c);
+      else if (estado === "nao_declarado") sem.push(nomes[c] || c);
+    });
+    if (contem.length) return "Não pode: " + contem.join(", ");
+    if (pode.length) return "Pode conter " + pode.join(", ").toLowerCase();
+    if (sem.length) return "Confirme alergênicos";
+    return "";
+  }
 
   // ---------- foto de perfil ----------
   //
@@ -1733,13 +2260,13 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   var LADO = 256;
 
   function fotoGuardada(){
-    try { return localStorage.getItem(FOTO) || ""; } catch (e) { return ""; }
+    return lido(FOTO) || "";
   }
   function guardarFoto(dados){
-    try { localStorage.setItem(FOTO, dados); return true; } catch (e) { return false; }
+    return guardar(FOTO, dados);
   }
   function apagarFoto(){
-    try { localStorage.removeItem(FOTO); } catch (e) {}
+    esquecer(FOTO);
   }
 
   // Recorte quadrado pelo centro: o avatar e redondo, e esticar a foto para
@@ -1791,12 +2318,11 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     entrada.value = "";
     if (!arquivo) return;
     reduzirFoto(arquivo).then(function(dados){
-      if (!guardarFoto(dados)){
-        recado("Não consegui guardar a foto: o armazenamento do navegador está cheio.");
-        return;
-      }
+      var onde = guardarFoto(dados);
       redesenhar();
-      recado("Foto atualizada. Ela fica só neste aparelho.");
+      recado(onde === "aparelho"
+        ? "Foto atualizada. Ela fica só neste aparelho."
+        : "Foto atualizada. Aqui na prévia ela vale enquanto esta página estiver aberta.");
     }).catch(function(erro){
       recado(erro.message === "nao-e-imagem"
         ? "Esse arquivo não é uma imagem. Escolha uma foto."
@@ -1806,7 +2332,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   function telaPerfil(){
     cabecalhoInterno("Apetit", "");
-    var p = (DADOS && DADOS.perfil) || {};
+    var p = pessoa();
 
     var cabeca = el("div", "perfil-topo");
     cabeca.appendChild(desenhaAvatar(p));
@@ -1894,24 +2420,39 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       });
       tela.appendChild(tirar);
     }
-    tela.appendChild(el("p", "legenda",
-      "A foto fica só neste aparelho. Ela não é enviada para a Apetit nem para a sua empresa."));
+    tela.appendChild(el("p", "legenda", guardaNoAparelho()
+      ? "A foto fica só neste aparelho. Ela não é enviada para a Apetit nem para a sua empresa."
+      : "A foto não sai daqui. Nesta prévia ela nem chega a ser gravada: vale só " +
+        "enquanto a página estiver aberta."));
 
-    secao("Conta");
+    secao("Cadastro");
     var conta = el("div", "pilha");
-    [{ nome: "Meus dados e privacidade", icone: "i-cadeado", busca: "Meus dados" },
-     { nome: "Refazer cadastro", icone: "i-atualizar", busca: "Refazer cadastro" }
-    ].forEach(function(c){
-      var alvoC = alvoDeRotulo(c.busca);
-      var b = el("button", "item");
-      b.appendChild(chip(c.icone, true));
-      b.appendChild(el("b", "", c.nome));
-      b.appendChild(icone("i-seta", "seta"));
-      if (alvoC) b.addEventListener("click", function(){ mostrar(alvoC); });
-      else b.disabled = true;
-      conta.appendChild(b);
-    });
+    // O cadastro e editavel aqui, na tela onde ele esta escrito. Enquanto nao
+    // existe um, o mesmo lugar oferece criar: quem entrou pelo exemplo ve os
+    // dados da Mariana e precisa de um caminho para trocar por si.
+    var temCadastro = !!cadastroSalvo();
+    conta.appendChild(itemDeConta(
+      temCadastro ? "Editar meu cadastro" : "Criar o meu cadastro",
+      temCadastro ? "i-lapis" : "i-pessoa",
+      function(){ comecarCadastro(temCadastro); }
+    ));
+    var privacidade = alvoDeRotulo("Meus dados");
+    if (privacidade){
+      conta.appendChild(itemDeConta("Meus dados e privacidade", "i-cadeado",
+        function(){ mostrar(privacidade); }));
+    }
+    if (temCadastro){
+      conta.appendChild(itemDeConta("Apagar meu cadastro deste aparelho", "i-proibido",
+        function(){ confirmarApagar(); }));
+    }
     tela.appendChild(conta);
+    if (temCadastro){
+      tela.appendChild(el("p", "legenda", guardaNoAparelho()
+        ? "Seu cadastro fica neste aparelho, como a foto. Nada dele é enviado para " +
+          "a sua empresa."
+        : "Nada do seu cadastro é enviado para a sua empresa. Nesta prévia ele " +
+          "também não é gravado: vale enquanto esta página estiver aberta."));
+    }
 
     // A area de gestao nao aparece para funcionario. No app de verdade quem
     // libera e `ADMIN_IDS` no servidor; aqui, sem servidor, a chave fica
@@ -1959,6 +2500,38 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       });
       tela.appendChild(dl);
     }
+  }
+
+  function itemDeConta(nome, ic, aoClicar){
+    var b = el("button", "item");
+    b.appendChild(chip(ic, true));
+    b.appendChild(el("b", "", escapar(nome)));
+    b.appendChild(icone("i-seta", "seta"));
+    b.addEventListener("click", aoClicar);
+    return b;
+  }
+
+  // Apagar o cadastro e irreversivel e nao tem desfazer: a folha pergunta antes,
+  // e diz o que vai embora com ele.
+  function confirmarApagar(){
+    abrirFolha(function(c){
+      c.appendChild(el("h2", "", "Apagar o seu cadastro?"));
+      c.appendChild(el("p", "", "Vão embora deste aparelho o seu nome, refeitório, " +
+        "empresa, setor, objetivo e as suas restrições. Não tem como desfazer."));
+      c.appendChild(el("p", "", "O app volta a mostrar o exemplo da Mariana, e você " +
+        "pode se cadastrar de novo quando quiser."));
+      var apagar = el("button", "cta forte");
+      apagar.appendChild(icone("i-proibido"));
+      apagar.appendChild(el("b", "", "Apagar o meu cadastro"));
+      apagar.addEventListener("click", function(){
+        apagarCadastro();
+        if (typeof folha.close === "function") folha.close();
+        historico.length = 0;
+        mostrar("boas_vindas", false);
+        recado("Cadastro apagado deste aparelho.");
+      });
+      c.appendChild(apagar);
+    });
   }
 
   function alvoDeRotulo(texto){
@@ -2015,8 +2588,14 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   var NATIVAS = {
     inicio: telaInicio, cardapio: telaCardapio, quanto: telaQuanto,
     avaliar: telaAvaliar, progresso: telaProgresso, perfil: telaPerfil,
-    gestao: telaGestao, estados: telaEstados
+    gestao: telaGestao, estados: telaEstados,
+    boas_vindas: telaBoasVindas, cadastro: telaCadastro
   };
+
+  // Telas de antes de existir cadastro. A navegacao inferior nao aparece nelas:
+  // levar para "Progresso" quem ainda nao se cadastrou mostraria o progresso de
+  // outra pessoa.
+  var SEM_ABAS = { boas_vindas: true, cadastro: true };
 
 
   // ---------- navegacao ----------
@@ -2061,6 +2640,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       telaDoBot(t);
     }
 
+    abas.hidden = !!SEM_ABAS[alvo];
     marcarAba(alvo);
     tela.scrollTop = 0;
     tela.focus({ preventScroll: true });
@@ -2413,7 +2993,9 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       TELAS = par[0];
       DADOS = par[1];
       estado.pontos = (DADOS && DADOS.progresso && DADOS.progresso.pontos) || 0;
-      mostrar("inicio", false);
+      // Primeira vez: cadastro. Depois, direto para o app — a boas-vindas some
+      // e nao volta a atrapalhar quem ja se cadastrou.
+      mostrar(cadastroSalvo() ? "inicio" : "boas_vindas", false);
     }).catch(falhou);
   }
 

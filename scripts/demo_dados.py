@@ -26,7 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "demo")
 
 import bot  # noqa: E402
-from apetit.allergens import ALLERGENS  # noqa: E402
+from apetit.allergens import ALLERGENS, Declaration, Restriction, check_item  # noqa: E402
+from apetit.catalog import item_allergens  # noqa: E402
 from apetit.feedback import MISSING_TAGS, SCALE  # noqa: E402
 from apetit.humanize import DIAS  # noqa: E402
 from apetit.humanize import (  # noqa: E402
@@ -68,26 +69,97 @@ def etiqueta(check) -> str:
     return ""
 
 
+def declaracoes_do_prato(conn, codigo: str) -> dict:
+    """O que a ficha do prato declara sobre cada alergenico da RDC 26/2015.
+
+    Alergenico que ninguem declarou sai como `nao_declarado` explicito, e nao
+    ausente: no navegador, chave faltando viraria `undefined`, e a unica coisa
+    pior que "nao sei" e um "nao sei" que parece um "pode".
+    """
+    declarado = item_allergens(conn, codigo)
+    return {
+        codigo_alergenico: declarado.get(codigo_alergenico, Declaration.NAO_DECLARADO).value
+        for codigo_alergenico in ALLERGENS
+    }
+
+
 def cardapio(pessoa) -> list[dict]:
     """O cardapio do dia, por categoria, com o veredito de cada prato."""
-    grupos: dict[str, list[dict]] = {}
-    for item in bot.load_menu(pessoa, DIA):
-        check = item["check"]
-        grupos.setdefault(item["category"], []).append({
-            "nome": clean_dish_name(item["name"]),
-            "veredito": MARCA.get(check.verdict.value, "atencao"),
-            "etiqueta": etiqueta(check),
-            "motivo": check.message() if check.verdict.value != "sem_restricao" else "",
-            "peso": dish_weight(item.get("kcal")),
-            "papel": dish_role(item["category"]),
-            "dica": dish_hint(item.get("kcal"), item.get("ptn_g")),
-            "kcal": item.get("kcal"),
-            "ptn": item.get("ptn_g"),
-        })
+    conn = bot.db()
+    try:
+        grupos: dict[str, list[dict]] = {}
+        for item in bot.load_menu(pessoa, DIA):
+            check = item["check"]
+            grupos.setdefault(item["category"], []).append({
+                "codigo": item["item_code"],
+                "declaracoes": declaracoes_do_prato(conn, item["item_code"]),
+                "nome": clean_dish_name(item["name"]),
+                "veredito": MARCA.get(check.verdict.value, "atencao"),
+                "etiqueta": etiqueta(check),
+                "motivo": check.message() if check.verdict.value != "sem_restricao" else "",
+                "peso": dish_weight(item.get("kcal")),
+                "papel": dish_role(item["category"]),
+                "dica": dish_hint(item.get("kcal"), item.get("ptn_g")),
+                "kcal": item.get("kcal"),
+                "ptn": item.get("ptn_g"),
+            })
+    finally:
+        conn.close()
     return [
         {"categoria": category_label(nome), "codigo": nome, "itens": grupos[nome]}
         for nome in order_categories(grupos)
     ]
+
+
+# Combinacoes usadas para provar que o navegador concorda com o Python.
+# Sao as que o cadastro do app consegue produzir: nenhuma, uma, duas e uma
+# larga. Alergia de texto livre nao entra porque a tela de cadastro oferece
+# lista, e o que ela nao oferece o app nao finge saber checar.
+COMBINACOES = (
+    [],
+    ["ovos"],
+    ["leite"],
+    ["gluten"],
+    ["ovos", "leite"],
+    ["gluten", "soja", "leite"],
+    ["amendoim", "castanhas", "peixes", "crustaceos"],
+)
+
+
+def conformidade(pessoa) -> list[dict]:
+    """O veredito que o Python da para cada combinacao, prato a prato.
+
+    O navegador precisa decidir o veredito sozinho: o cadastro e do proprio
+    funcionario, e a lista de alergias dele so existe no aparelho. Isso poe a
+    regra dos tres estados em dois lugares, que e exatamente o jeito de eles
+    discordarem um dia. Esta tabela e a trava: `scripts/conferir_vereditos.py`
+    roda o app num navegador de verdade e falha se um unico prato divergir.
+    """
+    conn = bot.db()
+    try:
+        codigos = [
+            linha["item_code"]
+            for linha in bot.load_menu(pessoa, DIA)
+        ]
+        declaradas = {c: item_allergens(conn, c) for c in codigos}
+    finally:
+        conn.close()
+
+    casos = []
+    for combinacao in COMBINACOES:
+        restricoes = [Restriction(c) for c in combinacao]
+        casos.append({
+            "restricoes": combinacao,
+            "vereditos": {
+                # Sem o `MARCA` de proposito: `sem_restricao` fica como esta.
+                # Quem nao declarou alergia nao pode ver o cardapio inteiro de
+                # verde — "liberado" afirma que alguem conferiu o prato para
+                # ela, e ninguem conferiu coisa nenhuma.
+                codigo: check_item(restricoes, declaradas[codigo]).verdict.value
+                for codigo in codigos
+            },
+        })
+    return casos
 
 
 def contagem(grupos: list[dict]) -> dict:
@@ -250,6 +322,10 @@ def perfil(pessoa) -> dict:
         "objetivo": pessoa.goal,
         "alvo": bot.target_for(pessoa),
         "restricoes": [ALLERGENS.get(r.allergen, r.allergen) for r in pessoa.restrictions],
+        # O nome e para ler; o codigo e para decidir. Quem abre a demonstracao
+        # sem se cadastrar ve o cardapio pelos olhos deste exemplo, e para isso
+        # o navegador precisa da mesma chave que as declaracoes do prato usam.
+        "restricoes_codigos": [r.allergen for r in pessoa.restrictions],
         "restricoes_livres": list(pessoa.free_restrictions),
         "evitar": list(pessoa.avoid_foods),
         "favoritos": guardados,
@@ -343,6 +419,11 @@ def main() -> int:
             },
             "cardapio": (pratos := cardapio(pessoa)),
             "contagem": contagem(pratos),
+            "conformidade": conformidade(pessoa),
+            "alergenicos": [{"codigo": c, "nome": n} for c, n in ALLERGENS.items()],
+            "objetivos": [
+                {"nome": nome, "alvo": alvo} for nome, alvo in bot.TARGETS.items()
+            ],
             "porcoes": porcoes(pessoa),
             "meu_dia": meu_dia(pessoa),
             "progresso": progresso(pessoa),

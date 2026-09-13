@@ -723,6 +723,54 @@ Os icones sao desenhados em codigo (`scripts/demo_icone.py`) em vez de virarem
 binario solto: da para mudar a cor numa linha, e o `maskable` sai com margem
 folgada porque o Android recorta o icone na forma do lancador.
 
+### O cadastro, na primeira vez e depois
+
+Quem abre o app pela primeira vez cai numa tela de boas-vindas e se cadastra do
+zero: nome, refeitório, empresa e setor, objetivo, alergias e o termo — os
+mesmos passos, na mesma ordem, com as mesmas palavras que o bot usa em
+`ask_name` até `ask_consent`. Depois disso o cadastro fica guardado e a pessoa
+edita quando quiser, no **Perfil → Editar meu cadastro**, ou apaga tudo ali
+mesmo.
+
+A tela de boas-vindas também oferece **"Só olhar, com o exemplo da Mariana"**.
+O link do piloto é compartilhado, e quem só quer conferir o app precisa
+conseguir, sem inventar um cadastro. O exemplo é dito com esse nome para
+ninguém confundir dado de exemplo com dado seu.
+
+**O cadastro muda o cardápio.** Os vereditos de alergênico não vêm prontos do
+Python: eles são calculados no navegador, contra a lista de quem está usando o
+app. Sem isso, quem se cadastrasse com outra alergia veria as cores da Mariana.
+Isso põe a regra dos três estados em dois lugares — `apetit/allergens.py` e o
+JavaScript de `demo/index.html` —, que é exatamente o jeito de os dois
+discordarem um dia sem ninguém ver. A trava é `dados.conformidade`: o Python
+calcula o veredito de cada prato para várias combinações de alergia, e
+
+```bash
+python scripts/conferir_vereditos.py
+```
+
+roda o app num navegador de verdade, se cadastra com cada combinação e falha se
+um único prato divergir. A comparação é feita pelo que chega na tela
+(`data-veredito` no botão do prato), e não pela função por dentro: o que importa
+é o aviso que a pessoa viu.
+
+Quem não declarou alergia **não** vê o cardápio inteiro de verde. `liberado`
+afirma que alguém conferiu o prato para ela, e ninguém conferiu; o estado fica
+`sem_restricao`, sem cor de segurança, e a tela diz por quê.
+
+### Onde o cadastro fica guardado
+
+Em `localStorage`, como a foto de perfil: esta demonstração não tem servidor, e
+inventar um "salvo na nuvem" seria prometer o que não existe. No app de verdade
+quem guarda é o banco do bot, com o mesmo `Employee`.
+
+Num quadro embutido — e é assim que a prévia chega para quem só recebeu o link —
+o navegador bloqueia o `localStorage` do endereço de dentro. Sem alternativa, o
+cadastro morreria no último passo, e com uma mensagem sobre espaço em disco que
+nem é o motivo. Então há dois lugares: o aparelho, quando dá, e a memória da
+aba, quando não dá. O app funciona nos dois. O que muda é o que ele pode
+prometer — e ele avisa **antes** dos seis passos, não depois.
+
 ### As cores, e por que o vermelho nao vai para todo lado
 
 A interface usa o **vermelho `#EC003F`** e o **amarelo `#F5D94E`** já presentes
@@ -737,9 +785,9 @@ reorganização visual não muda os vereditos nem as regras de pontuação.
 
 ### Prévia do visual, sem servidor
 
-Para ver todas as telas, abra [Apetit-oito-telas.html](preview/Apetit-oito-telas.html).
-A galeria é estática e permite conferir as oito telas mesmo em leitores de
-anexos sem JavaScript.
+Para ver todas as telas, abra [Apetit-telas.html](preview/Apetit-telas.html).
+A galeria é estática e vai do cadastro ao relatório, e permite conferir as telas
+mesmo em leitores de anexos sem JavaScript.
 
 Baixe e abra [Apetit-previa-referencia.html](preview/Apetit-previa-referencia.html) no
 navegador. É uma demonstração interativa com os mesmos dados de exemplo do
@@ -747,7 +795,7 @@ navegador. É uma demonstração interativa com os mesmos dados de exemplo do
 como PWA. Fontes e leitor de PDF dependem de conexão; a navegação usa os dados
 embutidos no arquivo, assim como as fotos ilustrativas.
 
-A tela inicial já vem montada no HTML e aparece mesmo em leitores de anexos
+A primeira tela já vem montada no HTML e aparece mesmo em leitores de anexos
 que não executam JavaScript, como a prévia do iPhone. Nesse modo, os botões
 não funcionam. Em um navegador com JavaScript, a demonstração é interativa.
 
@@ -756,7 +804,7 @@ interface ou os dados de exemplo, atualize-o a partir da raiz do repositório:
 
 ```bash
 npm ci --prefix scripts
-python scripts/demo_pagina.py --documento --telas preview/Apetit-oito-telas.html preview/Apetit-previa-referencia.html
+python scripts/demo_pagina.py --documento --telas preview/Apetit-telas.html preview/Apetit-previa-referencia.html
 ```
 
 Sem `--documento`, o script mantém o formato de fragmento para incorporação.
@@ -922,6 +970,8 @@ apetit/
   pilot.py       relatorio do piloto, sem individualizar ninguem
 bot.py           camada do Telegram
 demo/            PWA de demonstracao, instalavel no celular
+scripts/         gera as telas, os dados e os icones do demo;
+                 conferir_vereditos.py confere o app contra o Python
 LICENSE          todos os direitos reservados
 Dockerfile       imagem, com o banco em /data
 render.yaml      blueprint do Render, ja com disco persistente

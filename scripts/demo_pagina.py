@@ -1,7 +1,7 @@
 """Empacota a demonstracao numa pagina unica, para virar um link.
 
     python scripts/demo_pagina.py saida.html
-    python scripts/demo_pagina.py --documento --telas preview/Apetit-oito-telas.html preview/Apetit-previa-referencia.html
+    python scripts/demo_pagina.py --documento --telas preview/Apetit-telas.html preview/Apetit-previa-referencia.html
 
 O `demo/` e um PWA de varios arquivos: instala na tela inicial, guarda o
 shell em cache e busca `telas.json` e `dados.json` por HTTP. Isso exige um

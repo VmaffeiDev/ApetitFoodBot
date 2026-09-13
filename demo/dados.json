@@ -15,6 +15,18 @@
    "codigo": "PRATO PRINCIPAL",
    "itens": [
     {
+     "codigo": "carne_assada_ao_molho",
+     "declaracoes": {
+      "gluten": "nao_declarado",
+      "crustaceos": "nao_declarado",
+      "ovos": "nao_declarado",
+      "peixes": "nao_declarado",
+      "amendoim": "nao_declarado",
+      "soja": "nao_declarado",
+      "leite": "nao_declarado",
+      "castanhas": "nao_declarado",
+      "latex": "nao_declarado"
+     },
      "nome": "Carne assada ao molho",
      "veredito": "atencao",
      "etiqueta": "sem declaracao de leite e derivados, ovos",
@@ -32,6 +44,18 @@
    "codigo": "OPCAO AO PP",
    "itens": [
     {
+     "codigo": "ovo_cozido",
+     "declaracoes": {
+      "gluten": "nao_declarado",
+      "crustaceos": "nao_declarado",
+      "ovos": "contem",
+      "peixes": "nao_declarado",
+      "amendoim": "nao_declarado",
+      "soja": "nao_declarado",
+      "leite": "nao_declarado",
+      "castanhas": "nao_declarado",
+      "latex": "nao_declarado"
+     },
      "nome": "Ovo cozido",
      "veredito": "bloqueio",
      "etiqueta": "contem ovos",
@@ -49,6 +73,18 @@
    "codigo": "GUARNICAO",
    "itens": [
     {
+     "codigo": "macarrao_alho_e_oleo",
+     "declaracoes": {
+      "gluten": "contem",
+      "crustaceos": "nao_declarado",
+      "ovos": "nao_declarado",
+      "peixes": "nao_declarado",
+      "amendoim": "nao_declarado",
+      "soja": "pode_conter",
+      "leite": "nao_declarado",
+      "castanhas": "nao_declarado",
+      "latex": "nao_declarado"
+     },
      "nome": "Macarrao alho e oleo",
      "veredito": "atencao",
      "etiqueta": "sem declaracao de leite e derivados, ovos",
@@ -66,6 +102,18 @@
    "codigo": "ARROZ",
    "itens": [
     {
+     "codigo": "arroz_parboilizado",
+     "declaracoes": {
+      "gluten": "nao_declarado",
+      "crustaceos": "nao_declarado",
+      "ovos": "nao_declarado",
+      "peixes": "nao_declarado",
+      "amendoim": "nao_declarado",
+      "soja": "pode_conter",
+      "leite": "nao_declarado",
+      "castanhas": "nao_declarado",
+      "latex": "nao_declarado"
+     },
      "nome": "Arroz parboilizado",
      "veredito": "atencao",
      "etiqueta": "sem declaracao de leite e derivados, ovos",
@@ -83,6 +131,18 @@
    "codigo": "FEIJAO",
    "itens": [
     {
+     "codigo": "feijao_preto",
+     "declaracoes": {
+      "gluten": "nao_declarado",
+      "crustaceos": "nao_declarado",
+      "ovos": "nao_declarado",
+      "peixes": "nao_declarado",
+      "amendoim": "nao_declarado",
+      "soja": "nao_declarado",
+      "leite": "nao_declarado",
+      "castanhas": "nao_declarado",
+      "latex": "nao_declarado"
+     },
      "nome": "Feijao preto",
      "veredito": "atencao",
      "etiqueta": "sem declaracao de leite e derivados, ovos",
@@ -100,6 +160,18 @@
    "codigo": "SALADA",
    "itens": [
     {
+     "codigo": "sal_mix_de_alface",
+     "declaracoes": {
+      "gluten": "nao_declarado",
+      "crustaceos": "nao_declarado",
+      "ovos": "nao_contem",
+      "peixes": "nao_declarado",
+      "amendoim": "nao_declarado",
+      "soja": "nao_declarado",
+      "leite": "nao_contem",
+      "castanhas": "nao_declarado",
+      "latex": "nao_declarado"
+     },
      "nome": "Mix de alface",
      "veredito": "liberado",
      "etiqueta": "conferido para a sua ficha",
@@ -119,6 +191,171 @@
   "atencao": 4,
   "liberado": 1
  },
+ "conformidade": [
+  {
+   "restricoes": [],
+   "vereditos": {
+    "arroz_parboilizado": "sem_restricao",
+    "feijao_preto": "sem_restricao",
+    "macarrao_alho_e_oleo": "sem_restricao",
+    "ovo_cozido": "sem_restricao",
+    "carne_assada_ao_molho": "sem_restricao",
+    "sal_mix_de_alface": "sem_restricao"
+   }
+  },
+  {
+   "restricoes": [
+    "ovos"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "atencao",
+    "ovo_cozido": "bloqueio",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "liberado"
+   }
+  },
+  {
+   "restricoes": [
+    "leite"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "atencao",
+    "ovo_cozido": "atencao",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "liberado"
+   }
+  },
+  {
+   "restricoes": [
+    "gluten"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "bloqueio",
+    "ovo_cozido": "atencao",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "atencao"
+   }
+  },
+  {
+   "restricoes": [
+    "ovos",
+    "leite"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "atencao",
+    "ovo_cozido": "bloqueio",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "liberado"
+   }
+  },
+  {
+   "restricoes": [
+    "gluten",
+    "soja",
+    "leite"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "bloqueio",
+    "ovo_cozido": "atencao",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "atencao"
+   }
+  },
+  {
+   "restricoes": [
+    "amendoim",
+    "castanhas",
+    "peixes",
+    "crustaceos"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "atencao",
+    "ovo_cozido": "atencao",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "atencao"
+   }
+  }
+ ],
+ "alergenicos": [
+  {
+   "codigo": "gluten",
+   "nome": "Gluten (trigo, centeio, cevada, aveia)"
+  },
+  {
+   "codigo": "crustaceos",
+   "nome": "Crustaceos"
+  },
+  {
+   "codigo": "ovos",
+   "nome": "Ovos"
+  },
+  {
+   "codigo": "peixes",
+   "nome": "Peixes"
+  },
+  {
+   "codigo": "amendoim",
+   "nome": "Amendoim"
+  },
+  {
+   "codigo": "soja",
+   "nome": "Soja"
+  },
+  {
+   "codigo": "leite",
+   "nome": "Leite e derivados"
+  },
+  {
+   "codigo": "castanhas",
+   "nome": "Castanhas, nozes, amendoas e pistache"
+  },
+  {
+   "codigo": "latex",
+   "nome": "Latex natural"
+  }
+ ],
+ "objetivos": [
+  {
+   "nome": "Comer melhor no dia a dia",
+   "alvo": {
+    "kcal": 700,
+    "ptn": 30
+   }
+  },
+  {
+   "nome": "Manter o equilibrio",
+   "alvo": {
+    "kcal": 700,
+    "ptn": 30
+   }
+  },
+  {
+   "nome": "Comer mais leve",
+   "alvo": {
+    "kcal": 550,
+    "ptn": 25
+   }
+  },
+  {
+   "nome": "Reforcar a proteina",
+   "alvo": {
+    "kcal": 850,
+    "ptn": 45
+   }
+  }
+ ],
  "porcoes": {
   "itens": [
    {
@@ -264,6 +501,10 @@
   "restricoes": [
    "Leite e derivados",
    "Ovos"
+  ],
+  "restricoes_codigos": [
+   "leite",
+   "ovos"
   ],
   "restricoes_livres": [],
   "evitar": [],

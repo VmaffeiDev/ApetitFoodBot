@@ -184,7 +184,7 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .foto-refeicao{background-position:66.667% 100%}
 .fotos-nota{font-size:10px;color:var(--texto-2)}
 .filtros{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:1px 0 4px}
-.filtro{flex:1;min-height:38px;border:1px solid var(--linha-2);border-radius:var(--r-pill);padding:7px 10px;
+.filtro{flex:1;min-height:44px;border:1px solid var(--linha-2);border-radius:var(--r-pill);padding:7px 10px;
   background:var(--card);color:var(--texto-2);font-size:11px;cursor:pointer;white-space:nowrap}
 .filtro[aria-pressed="true"]{background:var(--vermelho);border-color:var(--vermelho);color:white;font-weight:600}
 .filtro:focus-visible{outline:2px solid var(--amarelo);outline-offset:-2px}
@@ -208,7 +208,7 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .resumo-progresso .placar-label{font-size:11px;line-height:1.4;max-width:9ch}
 .resumo-progresso .resumo-mensagem{flex:1;border-left:1px solid var(--linha-2);padding-left:15px;font-size:11px;line-height:1.5;color:var(--texto-2)}
 .periodos{display:flex;padding:3px;background:var(--card);border:1px solid var(--linha);border-radius:11px}
-.periodos .filtro{border-radius:8px;border:0;min-height:32px;background:transparent;padding:5px}
+.periodos .filtro{border-radius:8px;border:0;min-height:44px;background:transparent;padding:5px}
 .periodos .filtro[aria-pressed="true"]{background:var(--vermelho)}
 .discreto{border:1px solid var(--linha);border-radius:12px;background:var(--card);padding:11px 13px;font-size:12px;color:var(--texto-2)}
 .discreto summary{cursor:pointer;color:var(--texto);min-height:24px;font-weight:500}
@@ -402,7 +402,18 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 /* ---------- perfil ---------- */
 .perfil-topo{display:flex;align-items:center;gap:14px;padding:10px 0}
 .avatar{width:64px;height:64px;border-radius:50%;flex:none;display:grid;place-items:center;
-  background:linear-gradient(145deg,#77808D,#424954);border:2px solid #858D99;color:#fff;font-size:24px;font-weight:700}
+  background:linear-gradient(145deg,#77808D,#424954);border:2px solid #858D99;color:#fff;font-size:24px;font-weight:700;
+  position:relative;overflow:visible;padding:0;cursor:pointer;
+  transition:border-color var(--medio) var(--curva),transform var(--rapido) var(--curva)}
+.avatar:hover{border-color:var(--vermelho-alto)}
+.avatar:active{transform:scale(.97)}
+.avatar:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:3px}
+.avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+/* O selo da camera diz que o circulo e tocavel. Sem ele, a foto parece
+   decoracao e ninguem descobre que da para trocar. */
+.avatar .camera{position:absolute;right:-3px;bottom:-3px;width:24px;height:24px;border-radius:50%;
+  display:grid;place-items:center;background:var(--vermelho);border:2px solid var(--fundo);color:#fff}
+.avatar .camera .icone{width:12px;height:12px}
 
 .perfil-topo .quem{min-width:0}
 .perfil-topo .quem b{display:block;font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
@@ -459,6 +470,7 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .secao{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--texto-3);margin:22px 0 -4px}
 .tela > .secao:first-child{margin-top:0}
 .paragrafo{margin:0;font-size:var(--t-body);color:var(--texto)}
+.cartao > .paragrafo + .paragrafo{margin-top:12px}
 .paragrafo b{font-weight:700}
 .nota{margin:0;font-size:13px;color:var(--texto-2);line-height:1.55}
 .prosa{background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);padding:16px}
@@ -483,7 +495,23 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
   display:grid;place-items:center;color:transparent}
 .opcao.marcada .caixa{background:var(--vermelho);border-color:var(--vermelho);color:#fff}
 .opcao .caixa .icone{width:12px;height:12px;stroke-width:3}
+.opcao .txt{flex:1;min-width:0}
+.opcao .txt b{display:block;font-size:14px;font-weight:600}
+.opcao .txt span{display:block;font-size:12px;font-weight:400;color:var(--texto-2);margin-top:3px;line-height:1.45}
 .cabeca-tela{font-size:26px;font-weight:800;line-height:1.22;letter-spacing:-.03em}
+
+/* ---------- cadastro ---------- */
+.progresso-cadastro{height:4px;border-radius:2px;background:var(--card-3);overflow:hidden;margin-bottom:20px}
+.progresso-cadastro .feito{height:100%;background:var(--vermelho);border-radius:2px;
+  transition:width var(--medio) var(--curva)}
+.campo-texto{margin-top:14px}
+.campo-texto label{display:block;font-size:12px;font-weight:600;color:var(--texto-2);margin-bottom:6px}
+/* 16px nao e capricho: abaixo disso o Safari do iPhone da zoom ao focar o
+   campo, e a tela inteira sai de lugar no meio do cadastro. */
+.campo-texto input{width:100%;min-height:56px;font:inherit;font-size:16px;color:var(--texto);
+  background:var(--card);border:1px solid var(--linha-2);border-radius:var(--r-card);padding:0 16px}
+.campo-texto input::placeholder{color:var(--texto-3)}
+.campo-texto input:focus{border-color:var(--vermelho-alto);outline:2px solid var(--vermelho-alto);outline-offset:1px}
 
 /* ---------- acoes no rodape ---------- */
 .acoes{flex:none;display:flex;flex-direction:column;gap:7px;padding:10px var(--pad);max-height:38dvh;overflow-y:auto;
@@ -499,6 +527,10 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 
 /* ---------- navegacao inferior ---------- */
 .abas{flex:none;display:flex;background:var(--fundo);border-top:1px solid var(--linha-2);padding:7px 8px 6px;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+/* No cadastro a navegacao sai: um toque numa aba abandonaria o rascunho sem
+   avisar. O `display:flex` acima vence o `[hidden]` do navegador, por isso a
+   regra explicita. */
+.abas[hidden]{display:none}
 .aba{flex:1;min-width:0;min-height:55px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
   padding:7px 3px;background:transparent;border:0;cursor:pointer;font-size:10px;color:var(--texto-3)}
 .aba .icone{width:21px;height:21px}
@@ -573,7 +605,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 </style>
 </head>
 <body>
-<script>window.__APETIT__ = {"telas":{"inicio":{"texto":"🍽️ \u003cb>Ola, Mariana!\u003c/b>","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":[]},"quanto":{"texto":"🍽️ \u003cb>Quanto pegar hoje\u003c/b>\n\u003ci>segunda-feira, 1 de setembro · objetivo: Manter o equilibrio\u003c/i>\n\n• 2 porcoes de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 2 colheres de Arroz parboilizado\n• 1 concha de Feijao preto\n• Mix de alface a vontade\n\nIsso da 703 kcal e 33 g de proteina. E a sua meta do dia.\n\n\u003ci>E uma sugestao com base no que tem hoje e no objetivo que voce escolheu. Quem define quantidade individual e o nutricionista.\u003c/i>","botoes":[{"rotulo":"✅ Vou pegar isso — registrar","acao":"registrar_sugestao","destino":"registrar_sugestao__"},{"rotulo":"🍽️ Montar do meu jeito","acao":"montar","destino":"montar"},{"rotulo":"📅 Ver cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["quanto"]},"montar":{"texto":"\u003cb>Passo 1 de 6\u003c/b> · Prato principal\n\nToque no que voce pegou:\n⬜ CARNE ASSADA AO MOLHO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"⬜ CARNE ASSADA AO MOLHO","acao":"pick:carne_assada_ao_molho","destino":"pick:carne_assada_ao_molho"},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar"]},"cardapio":{"texto":"📅 \u003cb>segunda-feira, 1 de setembro\u003c/b>\n\n\u003cb>Prato principal\u003c/b>\n⚠️ CARNE ASSADA AO MOLHO — \u003ci>moderado\u003c/i>\n\n\u003cb>Opcao ao prato principal\u003c/b>\n⛔ OVO COZIDO — \u003ci>leve\u003c/i>\n    \u003cb>Nao pode: Ovos\u003c/b>\n\n\u003cb>Guarnicao\u003c/b>\n⚠️ MACARRAO ALHO E OLEO — \u003ci>moderado\u003c/i>\n\n\u003cb>Arroz\u003c/b>\n⚠️ ARROZ PARBOILIZADO — \u003ci>moderado\u003c/i>\n\n\u003cb>Feijao\u003c/b>\n⚠️ FEIJAO PRETO — \u003ci>leve\u003c/i>\n\n\u003cb>Salada\u003c/b>\n✅ SAL. MIX DE ALFACE — \u003ci>leve\u003c/i>\n\n⚠️ \u003cb>4 prato(s) sem informacao de alergenico.\u003c/b> Nao consigo garantir que sao seguros para voce — pergunte no balcao antes de se servir.","botoes":[{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["cardapio"]},"avaliar":{"texto":"⭐ \u003cb>Como foi o almoco de hoje?\u003c/b>\n\u003ci>SM · segunda-feira, 1 de setembro\u003c/i>\n\n\u003cb>A comida estava boa?\u003c/b>\n\n\u003ci>Sua resposta vai sem o seu nome. A Apetit ve como o refeitorio esta indo, nunca quem disse o que — nem a sua empresa, nem o seu setor.\u003c/i>","botoes":[{"rotulo":"😋 Boa","acao":"aval_comida:3","destino":"aval_comida:3"},{"rotulo":"😐 Regular","acao":"aval_comida:2","destino":""},{"rotulo":"😞 Ruim","acao":"aval_comida:1","destino":""},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["avaliar"]},"progresso":{"texto":"📈 \u003cb>Meu progresso\u003c/b>\n\nVoce ainda nao registrou nenhuma refeicao esta semana.\n\n\u003cb>Minhas conquistas:\u003c/b>\n• Atingiu a meta de proteina do dia — 1x\n• Registrou a refeicao — 1x\n• Incluiu salada ou fruta no prato — 1x\n\n\u003cb>25 pontos\u003c/b> acumulados.\n\n\u003ci>Isso e so seu. Nao existe ranking, e ninguem compara voce com colega nenhum.\u003c/i>","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["progresso"]},"ficha":{"texto":"📋 \u003cb>Ficha do nutricionista\u003c/b>\n\nSe voce faz acompanhamento com nutricionista e tem uma ficha com os seus numeros, eu passo a seguir \u003cb>ela\u003c/b> em vez do objetivo generico que voce escolheu no cadastro.\n\nMande a ficha aqui em \u003cb>PDF\u003c/b> e eu leio. Voce confere tudo o que eu entendi antes de valer.\n\n\u003cb>O arquivo nao fica guardado.\u003c/b> Eu tiro os numeros, voce confirma, e o documento e descartado — ficha costuma trazer peso e historico, e disso eu nao preciso.\n\nSe a sua ficha for foto ou papel, da para digitar os numeros.","botoes":[{"rotulo":"📎 Mandar a ficha em PDF","acao":"ficha_pdf","destino":"ficha_pdf"},{"rotulo":"✍️ Digitar os numeros","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha"]},"meu_dia":{"texto":"📊 \u003cb>Meu dia\u003c/b>\n\nVoce ainda nao registrou o almoco de hoje.\n\nToque em \u003cb>Quanto pegar hoje\u003c/b> e depois em \u003cb>Vou pegar isso\u003c/b> — assim fica guardado no seu historico.\n\n📆 \u003cb>Seu historico\u003c/b>\n\n\u003ci>sexta-feira, 29 de agosto\u003c/i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador","botoes":[{"rotulo":"🍽️ Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["meu_dia"]},"favoritos":{"texto":"⭐ \u003cb>Voce ainda nao guardou nenhum prato.\u003c/b>\n\nDepois de montar o prato, toque em \u003cb>Guardar um prato\u003c/b>. Quando ele voltar ao cardapio, eu te aviso.","botoes":[{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["favoritos"]},"perfil":{"texto":"👤 \u003cb>Meu cadastro\u003c/b>\n\n\u003cb>Nome:\u003c/b> Mariana\n\u003cb>Refeitorio:\u003c/b> SM\n\u003cb>Empresa:\u003c/b> Industria Exemplo\n\u003cb>Setor:\u003c/b> Producao\n\u003cb>Objetivo:\u003c/b> Manter o equilibrio\n\u003cb>Restricoes:\u003c/b> Leite e derivados, Ovos","botoes":[{"rotulo":"✏️ Refazer cadastro","acao":"recadastrar","destino":""},{"rotulo":"🔒 Meus dados","acao":"meus_dados","destino":"meus_dados"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["perfil"]},"avisos":{"texto":"🔔 \u003cb>Avisos\u003c/b>\n\nToque para ligar ou desligar. Da para mudar quando quiser.\n\n\u003cb>Resumo da semana\u003c/b> — na sexta eu te mando quantos dias voce registrou e o que voce conquistou. So sobre voce: nao existe ranking e sua empresa nao ve nada disso.\n\n\u003cb>Lembrete do almoco\u003c/b> — um toque no seu ombro na hora do almoco, so nos dias em que voce ainda nao registrou.\n\n\u003ci>Eu nunca comento o que voce comeu.\u003c/i>","botoes":[{"rotulo":"☑️ Resumo da minha semana (sexta)","acao":"aviso:resumo_semanal","destino":""},{"rotulo":"⬜ Lembrete de registrar o almoco","acao":"aviso:lembrete_almoco","destino":""},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["avisos"]},"ajuda":{"texto":"❓ \u003cb>Como usar\u003c/b>\n\n\u003cb>Quanto pegar hoje\u003c/b> — eu digo quantas conchas e colheres pegar de cada coisa para chegar no seu objetivo, com o cardapio de hoje. Se voce pegar o que eu sugeri, toque em \u003cb>Vou pegar isso\u003c/b> e ja fica guardado.\n\n\u003cb>Montar meu prato\u003c/b> — eu te levo pela fila, uma categoria por vez. Voce toca no que pegou e eu mostro como ficou o prato.\n\n\u003cb>Cardapio de hoje\u003c/b> — o que tem hoje, com aviso do que voce nao pode comer.\n\n\u003cb>Meu dia\u003c/b> — o que voce registrou hoje e nos dias anteriores, com quanto pegou de cada coisa. Registrar de novo no mesmo dia substitui o registro anterior.\n\n\u003cb>Favoritos\u003c/b> — pratos que voce gostou. Aviso quando voltarem.\n\n\u003cb>Meu progresso\u003c/b> — sua sequencia e suas conquistas. So suas.\n\n\u003cb>Minha ficha\u003c/b> — se voce faz acompanhamento com nutricionista, mande a ficha em PDF (ou digite os numeros) e eu passo a seguir \u003cb>ela\u003c/b> em vez do objetivo generico. Voce confere tudo o que eu li antes de valer, e o arquivo nao fica guardado: so os numeros que voce confirmar.\n\n\u003cb>Avaliar o refeitorio\u003c/b> — tres toques dizendo como foi a comida, o atendimento e se faltou algo. \u003cb>Vai sem o seu nome:\u003c/b> a Apetit ve como o refeitorio esta indo, nunca quem disse o que — nem a sua empresa, nem o seu setor. E a unica coisa do app que sai de voce.\n\n\u003cb>Avisos\u003c/b> — na sexta eu te mando o resumo da sua semana, e se voce quiser eu te lembro de registrar o almoco. Eu nunca comento o que voce comeu, e voce liga e desliga em /avisos quando quiser.\n\n\u003cb>Sobre os simbolos\u003c/b>\n⛔ contem algo que voce marcou como alergia\n⚠️ sem informacao de alergenico — pergunte no balcao\n✅ conferido e liberado para voce\n\nSeus dados sao seus: /meus_dados mostra tudo, /excluir_dados apaga tudo. Sua empresa nao ve nada disso sobre voce.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["ajuda"]},"registrar_sugestao":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• 2 porcoes de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 2 colheres de Arroz parboilizado\n• 1 concha de Feijao preto\n• Mix de alface a vontade\n\n\u003ci>703 kcal · 33 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\n🌱 \u003cb>Voce conquistou hoje:\u003c/b>\n• Registrou a refeicao\n• Incluiu salada ou fruta no prato\n• Atingiu a meta de proteina do dia\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.\n\nComo foi o refeitorio hoje? Leva tres toques.","botoes":[{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["quanto","registrar_sugestao"]},"menu":{"texto":"O que voce quer fazer?","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["quanto","menu"]},"pick:carne_assada_ao_molho":{"texto":"\u003cb>Passo 1 de 6\u003c/b> · Prato principal\n\nToque no que voce pegou:\n☑️ CARNE ASSADA AO MOLHO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"☑️ CARNE ASSADA AO MOLHO","acao":"pick:carne_assada_ao_molho","destino":"pick:carne_assada_ao_molho"},{"rotulo":"Proximo ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","pick:carne_assada_ao_molho"]},"flow_next":{"texto":"\u003cb>Passo 2 de 6\u003c/b> · Opcao ao prato principal\n\nToque no que voce pegou:\n⛔ \u003cs>OVO COZIDO\u003c/s> — \u003cb>contem Ovos\u003c/b>","botoes":[{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next"]},"flow_fim":{"texto":"Seu prato esta vazio.\n\nQuer comecar de novo?","botoes":[{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","flow_fim"]},"aval_comida:3":{"texto":"⭐ \u003cb>E o atendimento?\u003c/b>\n\n\u003ci>Como voce foi tratado no balcao e na fila.\u003c/i>","botoes":[{"rotulo":"😋 Boa","acao":"aval_atend:3","destino":"aval_atend:3"},{"rotulo":"😐 Regular","acao":"aval_atend:2","destino":""},{"rotulo":"😞 Ruim","acao":"aval_atend:1","destino":""},{"rotulo":"← Voltar","acao":"avaliar","destino":"avaliar"}],"caminho":["avaliar","aval_comida:3"]},"progresso_":{"texto":"📈 \u003cb>Meu progresso\u003c/b>\n\nVoce registrou 1 de 5 dias desta semana.\n\n\u003cb>Minhas conquistas:\u003c/b>\n• Atingiu a meta de proteina do dia — 2x\n• Registrou a refeicao — 2x\n• Incluiu salada ou fruta no prato — 2x\n\n\u003cb>50 pontos\u003c/b> acumulados.\n\n\u003ci>Isso e so seu. Nao existe ranking, e ninguem compara voce com colega nenhum.\u003c/i>","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["progresso","progresso"]},"meu_dia_":{"texto":"📊 \u003cb>Meu dia\u003c/b>\n\nPrato alinhado com o seu objetivo de hoje.\nProteina do dia atingida: 33 g.\n\n• Arroz parboilizado — 2 colheres\n• Carne assada ao molho — 2 porcoes\n• Feijao preto — 1 concha\n• Macarrao alho e oleo — 1 colher\n• Mix de alface — 1 pegador\n\n\u003ci>703 kcal · 33 g de proteina\u003c/i>\n\n📆 \u003cb>Seu historico\u003c/b>\n\n\u003ci>sexta-feira, 29 de agosto\u003c/i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador","botoes":[{"rotulo":"✏️ Corrigir o de hoje","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["progresso","meu_dia"]},"ficha_pdf":{"texto":"📎 \u003cb>Mande o PDF da sua ficha\u003c/b>\n\nAqui mesmo nesta conversa:\n\n1. toque no \u003cb>clipe 📎\u003c/b> ao lado de onde voce escreve\n2. escolha \u003cb>Arquivo\u003c/b> e ache o PDF da sua ficha\n3. envie\n\nEu leio e te mostro o que entendi, numero por numero, antes de valer.\n\n\u003cb>O arquivo nao fica guardado.\u003c/b>\n\n\u003ci>Se a ficha for foto ou papel digitalizado, eu nao consigo ler a letra da imagem — nesse caso, digite os numeros.\u003c/i>","botoes":[{"rotulo":"📎 Anexar ficha_nutricionista.pdf","acao":"__anexar_pdf__","destino":"__anexar_pdf__"},{"rotulo":"✍️ Digitar os numeros","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🔙 Voltar","acao":"ficha","destino":"ficha"}],"caminho":["ficha","ficha_pdf"]},"ficha_manual":{"texto":"🤔 \u003cb>Esses numeros sao do dia inteiro ou so do almoco?\u003c/b>\n\nE a diferenca que mais importa aqui. Se eu tratar o total do dia como se fosse o almoco, eu vou te mandar comer o dia inteiro num prato so.\n\nSe voce nao tiver certeza, \u003cb>pergunte ao seu nutricionista\u003c/b> — ele e quem reparte o dia entre as refeicoes.","botoes":[{"rotulo":"🍽️ E so do almoco","acao":"ficha_escopo:almoco","destino":"ficha_escopo:almoco_"},{"rotulo":"📅 E do dia inteiro","acao":"ficha_escopo:dia","destino":"ficha_escopo:dia_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual"]},"meus_dados":{"texto":"🔒 \u003cb>Tudo o que eu guardo sobre voce\u003c/b>\n\n\u003cb>Nome:\u003c/b> Mariana\n\u003cb>Refeitorio:\u003c/b> SM\n\u003cb>Empresa:\u003c/b> Industria Exemplo\n\u003cb>Setor:\u003c/b> Producao\n\u003cb>Objetivo:\u003c/b> Manter o equilibrio\n\u003cb>Restricoes:\u003c/b> Leite e derivados, Ovos\n\u003cb>Aceite:\u003c/b> 2026-09-12T21:35:49+00:00\n\n\u003cb>Dias com refeicao registrada:\u003c/b> 2\n\u003cb>Pratos guardados:\u003c/b> 0\n\u003cb>Pontos:\u003c/b> 50\n\u003cb>Avaliacoes do refeitorio:\u003c/b> 0\n\n\u003cb>Sua empresa nao ve nada disso sobre voce.\u003c/b>\nA unica coisa que sai daqui e a avaliacao do refeitorio — e ela vai sem o seu nome, sem a sua empresa e sem o seu setor, junto com a de todo mundo. A Apetit ve como o refeitorio esta indo, nunca quem disse o que.\n\nPara apagar tudo: /excluir_dados","botoes":[{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["perfil","meus_dados"]},"flow_fim_":{"texto":"🍽️ \u003cb>Seu prato\u003c/b>\n\n• CARNE ASSADA AO MOLHO\n\nPrato leve para o seu objetivo de hoje.\nFaltam 18 g de proteina para o seu alvo.\nSem salada nem fruta no prato — vale somar uma.\n\n\u003ci>134 kcal · 2 g carboidrato · 9 g gordura · 12 g proteina\u003c/i>","botoes":[{"rotulo":"✅ Registrar este prato","acao":"registrar","destino":"registrar__"},{"rotulo":"✏️ Mudar o prato","acao":"montar","destino":"montar"},{"rotulo":"⭐ Guardar um prato","acao":"fav_lista","destino":"fav_lista"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim"]},"flow_next_":{"texto":"\u003cb>Passo 3 de 6\u003c/b> · Guarnicao\n\nToque no que voce pegou:\n⬜ MACARRAO ALHO E OLEO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"⬜ MACARRAO ALHO E OLEO","acao":"pick:macarrao_alho_e_oleo","destino":"pick:macarrao_alho_e_oleo"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next"]},"aval_atend:3":{"texto":"⭐ \u003cb>Faltou alguma coisa?\u003c/b>","botoes":[{"rotulo":"👍 Nao, estava tudo la","acao":"aval_faltou:nao","destino":"aval_faltou:nao"},{"rotulo":"👎 Sim, faltou","acao":"aval_faltou:sim","destino":"aval_faltou:sim"}],"caminho":["avaliar","aval_comida:3","aval_atend:3"]},"__anexar_pdf__":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n☑️ \u003cb>Calorias:\u003c/b> 1800 kcal \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “VET: 1800 kcal/dia”\u003c/i>\n☑️ \u003cb>Proteina:\u003c/b> 90 g \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “PTN: 90 g/dia”\u003c/i>\n\n⛔ \u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Vou marcar no cardapio quando aparecer no nome do prato.\u003c/i>\n\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"☑️ Calorias 1800 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"☑️ Proteina 90 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__"]},"ficha_escopo:almoco":{"texto":"📋 \u003cb>Vai ficar assim\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 600 kcal\n\u003cb>Proteina no almoco:\u003c/b> 35 g\n\n\u003cb>A partir daqui eu sigo esses numeros\u003c/b> no lugar do objetivo do cadastro.\n\u003ci>Guardo so os numeros. O documento nao fica.\u003c/i>","botoes":[{"rotulo":"✅ Confirmar","acao":"ficha_ok","destino":"ficha_ok___"},{"rotulo":"🔙 Rever o que eu li","acao":"ficha_rever","destino":"ficha_rever"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco"]},"ficha_escopo:dia":{"texto":"📋 \u003cb>Vai ficar assim\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 210 kcal\n\u003cb>Proteina no almoco:\u003c/b> 12 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\n\u003ci>Repartir o dia entre as refeicoes e decisao do seu nutricionista. Os 35% sao a proporcao usual do almoco — se ele te passou outra, me diga digitando os numeros do almoco.\u003c/i>\n\n\u003cb>A partir daqui eu sigo esses numeros\u003c/b> no lugar do objetivo do cadastro.\n\u003ci>Guardo so os numeros. O documento nao fica.\u003c/i>","botoes":[{"rotulo":"✅ Confirmar","acao":"ficha_ok","destino":"ficha_ok___"},{"rotulo":"🔙 Rever o que eu li","acao":"ficha_rever","destino":"ficha_rever"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:dia"]},"registrar":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• CARNE ASSADA AO MOLHO\n\n\u003ci>134 kcal · 12 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.\n\nComo foi o refeitorio hoje? Leva tres toques.","botoes":[{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","registrar"]},"fav_lista":{"texto":"⭐ \u003cb>Qual prato voce quer guardar?\u003c/b>","botoes":[{"rotulo":"CARNE ASSADA AO MOLHO","acao":"fav:carne_assada_ao_molho","destino":"fav:carne_assada_ao_molho"},{"rotulo":"🔙 Voltar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","fav_lista"]},"pick:macarrao_alho_e_oleo":{"texto":"\u003cb>Passo 3 de 6\u003c/b> · Guarnicao\n\nToque no que voce pegou:\n☑️ MACARRAO ALHO E OLEO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"☑️ MACARRAO ALHO E OLEO","acao":"pick:macarrao_alho_e_oleo","destino":"pick:macarrao_alho_e_oleo"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Proximo ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","pick:macarrao_alho_e_oleo"]},"flow_next__":{"texto":"\u003cb>Passo 4 de 6\u003c/b> · Arroz\n\nToque no que voce pegou:\n⬜ ARROZ PARBOILIZADO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"⬜ ARROZ PARBOILIZADO","acao":"pick:arroz_parboilizado","destino":"pick:arroz_parboilizado"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","flow_next"]},"aval_faltou:nao":{"texto":"⭐ \u003cb>Quer contar mais alguma coisa?\u003c/b>\n\nEscreva o que quiser sobre o refeitorio de hoje, ou toque em pular.\n\n\u003ci>O texto chega a Apetit sem o seu nome. Ainda assim, evite escrever algo que so voce diria — e evite citar colega pelo nome.\u003c/i>","botoes":[{"rotulo":"Pular e enviar","acao":"aval_enviar","destino":"aval_enviar"}],"caminho":["avaliar","aval_comida:3","aval_atend:3","aval_faltou:nao"]},"aval_faltou:sim":{"texto":"⭐ \u003cb>O que faltou?\u003c/b>\n\nPode marcar mais de um.","botoes":[{"rotulo":"⬜ Acabou antes de eu chegar","acao":"aval_tag:acabou","destino":""},{"rotulo":"⬜ Pouca quantidade","acao":"aval_tag:pouca_quantidade","destino":""},{"rotulo":"⬜ Nada que eu pudesse comer","acao":"aval_tag:sem_opcao_restricao","destino":""},{"rotulo":"⬜ Faltou talher, prato ou copo","acao":"aval_tag:faltou_utensilio","destino":""},{"rotulo":"⬜ Faltou bebida","acao":"aval_tag:faltou_bebida","destino":""},{"rotulo":"⬜ Comida fria","acao":"aval_tag:comida_fria","destino":""},{"rotulo":"Continuar ➡️","acao":"aval_comentario","destino":""}],"caminho":["avaliar","aval_comida:3","aval_atend:3","aval_faltou:sim"]},"ficha_campo:kcal":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n⬜ \u003cb>Calorias:\u003c/b> 1800 kcal \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “VET: 1800 kcal/dia”\u003c/i>\n☑️ \u003cb>Proteina:\u003c/b> 90 g \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “PTN: 90 g/dia”\u003c/i>\n\n⛔ \u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Vou marcar no cardapio quando aparecer no nome do prato.\u003c/i>\n\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"⬜ Calorias 1800 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"☑️ Proteina 90 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_campo:kcal"]},"ficha_campo:ptn_g":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n☑️ \u003cb>Calorias:\u003c/b> 1800 kcal \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “VET: 1800 kcal/dia”\u003c/i>\n⬜ \u003cb>Proteina:\u003c/b> 90 g \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “PTN: 90 g/dia”\u003c/i>\n\n⛔ \u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Vou marcar no cardapio quando aparecer no nome do prato.\u003c/i>\n\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"☑️ Calorias 1800 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"⬜ Proteina 90 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_campo:ptn_g"]},"ficha_escopo":{"texto":"🤔 \u003cb>Esses numeros sao do dia inteiro ou so do almoco?\u003c/b>\n\nE a diferenca que mais importa aqui. Pelo que eu li, parece ser do dia inteiro. Se eu tratar o total do dia como se fosse o almoco, eu vou te mandar comer o dia inteiro num prato so.\n\nSe voce nao tiver certeza, \u003cb>pergunte ao seu nutricionista\u003c/b> — ele e quem reparte o dia entre as refeicoes.","botoes":[{"rotulo":"🍽️ E so do almoco","acao":"ficha_escopo:almoco","destino":"ficha_escopo:almoco_"},{"rotulo":"📅 E do dia inteiro","acao":"ficha_escopo:dia","destino":"ficha_escopo:dia_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo"]},"ficha_ok":{"texto":"✅ \u003cb>Ficha guardada.\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 600 kcal\n\u003cb>Proteina no almoco:\u003c/b> 35 g\n\nToque em \u003cb>Quanto pegar hoje\u003c/b> para ver o almoco pela sua ficha.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_ok"]},"ficha_rever":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n☑️ \u003cb>Calorias:\u003c/b> 600 kcal\n     \u003ci>li de: “voce digitou”\u003c/i>\n☑️ \u003cb>Proteina:\u003c/b> 35 g\n     \u003ci>li de: “voce digitou”\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"☑️ Calorias 600 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"☑️ Proteina 35 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_rever"]},"ficha_cancelar":{"texto":"📋 \u003cb>Sua ficha do nutricionista\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 600 kcal\n\u003cb>Proteina no almoco:\u003c/b> 35 g\n\n\u003ci>Confirmada por voce em 2026-09-12.\u003c/i>\n\u003ci>O documento nao ficou guardado, so estes numeros.\u003c/i>","botoes":[{"rotulo":"📎 Mandar outra ficha em PDF","acao":"ficha_pdf","destino":"ficha_pdf"},{"rotulo":"✍️ Digitar os numeros de novo","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🗑️ Remover a ficha","acao":"ficha_remover","destino":"ficha_remover"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_cancelar"]},"ficha_ok_":{"texto":"✅ \u003cb>Ficha guardada.\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 210 kcal\n\u003cb>Proteina no almoco:\u003c/b> 12 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\nToque em \u003cb>Quanto pegar hoje\u003c/b> para ver o almoco pela sua ficha.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:dia","ficha_ok"]},"ficha_cancelar_":{"texto":"📋 \u003cb>Sua ficha do nutricionista\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 210 kcal\n\u003cb>Proteina no almoco:\u003c/b> 12 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\n\u003ci>Confirmada por voce em 2026-09-12.\u003c/i>\n\u003ci>O documento nao ficou guardado, so estes numeros.\u003c/i>","botoes":[{"rotulo":"📎 Mandar outra ficha em PDF","acao":"ficha_pdf","destino":"ficha_pdf"},{"rotulo":"✍️ Digitar os numeros de novo","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🗑️ Remover a ficha","acao":"ficha_remover","destino":"ficha_remover"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:dia","ficha_cancelar"]},"meu_dia__":{"texto":"📊 \u003cb>Meu dia\u003c/b>\n\nPrato leve para o seu objetivo de hoje.\nProteina do dia atingida: 12 g.\nSem salada nem fruta no prato — vale somar uma.\n\n• Carne assada ao molho — 1 porcao\n\n\u003ci>134 kcal · 12 g de proteina\u003c/i>\n\n📆 \u003cb>Seu historico\u003c/b>\n\n\u003ci>sexta-feira, 29 de agosto\u003c/i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador","botoes":[{"rotulo":"✏️ Corrigir o de hoje","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","registrar","meu_dia"]},"fav:carne_assada_ao_molho":{"texto":"⭐ Guardado! Te aviso quando esse prato voltar ao cardapio.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","fav_lista","fav:carne_assada_ao_molho"]},"flow_fim__":{"texto":"🍽️ \u003cb>Seu prato\u003c/b>\n\n• CARNE ASSADA AO MOLHO\n\nPrato leve para o seu objetivo de hoje.\nProteina do dia atingida: 12 g.\nSem salada nem fruta no prato — vale somar uma.\n\n\u003ci>134 kcal · 2 g carboidrato · 9 g gordura · 12 g proteina\u003c/i>","botoes":[{"rotulo":"✅ Registrar este prato","acao":"registrar","destino":"registrar__"},{"rotulo":"✏️ Mudar o prato","acao":"montar","destino":"montar"},{"rotulo":"⭐ Guardar um prato","acao":"fav_lista","destino":"fav_lista"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","fav_lista","flow_fim"]},"flow_fim___":{"texto":"🍽️ \u003cb>Seu prato\u003c/b>\n\n• MACARRAO ALHO E OLEO\n\nPrato leve para o seu objetivo de hoje.\nFaltam 10 g de proteina para o seu alvo.\nSem salada nem fruta no prato — vale somar uma.\n\n\u003ci>126 kcal · 18 g carboidrato · 5 g gordura · 2 g proteina\u003c/i>","botoes":[{"rotulo":"✅ Registrar este prato","acao":"registrar","destino":"registrar__"},{"rotulo":"✏️ Mudar o prato","acao":"montar","destino":"montar"},{"rotulo":"⭐ Guardar um prato","acao":"fav_lista","destino":"fav_lista"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","flow_next","flow_next","pick:macarrao_alho_e_oleo","flow_fim"]},"pick:arroz_parboilizado":{"texto":"\u003cb>Passo 4 de 6\u003c/b> · Arroz\n\nToque no que voce pegou:\n☑️ ARROZ PARBOILIZADO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"☑️ ARROZ PARBOILIZADO","acao":"pick:arroz_parboilizado","destino":"pick:arroz_parboilizado"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Proximo ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","flow_next","pick:arroz_parboilizado"]},"flow_next___":{"texto":"\u003cb>Passo 5 de 6\u003c/b> · Feijao\n\nToque no que voce pegou:\n⬜ FEIJAO PRETO — \u003ci>leve\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"⬜ FEIJAO PRETO","acao":"pick:feijao_preto","destino":"pick:feijao_preto"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","flow_next","flow_next"]},"aval_enviar":{"texto":"✅ \u003cb>Obrigado!\u003c/b>\n\nSua avaliacao de hoje foi registrada.\n\n\u003cb>Comida:\u003c/b> Bom\n\u003cb>Atendimento:\u003c/b> Bom\n\n\u003ci>Isso entra na media do refeitorio, sem o seu nome. Se quiser mudar, e so avaliar de novo hoje — a nova substitui esta.\u003c/i>","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["avaliar","aval_comida:3","aval_atend:3","aval_faltou:nao","aval_enviar"]},"ficha_campo:ptn_g_":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n⬜ \u003cb>Calorias:\u003c/b> 1800 kcal \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “VET: 1800 kcal/dia”\u003c/i>\n⬜ \u003cb>Proteina:\u003c/b> 90 g \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “PTN: 90 g/dia”\u003c/i>\n\n⛔ \u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Vou marcar no cardapio quando aparecer no nome do prato.\u003c/i>\n\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"⬜ Calorias 1800 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"⬜ Proteina 90 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_campo:kcal","ficha_campo:ptn_g"]},"ficha_escopo:almoco_":{"texto":"📋 \u003cb>Vai ficar assim\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 1800 kcal\n\u003cb>Proteina no almoco:\u003c/b> 90 g\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\n⚠️ \u003cb>1800 kcal num almoco so — esse numero parece ser do dia inteiro.\u003c/b>\nSe for do dia, volte e marque \u003cb>do dia inteiro\u003c/b>. Enquanto esse numero estiver assim eu nao vou usar ele.\n\n\u003cb>A partir daqui eu sigo esses numeros\u003c/b> no lugar do objetivo do cadastro.\n\u003ci>Guardo so os numeros. O documento nao fica.\u003c/i>","botoes":[{"rotulo":"✅ Confirmar","acao":"ficha_ok","destino":"ficha_ok___"},{"rotulo":"🔙 Rever o que eu li","acao":"ficha_rever","destino":"ficha_rever"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:almoco"]},"ficha_escopo:dia_":{"texto":"📋 \u003cb>Vai ficar assim\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 630 kcal\n\u003cb>Proteina no almoco:\u003c/b> 31 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\n\u003ci>Repartir o dia entre as refeicoes e decisao do seu nutricionista. Os 35% sao a proporcao usual do almoco — se ele te passou outra, me diga digitando os numeros do almoco.\u003c/i>\n\n\u003cb>A partir daqui eu sigo esses numeros\u003c/b> no lugar do objetivo do cadastro.\n\u003ci>Guardo so os numeros. O documento nao fica.\u003c/i>","botoes":[{"rotulo":"✅ Confirmar","acao":"ficha_ok","destino":"ficha_ok___"},{"rotulo":"🔙 Rever o que eu li","acao":"ficha_rever","destino":"ficha_rever"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:dia"]},"quanto_":{"texto":"🍽️ \u003cb>Quanto pegar hoje\u003c/b>\n\u003ci>segunda-feira, 1 de setembro · sua ficha do nutricionista\u003c/i>\n\n• 2 porcoes de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 1 colher de Arroz parboilizado\n• 2 conchas de Feijao preto\n• Mix de alface a vontade\n\nIsso da 594 kcal e 33 g de proteina. Com o que tem hoje, ainda fica abaixo do seu alvo em 2 g de proteina.\n\n\u003ci>Estou seguindo os numeros da sua ficha.\u003c/i>","botoes":[{"rotulo":"✅ Vou pegar isso — registrar","acao":"registrar_sugestao","destino":"registrar_sugestao__"},{"rotulo":"🍽️ Montar do meu jeito","acao":"montar","destino":"montar"},{"rotulo":"📅 Ver cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_ok","quanto"]},"ficha_campo:kcal_":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n⬜ \u003cb>Calorias:\u003c/b> 600 kcal\n     \u003ci>li de: “voce digitou”\u003c/i>\n☑️ \u003cb>Proteina:\u003c/b> 35 g\n     \u003ci>li de: “voce digitou”\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"⬜ Calorias 600 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"☑️ Proteina 35 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_rever","ficha_campo:kcal"]},"ficha_campo:ptn_g__":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n☑️ \u003cb>Calorias:\u003c/b> 600 kcal\n     \u003ci>li de: “voce digitou”\u003c/i>\n⬜ \u003cb>Proteina:\u003c/b> 35 g\n     \u003ci>li de: “voce digitou”\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"☑️ Calorias 600 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"⬜ Proteina 35 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_rever","ficha_campo:ptn_g"]},"ficha_remover":{"texto":"⚠️ \u003cb>Remover a ficha?\u003c/b>\n\nEu volto a usar o objetivo do seu cadastro, e o que o nutricionista mandou evitar deixa de aparecer marcado no cardapio.","botoes":[{"rotulo":"Sim, remover","acao":"ficha_remover_sim","destino":""},{"rotulo":"Nao, manter","acao":"ficha","destino":"ficha"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_cancelar","ficha_remover"]},"quanto__":{"texto":"🍽️ \u003cb>Quanto pegar hoje\u003c/b>\n\u003ci>segunda-feira, 1 de setembro · sua ficha do nutricionista\u003c/i>\n\n• 1 porcao de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 1 colher de Arroz parboilizado\n• 1 concha de Feijao preto\n• Mix de alface a vontade\n\nIsso da 431 kcal e 19 g de proteina. E a sua meta do dia.\n\n\u003ci>Estou seguindo os numeros da sua ficha.\u003c/i>","botoes":[{"rotulo":"✅ Vou pegar isso — registrar","acao":"registrar_sugestao","destino":"registrar_sugestao__"},{"rotulo":"🍽️ Montar do meu jeito","acao":"montar","destino":"montar"},{"rotulo":"📅 Ver cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:dia","ficha_ok","quanto"]},"favoritos_":{"texto":"⭐ \u003cb>Pratos que voce guardou\u003c/b>\n\nEu te aviso quando algum voltar ao cardapio.\n\n• CARNE ASSADA AO MOLHO","botoes":[{"rotulo":"Remover CARNE ASSADA AO MOLHO","acao":"unfav:carne_assada_ao_molho","destino":""},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","fav_lista","fav:carne_assada_ao_molho","favoritos"]},"registrar_":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• CARNE ASSADA AO MOLHO\n\n\u003ci>134 kcal · 12 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.","botoes":[{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","fav_lista","flow_fim","registrar"]},"registrar__":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• MACARRAO ALHO E OLEO\n\n\u003ci>126 kcal · 2 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.","botoes":[{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","flow_next","flow_next","pick:macarrao_alho_e_oleo","flow_fim","registrar"]},"flow_fim____":{"texto":"🍽️ \u003cb>Seu prato\u003c/b>\n\n• ARROZ PARBOILIZADO\n\nPrato leve para o seu objetivo de hoje.\nFaltam 10 g de proteina para o seu alvo.\nSem salada nem fruta no prato — vale somar uma.\n\n\u003ci>138 kcal · 29 g carboidrato · 2 g gordura · 2 g proteina\u003c/i>","botoes":[{"rotulo":"✅ Registrar este prato","acao":"registrar","destino":"registrar__"},{"rotulo":"✏️ Mudar o prato","acao":"montar","destino":"montar"},{"rotulo":"⭐ Guardar um prato","acao":"fav_lista","destino":"fav_lista"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","flow_next","flow_next","flow_next","pick:arroz_parboilizado","flow_fim"]},"pick:feijao_preto":{"texto":"\u003cb>Passo 5 de 6\u003c/b> · Feijao\n\nToque no que voce pegou:\n☑️ FEIJAO PRETO — \u003ci>leve\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"☑️ FEIJAO PRETO","acao":"pick:feijao_preto","destino":"pick:feijao_preto"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Proximo ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","flow_next","flow_next","pick:feijao_preto"]},"flow_next____":{"texto":"\u003cb>Passo 6 de 6\u003c/b> · Salada\n\nToque no que voce pegou:\n⬜ SAL. MIX DE ALFACE — \u003ci>leve\u003c/i>","botoes":[{"rotulo":"⬜ SAL. MIX DE ALFACE","acao":"pick:sal_mix_de_alface","destino":""},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","flow_next","flow_next","flow_next"]},"meu_dia___":{"texto":"📊 \u003cb>Meu dia\u003c/b>\n\nPrato leve para o seu objetivo de hoje.\nFaltam 10 g de proteina para o seu alvo.\nSem salada nem fruta no prato — vale somar uma.\n\n• Macarrao alho e oleo — 1 colher\n\n\u003ci>126 kcal · 2 g de proteina\u003c/i>\n\n📆 \u003cb>Seu historico\u003c/b>\n\n\u003ci>sexta-feira, 29 de agosto\u003c/i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador","botoes":[{"rotulo":"✏️ Corrigir o de hoje","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["avaliar","aval_comida:3","aval_atend:3","aval_faltou:nao","aval_enviar","meu_dia"]},"ficha_escopo_":{"texto":"📋 \u003cb>Vai ficar assim\u003c/b>\n\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\n\u003cb>A partir daqui eu sigo esses numeros\u003c/b> no lugar do objetivo do cadastro.\n\u003ci>Guardo so os numeros. O documento nao fica.\u003c/i>","botoes":[{"rotulo":"✅ Confirmar","acao":"ficha_ok","destino":"ficha_ok___"},{"rotulo":"🔙 Rever o que eu li","acao":"ficha_rever","destino":"ficha_rever"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_campo:kcal","ficha_campo:ptn_g","ficha_escopo"]},"ficha_ok__":{"texto":"✅ \u003cb>Ficha guardada.\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 1800 kcal\n\u003cb>Proteina no almoco:\u003c/b> 90 g\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nVou marcar no cardapio o que voce deve evitar.\n\nToque em \u003cb>Quanto pegar hoje\u003c/b> para ver o almoco pela sua ficha.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:almoco","ficha_ok"]},"ficha_cancelar__":{"texto":"📋 \u003cb>Sua ficha do nutricionista\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 1800 kcal\n\u003cb>Proteina no almoco:\u003c/b> 90 g\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\n⚠️ 1800 kcal num almoco so — esse numero parece ser do dia inteiro.\n\u003cb>Nao estou usando esse numero\u003c/b> — confira a ficha.\n\n\u003ci>Confirmada por voce em 2026-09-12.\u003c/i>\n\u003ci>O documento nao ficou guardado, so estes numeros.\u003c/i>","botoes":[{"rotulo":"📎 Mandar outra ficha em PDF","acao":"ficha_pdf","destino":"ficha_pdf"},{"rotulo":"✍️ Digitar os numeros de novo","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🗑️ Remover a ficha","acao":"ficha_remover","destino":"ficha_remover"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:almoco","ficha_cancelar"]},"ficha_ok___":{"texto":"✅ \u003cb>Ficha guardada.\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 630 kcal\n\u003cb>Proteina no almoco:\u003c/b> 31 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nVou marcar no cardapio o que voce deve evitar.\n\nToque em \u003cb>Quanto pegar hoje\u003c/b> para ver o almoco pela sua ficha.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:dia","ficha_ok"]},"ficha_cancelar___":{"texto":"📋 \u003cb>Sua ficha do nutricionista\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 630 kcal\n\u003cb>Proteina no almoco:\u003c/b> 31 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\n\u003ci>Confirmada por voce em 2026-09-12.\u003c/i>\n\u003ci>O documento nao ficou guardado, so estes numeros.\u003c/i>","botoes":[{"rotulo":"📎 Mandar outra ficha em PDF","acao":"ficha_pdf","destino":"ficha_pdf"},{"rotulo":"✍️ Digitar os numeros de novo","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🗑️ Remover a ficha","acao":"ficha_remover","destino":"ficha_remover"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:dia","ficha_cancelar"]},"registrar_sugestao_":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• 2 porcoes de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 1 colher de Arroz parboilizado\n• 2 conchas de Feijao preto\n• Mix de alface a vontade\n\n\u003ci>594 kcal · 33 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.","botoes":[{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_ok","quanto","registrar_sugestao"]},"ficha_campo:ptn_g___":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n⬜ \u003cb>Calorias:\u003c/b> 600 kcal\n     \u003ci>li de: “voce digitou”\u003c/i>\n⬜ \u003cb>Proteina:\u003c/b> 35 g\n     \u003ci>li de: “voce digitou”\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"⬜ Calorias 600 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"⬜ Proteina 35 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_rever","ficha_campo:kcal","ficha_campo:ptn_g"]},"registrar_sugestao__":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• 1 porcao de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 1 colher de Arroz parboilizado\n• 1 concha de Feijao preto\n• Mix de alface a vontade\n\n\u003ci>431 kcal · 19 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.","botoes":[{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:dia","ficha_ok","quanto","registrar_sugestao"]},"piloto":{"texto":"📊 RELATORIO DO PILOTO\n2025-09-01 a 2025-09-30\n\nADESAO\n  Convidados:        16\n  Cadastrados:       16  (100% dos convidados)\n  Usaram de fato:    12  (75% de quem se cadastrou)\n  Voltaram outro dia:  8  (67% de quem usou)\n\nUSO\n  Refeicoes registradas: 20\n  Dias por pessoa:       1.7\n\nO QUE AS PESSOAS USAM\n  Registrar a refeicao         12 pessoa(s), 24 vez(es)\n  Avaliar o refeitorio         10 pessoa(s), 10 vez(es)\n  Seguir a sugestao de porcao  1 pessoa(s), 5 vez(es)\n  Guardar favorito             0 pessoa(s), 0 vez(es)\n  Ficha nutricional            0 pessoa(s), 0 vez(es)\n\nOBJETIVO DECLARADO (agregado)\n  Comer mais leve              10 pessoa(s)\n  Manter o equilibrio          6 pessoa(s)\n\nAVALIACAO DO REFEITORIO\n  Avaliacoes:        10\n  Comida boa:        70%\n  Atendimento bom:   80%\n\nQUALIDADE DO DADO DO CARDAPIO\n  Itens no cardapio:      16\n  Com informacao nutricional: 94%\n  Com alergenico declarado:   38%\n  Pessoas com restricao declarada: 1\n\nO QUE NAO ENTRA NESTE RELATORIO\n  O que cada pessoa comeu, a meta de cada pessoa e se ela bateu a meta.\n  Dado alimentar e dado de saude dentro de relacao de emprego, e o\n  funcionario aceitou o termo porque o app promete que a empresa nao ve\n  isso sobre ele. Num grupo pequeno, qualquer recorte aponta para alguem.\n\nPESSOAS POR DIA\n  2025-09-01  ▇▇▇▇▇▇▇▇▇▇▇▇ 12\n  2025-09-02  ▇▇▇▇▇▇▇▇ 8\n","botoes":[],"caminho":["piloto"],"comando":"/piloto 16 2025-09-01 2025-09-30","grupo":"administracao"},"cobertura":{"texto":"🧪 \u003cb>Cobertura de alergenicos\u003c/b>\n\n0 de 16 fichas com todos os alergenicos declarados (0%).\n6 parcialmente declaradas, 10 sem nenhuma declaracao.\nEnquanto a ficha nao estiver completa, o app avisa o funcionario que nao consegue confirmar — nunca que o prato e seguro.\n\n\u003cb>Declarar primeiro (aparecem mais no cardapio):\u003c/b>\n• ARROZ PARBOILIZADO\n• FEIJAO PRETO\n• ARROZ INTEGRAL\n• CARNE ASSADA AO MOLHO\n• FEIJAO CARIOCA\n• FEIJOADA\n• FILE DE FRANGO GRELHADO\n• MACARRAO ALHO E OLEO\n• OMELETE DE LEGUMES\n• OVO COZIDO\n\n\u003ci>Para declarar em lote: scripts/alergenicos.py --exportar, preencher no Excel e --importar.\u003c/i>","botoes":[],"caminho":["cobertura"],"comando":"/cobertura","grupo":"administracao"},"relatorio":{"texto":"📊 \u003cb>Adesao por setor\u003c/b>\n\n- Industria Exemplo · Logistica: 8 pessoas\n- Industria Exemplo · Producao: 8 pessoas\n\n\u003ci>So adesao agregada. Consumo, objetivo e restricao de pessoa identificada nao saem daqui — sao dado de saude do funcionario.\u003c/i>","botoes":[],"caminho":["relatorio"],"comando":"/relatorio","grupo":"administracao"},"atendimento":{"texto":"📊 \u003cb>Atendimento por refeitorio\u003c/b>\n\u003ci>domingo, 3 de agosto a segunda-feira, 1 de setembro\u003c/i>\n\n- \u003cb>SM\u003c/b>: 10 avaliacoes · comida boa 70% · atendimento bom 80%\n\n\u003ci>Ordenado por quem precisa de atencao primeiro. Use /atendimento &lt;refeitorio&gt; para o detalhe.\u003c/i>\n\u003ci>Avaliacao nao carrega nome, empresa nem setor de quem respondeu.\u003c/i>","botoes":[],"caminho":["atendimento"],"comando":"/atendimento","grupo":"administracao"}},"dados":{"dia":"2025-09-01","dia_amigavel":"segunda-feira, 1 de setembro","pessoa":{"nome":"Mariana","refeitorio":"SM","empresa":"Industria Exemplo","setor":"Producao","objetivo":"Manter o equilibrio","restricoes":"Leite e derivados, Ovos"},"cardapio":[{"categoria":"Prato principal","codigo":"PRATO PRINCIPAL","itens":[{"nome":"Carne assada ao molho","veredito":"atencao","etiqueta":"sem declaracao de leite e derivados, ovos","motivo":"Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.","peso":"moderado","papel":"Proteína do prato","dica":"moderado","kcal":134.0,"ptn":12.0}]},{"categoria":"Opcao ao prato principal","codigo":"OPCAO AO PP","itens":[{"nome":"Ovo cozido","veredito":"bloqueio","etiqueta":"contem ovos","motivo":"Este prato contem Ovos, que voce evita. Nao recomendo pedir.","peso":"leve","papel":"Proteína do prato","dica":"leve","kcal":78.0,"ptn":6.3}]},{"categoria":"Guarnicao","codigo":"GUARNICAO","itens":[{"nome":"Macarrao alho e oleo","veredito":"atencao","etiqueta":"sem declaracao de leite e derivados, ovos","motivo":"Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.","peso":"moderado","papel":"Acompanhamento","dica":"moderado","kcal":126.0,"ptn":2.0}]},{"categoria":"Arroz","codigo":"ARROZ","itens":[{"nome":"Arroz parboilizado","veredito":"atencao","etiqueta":"sem declaracao de leite e derivados, ovos","motivo":"Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.","peso":"moderado","papel":"Energia","dica":"moderado","kcal":138.0,"ptn":2.0}]},{"categoria":"Feijao","codigo":"FEIJAO","itens":[{"nome":"Feijao preto","veredito":"atencao","etiqueta":"sem declaracao de leite e derivados, ovos","motivo":"Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.","peso":"leve","papel":"Fibras","dica":"leve","kcal":29.0,"ptn":2.0}]},{"categoria":"Salada","codigo":"SALADA","itens":[{"nome":"Mix de alface","veredito":"liberado","etiqueta":"conferido para a sua ficha","motivo":"Nenhum alergenico da sua ficha aparece neste prato.","peso":"leve","papel":"Vitaminas e minerais","dica":"leve","kcal":4.0,"ptn":0.6}]}],"contagem":{"total":6,"bloqueio":1,"atencao":4,"liberado":1},"porcoes":{"itens":[{"nome":"Carne assada ao molho","medida":"2 porcoes","categoria":"Prato principal","kcal":268,"ptn":24},{"nome":"Macarrao alho e oleo","medida":"1 colher","categoria":"Guarnicao","kcal":126,"ptn":2},{"nome":"Arroz parboilizado","medida":"2 colheres","categoria":"Arroz","kcal":276,"ptn":4},{"nome":"Feijao preto","medida":"1 concha","categoria":"Feijao","kcal":29,"ptn":2},{"nome":"Mix de alface","medida":"a vontade","categoria":"Salada","kcal":4,"ptn":1}],"kcal":703,"ptn":33,"alvo_kcal":700,"alvo_ptn":30,"resumo":"Isso da 703 kcal e 33 g de proteina. E a sua meta do dia.","avisos":[]},"meu_dia":{"dias":[{"data":"2025-08-29","data_amigavel":"sexta-feira, 29 de agosto","kcal":292,"ptn":35,"incompleto":false,"itens":[{"nome":"Arroz parboilizado","quantidade":1},{"nome":"File de frango grelhado","quantidade":1},{"nome":"Mix de alface","quantidade":1}]}]},"progresso":{"pontos":25,"dias_na_semana":0,"resumo_semana":"Voce ainda nao registrou nenhuma refeicao esta semana.","conquistas":[{"nome":"Atingiu a meta de proteina do dia","vezes":1},{"nome":"Registrou a refeicao","vezes":1},{"nome":"Incluiu salada ou fruta no prato","vezes":1}]},"semana":[{"data":"2025-08-26","sigla":"Ter","hoje":false,"registrado":false,"kcal":null,"ptn":null},{"data":"2025-08-27","sigla":"Qua","hoje":false,"registrado":false,"kcal":null,"ptn":null},{"data":"2025-08-28","sigla":"Qui","hoje":false,"registrado":false,"kcal":null,"ptn":null},{"data":"2025-08-29","sigla":"Sex","hoje":false,"registrado":true,"kcal":292,"ptn":35},{"data":"2025-09-01","sigla":"Seg","hoje":true,"registrado":false,"kcal":null,"ptn":null}],"perfil":{"nome":"Mariana","iniciais":"M","refeitorio":"SM","empresa":"Industria Exemplo","setor":"Producao","objetivo":"Manter o equilibrio","alvo":{"kcal":700,"ptn":30},"restricoes":["Leite e derivados","Ovos"],"restricoes_livres":[],"evitar":[],"favoritos":[],"avisos":[{"codigo":"resumo_semanal","nome":"Resumo da semana","detalhe":"Sexta, 16h. Só sobre você: não existe ranking.","ligado":true},{"codigo":"lembrete_almoco","nome":"Lembrete do almoço","detalhe":"Dia útil, 11h, só se você ainda não registrou.","ligado":false}]},"avaliacao":{"escala":[{"nota":3,"rotulo":"Bom"},{"nota":2,"rotulo":"Regular"},{"nota":1,"rotulo":"Ruim"}],"faltas":[{"codigo":"acabou","rotulo":"Acabou antes de eu chegar"},{"codigo":"pouca_quantidade","rotulo":"Pouca quantidade"},{"codigo":"sem_opcao_restricao","rotulo":"Nada que eu pudesse comer"},{"codigo":"faltou_utensilio","rotulo":"Faltou talher, prato ou copo"},{"codigo":"faltou_bebida","rotulo":"Faltou bebida"},{"codigo":"comida_fria","rotulo":"Comida fria"}]},"registro_previsto":{"pontos_antes":25,"pontos_depois":50,"ganho":25,"conquistas":[{"nome":"Registrou a refeicao","pontos":10},{"nome":"Incluiu salada ou fruta no prato","pontos":5},{"nome":"Atingiu a meta de proteina do dia","pontos":10}]},"plano_exemplo":[]},"regras":{"refeicoes":"(Caf[eé] da manh[ãa]|Cola[çc][ãa]o|Almo[çc]o|Lanche(?:\\s*-\\s*Op[çc][ãa]o\\s*\\d+)?|Jantar|Ceia)","rodape":"Digitally signed by.*?NUTRI[ÇC][ÃA]O","ancora":"\\((\\d+(?:[.,]\\d+)?)\\s*(g|ml)\\)|(À\\s*vontade|A\\s*vontade)|(\\d+(?:[.,]\\d+)?)\\s*ml","quantidade":"^(?P\u003cnome>.*?)\\s*(?P\u003cqtd>\\d+(?:[.,]\\d+)?)\\s*(?P\u003cmedida>.*)$","rotulos":{"kcal":"(?:vet|get|valor energetico(?: total)?|energia|calorias?|kcal|kilocalorias?)","ptn_g":"(?:ptn|proteinas?|prot\\b\\.?)","cho_g":"(?:cho|carboidratos?|carbo\\.?|gliciacids?)","lip_g":"(?:lip|lipideos?|lipidios?|gorduras?)"},"por_dia":"(?:/\\s*dia|por dia|ao dia|diari[oa]|total diari[oa]|/d\\b|24\\s*h)","do_almoco":"(?:almoco|refeicao principal|jantar/almoco)","limites":{"kcal_max":1500,"kcal_min":100,"ptn_max":150,"ptn_min":5,"fracao_almoco":0.35}}};</script>
+<script>window.__APETIT__ = {"telas":{"inicio":{"texto":"🍽️ \u003cb>Ola, Mariana!\u003c/b>","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":[]},"quanto":{"texto":"🍽️ \u003cb>Quanto pegar hoje\u003c/b>\n\u003ci>segunda-feira, 1 de setembro · objetivo: Manter o equilibrio\u003c/i>\n\n• 2 porcoes de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 2 colheres de Arroz parboilizado\n• 1 concha de Feijao preto\n• Mix de alface a vontade\n\nIsso da 703 kcal e 33 g de proteina. E a sua meta do dia.\n\n\u003ci>E uma sugestao com base no que tem hoje e no objetivo que voce escolheu. Quem define quantidade individual e o nutricionista.\u003c/i>","botoes":[{"rotulo":"✅ Vou pegar isso — registrar","acao":"registrar_sugestao","destino":"registrar_sugestao__"},{"rotulo":"🍽️ Montar do meu jeito","acao":"montar","destino":"montar"},{"rotulo":"📅 Ver cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["quanto"]},"montar":{"texto":"\u003cb>Passo 1 de 6\u003c/b> · Prato principal\n\nToque no que voce pegou:\n⬜ CARNE ASSADA AO MOLHO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"⬜ CARNE ASSADA AO MOLHO","acao":"pick:carne_assada_ao_molho","destino":"pick:carne_assada_ao_molho"},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar"]},"cardapio":{"texto":"📅 \u003cb>segunda-feira, 1 de setembro\u003c/b>\n\n\u003cb>Prato principal\u003c/b>\n⚠️ CARNE ASSADA AO MOLHO — \u003ci>moderado\u003c/i>\n\n\u003cb>Opcao ao prato principal\u003c/b>\n⛔ OVO COZIDO — \u003ci>leve\u003c/i>\n    \u003cb>Nao pode: Ovos\u003c/b>\n\n\u003cb>Guarnicao\u003c/b>\n⚠️ MACARRAO ALHO E OLEO — \u003ci>moderado\u003c/i>\n\n\u003cb>Arroz\u003c/b>\n⚠️ ARROZ PARBOILIZADO — \u003ci>moderado\u003c/i>\n\n\u003cb>Feijao\u003c/b>\n⚠️ FEIJAO PRETO — \u003ci>leve\u003c/i>\n\n\u003cb>Salada\u003c/b>\n✅ SAL. MIX DE ALFACE — \u003ci>leve\u003c/i>\n\n⚠️ \u003cb>4 prato(s) sem informacao de alergenico.\u003c/b> Nao consigo garantir que sao seguros para voce — pergunte no balcao antes de se servir.","botoes":[{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["cardapio"]},"avaliar":{"texto":"⭐ \u003cb>Como foi o almoco de hoje?\u003c/b>\n\u003ci>SM · segunda-feira, 1 de setembro\u003c/i>\n\n\u003cb>A comida estava boa?\u003c/b>\n\n\u003ci>Sua resposta vai sem o seu nome. A Apetit ve como o refeitorio esta indo, nunca quem disse o que — nem a sua empresa, nem o seu setor.\u003c/i>","botoes":[{"rotulo":"😋 Boa","acao":"aval_comida:3","destino":"aval_comida:3"},{"rotulo":"😐 Regular","acao":"aval_comida:2","destino":""},{"rotulo":"😞 Ruim","acao":"aval_comida:1","destino":""},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["avaliar"]},"progresso":{"texto":"📈 \u003cb>Meu progresso\u003c/b>\n\nVoce ainda nao registrou nenhuma refeicao esta semana.\n\n\u003cb>Minhas conquistas:\u003c/b>\n• Atingiu a meta de proteina do dia — 1x\n• Registrou a refeicao — 1x\n• Incluiu salada ou fruta no prato — 1x\n\n\u003cb>25 pontos\u003c/b> acumulados.\n\n\u003ci>Isso e so seu. Nao existe ranking, e ninguem compara voce com colega nenhum.\u003c/i>","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["progresso"]},"ficha":{"texto":"📋 \u003cb>Ficha do nutricionista\u003c/b>\n\nSe voce faz acompanhamento com nutricionista e tem uma ficha com os seus numeros, eu passo a seguir \u003cb>ela\u003c/b> em vez do objetivo generico que voce escolheu no cadastro.\n\nMande a ficha aqui em \u003cb>PDF\u003c/b> e eu leio. Voce confere tudo o que eu entendi antes de valer.\n\n\u003cb>O arquivo nao fica guardado.\u003c/b> Eu tiro os numeros, voce confirma, e o documento e descartado — ficha costuma trazer peso e historico, e disso eu nao preciso.\n\nSe a sua ficha for foto ou papel, da para digitar os numeros.","botoes":[{"rotulo":"📎 Mandar a ficha em PDF","acao":"ficha_pdf","destino":"ficha_pdf"},{"rotulo":"✍️ Digitar os numeros","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha"]},"meu_dia":{"texto":"📊 \u003cb>Meu dia\u003c/b>\n\nVoce ainda nao registrou o almoco de hoje.\n\nToque em \u003cb>Quanto pegar hoje\u003c/b> e depois em \u003cb>Vou pegar isso\u003c/b> — assim fica guardado no seu historico.\n\n📆 \u003cb>Seu historico\u003c/b>\n\n\u003ci>sexta-feira, 29 de agosto\u003c/i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador","botoes":[{"rotulo":"🍽️ Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["meu_dia"]},"favoritos":{"texto":"⭐ \u003cb>Voce ainda nao guardou nenhum prato.\u003c/b>\n\nDepois de montar o prato, toque em \u003cb>Guardar um prato\u003c/b>. Quando ele voltar ao cardapio, eu te aviso.","botoes":[{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["favoritos"]},"perfil":{"texto":"👤 \u003cb>Meu cadastro\u003c/b>\n\n\u003cb>Nome:\u003c/b> Mariana\n\u003cb>Refeitorio:\u003c/b> SM\n\u003cb>Empresa:\u003c/b> Industria Exemplo\n\u003cb>Setor:\u003c/b> Producao\n\u003cb>Objetivo:\u003c/b> Manter o equilibrio\n\u003cb>Restricoes:\u003c/b> Leite e derivados, Ovos","botoes":[{"rotulo":"✏️ Refazer cadastro","acao":"recadastrar","destino":""},{"rotulo":"🔒 Meus dados","acao":"meus_dados","destino":"meus_dados"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["perfil"]},"avisos":{"texto":"🔔 \u003cb>Avisos\u003c/b>\n\nToque para ligar ou desligar. Da para mudar quando quiser.\n\n\u003cb>Resumo da semana\u003c/b> — na sexta eu te mando quantos dias voce registrou e o que voce conquistou. So sobre voce: nao existe ranking e sua empresa nao ve nada disso.\n\n\u003cb>Lembrete do almoco\u003c/b> — um toque no seu ombro na hora do almoco, so nos dias em que voce ainda nao registrou.\n\n\u003ci>Eu nunca comento o que voce comeu.\u003c/i>","botoes":[{"rotulo":"☑️ Resumo da minha semana (sexta)","acao":"aviso:resumo_semanal","destino":""},{"rotulo":"⬜ Lembrete de registrar o almoco","acao":"aviso:lembrete_almoco","destino":""},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["avisos"]},"ajuda":{"texto":"❓ \u003cb>Como usar\u003c/b>\n\n\u003cb>Quanto pegar hoje\u003c/b> — eu digo quantas conchas e colheres pegar de cada coisa para chegar no seu objetivo, com o cardapio de hoje. Se voce pegar o que eu sugeri, toque em \u003cb>Vou pegar isso\u003c/b> e ja fica guardado.\n\n\u003cb>Montar meu prato\u003c/b> — eu te levo pela fila, uma categoria por vez. Voce toca no que pegou e eu mostro como ficou o prato.\n\n\u003cb>Cardapio de hoje\u003c/b> — o que tem hoje, com aviso do que voce nao pode comer.\n\n\u003cb>Meu dia\u003c/b> — o que voce registrou hoje e nos dias anteriores, com quanto pegou de cada coisa. Registrar de novo no mesmo dia substitui o registro anterior.\n\n\u003cb>Favoritos\u003c/b> — pratos que voce gostou. Aviso quando voltarem.\n\n\u003cb>Meu progresso\u003c/b> — sua sequencia e suas conquistas. So suas.\n\n\u003cb>Minha ficha\u003c/b> — se voce faz acompanhamento com nutricionista, mande a ficha em PDF (ou digite os numeros) e eu passo a seguir \u003cb>ela\u003c/b> em vez do objetivo generico. Voce confere tudo o que eu li antes de valer, e o arquivo nao fica guardado: so os numeros que voce confirmar.\n\n\u003cb>Avaliar o refeitorio\u003c/b> — tres toques dizendo como foi a comida, o atendimento e se faltou algo. \u003cb>Vai sem o seu nome:\u003c/b> a Apetit ve como o refeitorio esta indo, nunca quem disse o que — nem a sua empresa, nem o seu setor. E a unica coisa do app que sai de voce.\n\n\u003cb>Avisos\u003c/b> — na sexta eu te mando o resumo da sua semana, e se voce quiser eu te lembro de registrar o almoco. Eu nunca comento o que voce comeu, e voce liga e desliga em /avisos quando quiser.\n\n\u003cb>Sobre os simbolos\u003c/b>\n⛔ contem algo que voce marcou como alergia\n⚠️ sem informacao de alergenico — pergunte no balcao\n✅ conferido e liberado para voce\n\nSeus dados sao seus: /meus_dados mostra tudo, /excluir_dados apaga tudo. Sua empresa nao ve nada disso sobre voce.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["ajuda"]},"registrar_sugestao":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• 2 porcoes de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 2 colheres de Arroz parboilizado\n• 1 concha de Feijao preto\n• Mix de alface a vontade\n\n\u003ci>703 kcal · 33 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\n🌱 \u003cb>Voce conquistou hoje:\u003c/b>\n• Registrou a refeicao\n• Incluiu salada ou fruta no prato\n• Atingiu a meta de proteina do dia\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.\n\nComo foi o refeitorio hoje? Leva tres toques.","botoes":[{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["quanto","registrar_sugestao"]},"menu":{"texto":"O que voce quer fazer?","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["quanto","menu"]},"pick:carne_assada_ao_molho":{"texto":"\u003cb>Passo 1 de 6\u003c/b> · Prato principal\n\nToque no que voce pegou:\n☑️ CARNE ASSADA AO MOLHO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"☑️ CARNE ASSADA AO MOLHO","acao":"pick:carne_assada_ao_molho","destino":"pick:carne_assada_ao_molho"},{"rotulo":"Proximo ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","pick:carne_assada_ao_molho"]},"flow_next":{"texto":"\u003cb>Passo 2 de 6\u003c/b> · Opcao ao prato principal\n\nToque no que voce pegou:\n⛔ \u003cs>OVO COZIDO\u003c/s> — \u003cb>contem Ovos\u003c/b>","botoes":[{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next"]},"flow_fim":{"texto":"Seu prato esta vazio.\n\nQuer comecar de novo?","botoes":[{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","flow_fim"]},"aval_comida:3":{"texto":"⭐ \u003cb>E o atendimento?\u003c/b>\n\n\u003ci>Como voce foi tratado no balcao e na fila.\u003c/i>","botoes":[{"rotulo":"😋 Boa","acao":"aval_atend:3","destino":"aval_atend:3"},{"rotulo":"😐 Regular","acao":"aval_atend:2","destino":""},{"rotulo":"😞 Ruim","acao":"aval_atend:1","destino":""},{"rotulo":"← Voltar","acao":"avaliar","destino":"avaliar"}],"caminho":["avaliar","aval_comida:3"]},"progresso_":{"texto":"📈 \u003cb>Meu progresso\u003c/b>\n\nVoce registrou 1 de 5 dias desta semana.\n\n\u003cb>Minhas conquistas:\u003c/b>\n• Atingiu a meta de proteina do dia — 2x\n• Registrou a refeicao — 2x\n• Incluiu salada ou fruta no prato — 2x\n\n\u003cb>50 pontos\u003c/b> acumulados.\n\n\u003ci>Isso e so seu. Nao existe ranking, e ninguem compara voce com colega nenhum.\u003c/i>","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["progresso","progresso"]},"meu_dia_":{"texto":"📊 \u003cb>Meu dia\u003c/b>\n\nPrato alinhado com o seu objetivo de hoje.\nProteina do dia atingida: 33 g.\n\n• Arroz parboilizado — 2 colheres\n• Carne assada ao molho — 2 porcoes\n• Feijao preto — 1 concha\n• Macarrao alho e oleo — 1 colher\n• Mix de alface — 1 pegador\n\n\u003ci>703 kcal · 33 g de proteina\u003c/i>\n\n📆 \u003cb>Seu historico\u003c/b>\n\n\u003ci>sexta-feira, 29 de agosto\u003c/i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador","botoes":[{"rotulo":"✏️ Corrigir o de hoje","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["progresso","meu_dia"]},"ficha_pdf":{"texto":"📎 \u003cb>Mande o PDF da sua ficha\u003c/b>\n\nAqui mesmo nesta conversa:\n\n1. toque no \u003cb>clipe 📎\u003c/b> ao lado de onde voce escreve\n2. escolha \u003cb>Arquivo\u003c/b> e ache o PDF da sua ficha\n3. envie\n\nEu leio e te mostro o que entendi, numero por numero, antes de valer.\n\n\u003cb>O arquivo nao fica guardado.\u003c/b>\n\n\u003ci>Se a ficha for foto ou papel digitalizado, eu nao consigo ler a letra da imagem — nesse caso, digite os numeros.\u003c/i>","botoes":[{"rotulo":"📎 Anexar ficha_nutricionista.pdf","acao":"__anexar_pdf__","destino":"__anexar_pdf__"},{"rotulo":"✍️ Digitar os numeros","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🔙 Voltar","acao":"ficha","destino":"ficha"}],"caminho":["ficha","ficha_pdf"]},"ficha_manual":{"texto":"🤔 \u003cb>Esses numeros sao do dia inteiro ou so do almoco?\u003c/b>\n\nE a diferenca que mais importa aqui. Se eu tratar o total do dia como se fosse o almoco, eu vou te mandar comer o dia inteiro num prato so.\n\nSe voce nao tiver certeza, \u003cb>pergunte ao seu nutricionista\u003c/b> — ele e quem reparte o dia entre as refeicoes.","botoes":[{"rotulo":"🍽️ E so do almoco","acao":"ficha_escopo:almoco","destino":"ficha_escopo:almoco_"},{"rotulo":"📅 E do dia inteiro","acao":"ficha_escopo:dia","destino":"ficha_escopo:dia_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual"]},"meus_dados":{"texto":"🔒 \u003cb>Tudo o que eu guardo sobre voce\u003c/b>\n\n\u003cb>Nome:\u003c/b> Mariana\n\u003cb>Refeitorio:\u003c/b> SM\n\u003cb>Empresa:\u003c/b> Industria Exemplo\n\u003cb>Setor:\u003c/b> Producao\n\u003cb>Objetivo:\u003c/b> Manter o equilibrio\n\u003cb>Restricoes:\u003c/b> Leite e derivados, Ovos\n\u003cb>Aceite:\u003c/b> 2026-09-12T21:35:49+00:00\n\n\u003cb>Dias com refeicao registrada:\u003c/b> 2\n\u003cb>Pratos guardados:\u003c/b> 0\n\u003cb>Pontos:\u003c/b> 50\n\u003cb>Avaliacoes do refeitorio:\u003c/b> 0\n\n\u003cb>Sua empresa nao ve nada disso sobre voce.\u003c/b>\nA unica coisa que sai daqui e a avaliacao do refeitorio — e ela vai sem o seu nome, sem a sua empresa e sem o seu setor, junto com a de todo mundo. A Apetit ve como o refeitorio esta indo, nunca quem disse o que.\n\nPara apagar tudo: /excluir_dados","botoes":[{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["perfil","meus_dados"]},"flow_fim_":{"texto":"🍽️ \u003cb>Seu prato\u003c/b>\n\n• CARNE ASSADA AO MOLHO\n\nPrato leve para o seu objetivo de hoje.\nFaltam 18 g de proteina para o seu alvo.\nSem salada nem fruta no prato — vale somar uma.\n\n\u003ci>134 kcal · 2 g carboidrato · 9 g gordura · 12 g proteina\u003c/i>","botoes":[{"rotulo":"✅ Registrar este prato","acao":"registrar","destino":"registrar__"},{"rotulo":"✏️ Mudar o prato","acao":"montar","destino":"montar"},{"rotulo":"⭐ Guardar um prato","acao":"fav_lista","destino":"fav_lista"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim"]},"flow_next_":{"texto":"\u003cb>Passo 3 de 6\u003c/b> · Guarnicao\n\nToque no que voce pegou:\n⬜ MACARRAO ALHO E OLEO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"⬜ MACARRAO ALHO E OLEO","acao":"pick:macarrao_alho_e_oleo","destino":"pick:macarrao_alho_e_oleo"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next"]},"aval_atend:3":{"texto":"⭐ \u003cb>Faltou alguma coisa?\u003c/b>","botoes":[{"rotulo":"👍 Nao, estava tudo la","acao":"aval_faltou:nao","destino":"aval_faltou:nao"},{"rotulo":"👎 Sim, faltou","acao":"aval_faltou:sim","destino":"aval_faltou:sim"}],"caminho":["avaliar","aval_comida:3","aval_atend:3"]},"__anexar_pdf__":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n☑️ \u003cb>Calorias:\u003c/b> 1800 kcal \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “VET: 1800 kcal/dia”\u003c/i>\n☑️ \u003cb>Proteina:\u003c/b> 90 g \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “PTN: 90 g/dia”\u003c/i>\n\n⛔ \u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Vou marcar no cardapio quando aparecer no nome do prato.\u003c/i>\n\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"☑️ Calorias 1800 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"☑️ Proteina 90 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__"]},"ficha_escopo:almoco":{"texto":"📋 \u003cb>Vai ficar assim\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 600 kcal\n\u003cb>Proteina no almoco:\u003c/b> 35 g\n\n\u003cb>A partir daqui eu sigo esses numeros\u003c/b> no lugar do objetivo do cadastro.\n\u003ci>Guardo so os numeros. O documento nao fica.\u003c/i>","botoes":[{"rotulo":"✅ Confirmar","acao":"ficha_ok","destino":"ficha_ok___"},{"rotulo":"🔙 Rever o que eu li","acao":"ficha_rever","destino":"ficha_rever"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco"]},"ficha_escopo:dia":{"texto":"📋 \u003cb>Vai ficar assim\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 210 kcal\n\u003cb>Proteina no almoco:\u003c/b> 12 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\n\u003ci>Repartir o dia entre as refeicoes e decisao do seu nutricionista. Os 35% sao a proporcao usual do almoco — se ele te passou outra, me diga digitando os numeros do almoco.\u003c/i>\n\n\u003cb>A partir daqui eu sigo esses numeros\u003c/b> no lugar do objetivo do cadastro.\n\u003ci>Guardo so os numeros. O documento nao fica.\u003c/i>","botoes":[{"rotulo":"✅ Confirmar","acao":"ficha_ok","destino":"ficha_ok___"},{"rotulo":"🔙 Rever o que eu li","acao":"ficha_rever","destino":"ficha_rever"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:dia"]},"registrar":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• CARNE ASSADA AO MOLHO\n\n\u003ci>134 kcal · 12 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.\n\nComo foi o refeitorio hoje? Leva tres toques.","botoes":[{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","registrar"]},"fav_lista":{"texto":"⭐ \u003cb>Qual prato voce quer guardar?\u003c/b>","botoes":[{"rotulo":"CARNE ASSADA AO MOLHO","acao":"fav:carne_assada_ao_molho","destino":"fav:carne_assada_ao_molho"},{"rotulo":"🔙 Voltar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","fav_lista"]},"pick:macarrao_alho_e_oleo":{"texto":"\u003cb>Passo 3 de 6\u003c/b> · Guarnicao\n\nToque no que voce pegou:\n☑️ MACARRAO ALHO E OLEO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"☑️ MACARRAO ALHO E OLEO","acao":"pick:macarrao_alho_e_oleo","destino":"pick:macarrao_alho_e_oleo"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Proximo ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","pick:macarrao_alho_e_oleo"]},"flow_next__":{"texto":"\u003cb>Passo 4 de 6\u003c/b> · Arroz\n\nToque no que voce pegou:\n⬜ ARROZ PARBOILIZADO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"⬜ ARROZ PARBOILIZADO","acao":"pick:arroz_parboilizado","destino":"pick:arroz_parboilizado"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","flow_next"]},"aval_faltou:nao":{"texto":"⭐ \u003cb>Quer contar mais alguma coisa?\u003c/b>\n\nEscreva o que quiser sobre o refeitorio de hoje, ou toque em pular.\n\n\u003ci>O texto chega a Apetit sem o seu nome. Ainda assim, evite escrever algo que so voce diria — e evite citar colega pelo nome.\u003c/i>","botoes":[{"rotulo":"Pular e enviar","acao":"aval_enviar","destino":"aval_enviar"}],"caminho":["avaliar","aval_comida:3","aval_atend:3","aval_faltou:nao"]},"aval_faltou:sim":{"texto":"⭐ \u003cb>O que faltou?\u003c/b>\n\nPode marcar mais de um.","botoes":[{"rotulo":"⬜ Acabou antes de eu chegar","acao":"aval_tag:acabou","destino":""},{"rotulo":"⬜ Pouca quantidade","acao":"aval_tag:pouca_quantidade","destino":""},{"rotulo":"⬜ Nada que eu pudesse comer","acao":"aval_tag:sem_opcao_restricao","destino":""},{"rotulo":"⬜ Faltou talher, prato ou copo","acao":"aval_tag:faltou_utensilio","destino":""},{"rotulo":"⬜ Faltou bebida","acao":"aval_tag:faltou_bebida","destino":""},{"rotulo":"⬜ Comida fria","acao":"aval_tag:comida_fria","destino":""},{"rotulo":"Continuar ➡️","acao":"aval_comentario","destino":""}],"caminho":["avaliar","aval_comida:3","aval_atend:3","aval_faltou:sim"]},"ficha_campo:kcal":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n⬜ \u003cb>Calorias:\u003c/b> 1800 kcal \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “VET: 1800 kcal/dia”\u003c/i>\n☑️ \u003cb>Proteina:\u003c/b> 90 g \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “PTN: 90 g/dia”\u003c/i>\n\n⛔ \u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Vou marcar no cardapio quando aparecer no nome do prato.\u003c/i>\n\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"⬜ Calorias 1800 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"☑️ Proteina 90 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_campo:kcal"]},"ficha_campo:ptn_g":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n☑️ \u003cb>Calorias:\u003c/b> 1800 kcal \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “VET: 1800 kcal/dia”\u003c/i>\n⬜ \u003cb>Proteina:\u003c/b> 90 g \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “PTN: 90 g/dia”\u003c/i>\n\n⛔ \u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Vou marcar no cardapio quando aparecer no nome do prato.\u003c/i>\n\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"☑️ Calorias 1800 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"⬜ Proteina 90 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_campo:ptn_g"]},"ficha_escopo":{"texto":"🤔 \u003cb>Esses numeros sao do dia inteiro ou so do almoco?\u003c/b>\n\nE a diferenca que mais importa aqui. Pelo que eu li, parece ser do dia inteiro. Se eu tratar o total do dia como se fosse o almoco, eu vou te mandar comer o dia inteiro num prato so.\n\nSe voce nao tiver certeza, \u003cb>pergunte ao seu nutricionista\u003c/b> — ele e quem reparte o dia entre as refeicoes.","botoes":[{"rotulo":"🍽️ E so do almoco","acao":"ficha_escopo:almoco","destino":"ficha_escopo:almoco_"},{"rotulo":"📅 E do dia inteiro","acao":"ficha_escopo:dia","destino":"ficha_escopo:dia_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo"]},"ficha_ok":{"texto":"✅ \u003cb>Ficha guardada.\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 600 kcal\n\u003cb>Proteina no almoco:\u003c/b> 35 g\n\nToque em \u003cb>Quanto pegar hoje\u003c/b> para ver o almoco pela sua ficha.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_ok"]},"ficha_rever":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n☑️ \u003cb>Calorias:\u003c/b> 600 kcal\n     \u003ci>li de: “voce digitou”\u003c/i>\n☑️ \u003cb>Proteina:\u003c/b> 35 g\n     \u003ci>li de: “voce digitou”\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"☑️ Calorias 600 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"☑️ Proteina 35 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_rever"]},"ficha_cancelar":{"texto":"📋 \u003cb>Sua ficha do nutricionista\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 600 kcal\n\u003cb>Proteina no almoco:\u003c/b> 35 g\n\n\u003ci>Confirmada por voce em 2026-09-12.\u003c/i>\n\u003ci>O documento nao ficou guardado, so estes numeros.\u003c/i>","botoes":[{"rotulo":"📎 Mandar outra ficha em PDF","acao":"ficha_pdf","destino":"ficha_pdf"},{"rotulo":"✍️ Digitar os numeros de novo","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🗑️ Remover a ficha","acao":"ficha_remover","destino":"ficha_remover"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_cancelar"]},"ficha_ok_":{"texto":"✅ \u003cb>Ficha guardada.\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 210 kcal\n\u003cb>Proteina no almoco:\u003c/b> 12 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\nToque em \u003cb>Quanto pegar hoje\u003c/b> para ver o almoco pela sua ficha.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:dia","ficha_ok"]},"ficha_cancelar_":{"texto":"📋 \u003cb>Sua ficha do nutricionista\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 210 kcal\n\u003cb>Proteina no almoco:\u003c/b> 12 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\n\u003ci>Confirmada por voce em 2026-09-12.\u003c/i>\n\u003ci>O documento nao ficou guardado, so estes numeros.\u003c/i>","botoes":[{"rotulo":"📎 Mandar outra ficha em PDF","acao":"ficha_pdf","destino":"ficha_pdf"},{"rotulo":"✍️ Digitar os numeros de novo","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🗑️ Remover a ficha","acao":"ficha_remover","destino":"ficha_remover"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:dia","ficha_cancelar"]},"meu_dia__":{"texto":"📊 \u003cb>Meu dia\u003c/b>\n\nPrato leve para o seu objetivo de hoje.\nProteina do dia atingida: 12 g.\nSem salada nem fruta no prato — vale somar uma.\n\n• Carne assada ao molho — 1 porcao\n\n\u003ci>134 kcal · 12 g de proteina\u003c/i>\n\n📆 \u003cb>Seu historico\u003c/b>\n\n\u003ci>sexta-feira, 29 de agosto\u003c/i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador","botoes":[{"rotulo":"✏️ Corrigir o de hoje","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","registrar","meu_dia"]},"fav:carne_assada_ao_molho":{"texto":"⭐ Guardado! Te aviso quando esse prato voltar ao cardapio.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","fav_lista","fav:carne_assada_ao_molho"]},"flow_fim__":{"texto":"🍽️ \u003cb>Seu prato\u003c/b>\n\n• CARNE ASSADA AO MOLHO\n\nPrato leve para o seu objetivo de hoje.\nProteina do dia atingida: 12 g.\nSem salada nem fruta no prato — vale somar uma.\n\n\u003ci>134 kcal · 2 g carboidrato · 9 g gordura · 12 g proteina\u003c/i>","botoes":[{"rotulo":"✅ Registrar este prato","acao":"registrar","destino":"registrar__"},{"rotulo":"✏️ Mudar o prato","acao":"montar","destino":"montar"},{"rotulo":"⭐ Guardar um prato","acao":"fav_lista","destino":"fav_lista"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","fav_lista","flow_fim"]},"flow_fim___":{"texto":"🍽️ \u003cb>Seu prato\u003c/b>\n\n• MACARRAO ALHO E OLEO\n\nPrato leve para o seu objetivo de hoje.\nFaltam 10 g de proteina para o seu alvo.\nSem salada nem fruta no prato — vale somar uma.\n\n\u003ci>126 kcal · 18 g carboidrato · 5 g gordura · 2 g proteina\u003c/i>","botoes":[{"rotulo":"✅ Registrar este prato","acao":"registrar","destino":"registrar__"},{"rotulo":"✏️ Mudar o prato","acao":"montar","destino":"montar"},{"rotulo":"⭐ Guardar um prato","acao":"fav_lista","destino":"fav_lista"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","flow_next","flow_next","pick:macarrao_alho_e_oleo","flow_fim"]},"pick:arroz_parboilizado":{"texto":"\u003cb>Passo 4 de 6\u003c/b> · Arroz\n\nToque no que voce pegou:\n☑️ ARROZ PARBOILIZADO — \u003ci>moderado\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"☑️ ARROZ PARBOILIZADO","acao":"pick:arroz_parboilizado","destino":"pick:arroz_parboilizado"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Proximo ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","flow_next","pick:arroz_parboilizado"]},"flow_next___":{"texto":"\u003cb>Passo 5 de 6\u003c/b> · Feijao\n\nToque no que voce pegou:\n⬜ FEIJAO PRETO — \u003ci>leve\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"⬜ FEIJAO PRETO","acao":"pick:feijao_preto","destino":"pick:feijao_preto"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","flow_next","flow_next"]},"aval_enviar":{"texto":"✅ \u003cb>Obrigado!\u003c/b>\n\nSua avaliacao de hoje foi registrada.\n\n\u003cb>Comida:\u003c/b> Bom\n\u003cb>Atendimento:\u003c/b> Bom\n\n\u003ci>Isso entra na media do refeitorio, sem o seu nome. Se quiser mudar, e so avaliar de novo hoje — a nova substitui esta.\u003c/i>","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🍽️ Montar meu prato","acao":"montar","destino":"montar"},{"rotulo":"📅 Cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"⭐ Avaliar o refeitorio","acao":"avaliar","destino":"avaliar"},{"rotulo":"📈 Meu progresso","acao":"progresso","destino":"progresso_"},{"rotulo":"📋 Minha ficha","acao":"ficha","destino":"ficha"},{"rotulo":"📊 Meu dia","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"⭐ Favoritos","acao":"favoritos","destino":"favoritos_"},{"rotulo":"👤 Meu cadastro","acao":"perfil","destino":"perfil"},{"rotulo":"🔔 Avisos","acao":"avisos","destino":"avisos"},{"rotulo":"❓ Ajuda","acao":"ajuda","destino":"ajuda"}],"caminho":["avaliar","aval_comida:3","aval_atend:3","aval_faltou:nao","aval_enviar"]},"ficha_campo:ptn_g_":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n⬜ \u003cb>Calorias:\u003c/b> 1800 kcal \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “VET: 1800 kcal/dia”\u003c/i>\n⬜ \u003cb>Proteina:\u003c/b> 90 g \u003ci>(por dia)\u003c/i>\n     \u003ci>li de: “PTN: 90 g/dia”\u003c/i>\n\n⛔ \u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Vou marcar no cardapio quando aparecer no nome do prato.\u003c/i>\n\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"⬜ Calorias 1800 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"⬜ Proteina 90 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_campo:kcal","ficha_campo:ptn_g"]},"ficha_escopo:almoco_":{"texto":"📋 \u003cb>Vai ficar assim\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 1800 kcal\n\u003cb>Proteina no almoco:\u003c/b> 90 g\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\n⚠️ \u003cb>1800 kcal num almoco so — esse numero parece ser do dia inteiro.\u003c/b>\nSe for do dia, volte e marque \u003cb>do dia inteiro\u003c/b>. Enquanto esse numero estiver assim eu nao vou usar ele.\n\n\u003cb>A partir daqui eu sigo esses numeros\u003c/b> no lugar do objetivo do cadastro.\n\u003ci>Guardo so os numeros. O documento nao fica.\u003c/i>","botoes":[{"rotulo":"✅ Confirmar","acao":"ficha_ok","destino":"ficha_ok___"},{"rotulo":"🔙 Rever o que eu li","acao":"ficha_rever","destino":"ficha_rever"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:almoco"]},"ficha_escopo:dia_":{"texto":"📋 \u003cb>Vai ficar assim\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 630 kcal\n\u003cb>Proteina no almoco:\u003c/b> 31 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\n\u003ci>Repartir o dia entre as refeicoes e decisao do seu nutricionista. Os 35% sao a proporcao usual do almoco — se ele te passou outra, me diga digitando os numeros do almoco.\u003c/i>\n\n\u003cb>A partir daqui eu sigo esses numeros\u003c/b> no lugar do objetivo do cadastro.\n\u003ci>Guardo so os numeros. O documento nao fica.\u003c/i>","botoes":[{"rotulo":"✅ Confirmar","acao":"ficha_ok","destino":"ficha_ok___"},{"rotulo":"🔙 Rever o que eu li","acao":"ficha_rever","destino":"ficha_rever"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:dia"]},"quanto_":{"texto":"🍽️ \u003cb>Quanto pegar hoje\u003c/b>\n\u003ci>segunda-feira, 1 de setembro · sua ficha do nutricionista\u003c/i>\n\n• 2 porcoes de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 1 colher de Arroz parboilizado\n• 2 conchas de Feijao preto\n• Mix de alface a vontade\n\nIsso da 594 kcal e 33 g de proteina. Com o que tem hoje, ainda fica abaixo do seu alvo em 2 g de proteina.\n\n\u003ci>Estou seguindo os numeros da sua ficha.\u003c/i>","botoes":[{"rotulo":"✅ Vou pegar isso — registrar","acao":"registrar_sugestao","destino":"registrar_sugestao__"},{"rotulo":"🍽️ Montar do meu jeito","acao":"montar","destino":"montar"},{"rotulo":"📅 Ver cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_ok","quanto"]},"ficha_campo:kcal_":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n⬜ \u003cb>Calorias:\u003c/b> 600 kcal\n     \u003ci>li de: “voce digitou”\u003c/i>\n☑️ \u003cb>Proteina:\u003c/b> 35 g\n     \u003ci>li de: “voce digitou”\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"⬜ Calorias 600 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"☑️ Proteina 35 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_rever","ficha_campo:kcal"]},"ficha_campo:ptn_g__":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n☑️ \u003cb>Calorias:\u003c/b> 600 kcal\n     \u003ci>li de: “voce digitou”\u003c/i>\n⬜ \u003cb>Proteina:\u003c/b> 35 g\n     \u003ci>li de: “voce digitou”\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"☑️ Calorias 600 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"⬜ Proteina 35 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_rever","ficha_campo:ptn_g"]},"ficha_remover":{"texto":"⚠️ \u003cb>Remover a ficha?\u003c/b>\n\nEu volto a usar o objetivo do seu cadastro, e o que o nutricionista mandou evitar deixa de aparecer marcado no cardapio.","botoes":[{"rotulo":"Sim, remover","acao":"ficha_remover_sim","destino":""},{"rotulo":"Nao, manter","acao":"ficha","destino":"ficha"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_cancelar","ficha_remover"]},"quanto__":{"texto":"🍽️ \u003cb>Quanto pegar hoje\u003c/b>\n\u003ci>segunda-feira, 1 de setembro · sua ficha do nutricionista\u003c/i>\n\n• 1 porcao de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 1 colher de Arroz parboilizado\n• 1 concha de Feijao preto\n• Mix de alface a vontade\n\nIsso da 431 kcal e 19 g de proteina. E a sua meta do dia.\n\n\u003ci>Estou seguindo os numeros da sua ficha.\u003c/i>","botoes":[{"rotulo":"✅ Vou pegar isso — registrar","acao":"registrar_sugestao","destino":"registrar_sugestao__"},{"rotulo":"🍽️ Montar do meu jeito","acao":"montar","destino":"montar"},{"rotulo":"📅 Ver cardapio","acao":"cardapio","destino":"cardapio"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:dia","ficha_ok","quanto"]},"favoritos_":{"texto":"⭐ \u003cb>Pratos que voce guardou\u003c/b>\n\nEu te aviso quando algum voltar ao cardapio.\n\n• CARNE ASSADA AO MOLHO","botoes":[{"rotulo":"Remover CARNE ASSADA AO MOLHO","acao":"unfav:carne_assada_ao_molho","destino":""},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","fav_lista","fav:carne_assada_ao_molho","favoritos"]},"registrar_":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• CARNE ASSADA AO MOLHO\n\n\u003ci>134 kcal · 12 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.","botoes":[{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","pick:carne_assada_ao_molho","flow_fim","fav_lista","flow_fim","registrar"]},"registrar__":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• MACARRAO ALHO E OLEO\n\n\u003ci>126 kcal · 2 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.","botoes":[{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","flow_next","flow_next","pick:macarrao_alho_e_oleo","flow_fim","registrar"]},"flow_fim____":{"texto":"🍽️ \u003cb>Seu prato\u003c/b>\n\n• ARROZ PARBOILIZADO\n\nPrato leve para o seu objetivo de hoje.\nFaltam 10 g de proteina para o seu alvo.\nSem salada nem fruta no prato — vale somar uma.\n\n\u003ci>138 kcal · 29 g carboidrato · 2 g gordura · 2 g proteina\u003c/i>","botoes":[{"rotulo":"✅ Registrar este prato","acao":"registrar","destino":"registrar__"},{"rotulo":"✏️ Mudar o prato","acao":"montar","destino":"montar"},{"rotulo":"⭐ Guardar um prato","acao":"fav_lista","destino":"fav_lista"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["montar","flow_next","flow_next","flow_next","pick:arroz_parboilizado","flow_fim"]},"pick:feijao_preto":{"texto":"\u003cb>Passo 5 de 6\u003c/b> · Feijao\n\nToque no que voce pegou:\n☑️ FEIJAO PRETO — \u003ci>leve\u003c/i> ⚠️\n\n⚠️ = sem informacao de alergenico. Pergunte no balcao.","botoes":[{"rotulo":"☑️ FEIJAO PRETO","acao":"pick:feijao_preto","destino":"pick:feijao_preto"},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Proximo ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","flow_next","flow_next","pick:feijao_preto"]},"flow_next____":{"texto":"\u003cb>Passo 6 de 6\u003c/b> · Salada\n\nToque no que voce pegou:\n⬜ SAL. MIX DE ALFACE — \u003ci>leve\u003c/i>","botoes":[{"rotulo":"⬜ SAL. MIX DE ALFACE","acao":"pick:sal_mix_de_alface","destino":""},{"rotulo":"🔙 Voltar","acao":"flow_prev","destino":""},{"rotulo":"Pular ➡️","acao":"flow_next","destino":"flow_next____"},{"rotulo":"✋ Terminei de montar","acao":"flow_fim","destino":"flow_fim____"}],"caminho":["montar","flow_next","flow_next","flow_next","flow_next","flow_next"]},"meu_dia___":{"texto":"📊 \u003cb>Meu dia\u003c/b>\n\nPrato leve para o seu objetivo de hoje.\nFaltam 10 g de proteina para o seu alvo.\nSem salada nem fruta no prato — vale somar uma.\n\n• Macarrao alho e oleo — 1 colher\n\n\u003ci>126 kcal · 2 g de proteina\u003c/i>\n\n📆 \u003cb>Seu historico\u003c/b>\n\n\u003ci>sexta-feira, 29 de agosto\u003c/i> — 292 kcal · 35 g ptn\n• Arroz parboilizado — 1 colher\n• File de frango grelhado — 1 porcao\n• Mix de alface — 1 pegador","botoes":[{"rotulo":"✏️ Corrigir o de hoje","acao":"montar","destino":"montar"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["avaliar","aval_comida:3","aval_atend:3","aval_faltou:nao","aval_enviar","meu_dia"]},"ficha_escopo_":{"texto":"📋 \u003cb>Vai ficar assim\u003c/b>\n\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\n\u003cb>A partir daqui eu sigo esses numeros\u003c/b> no lugar do objetivo do cadastro.\n\u003ci>Guardo so os numeros. O documento nao fica.\u003c/i>","botoes":[{"rotulo":"✅ Confirmar","acao":"ficha_ok","destino":"ficha_ok___"},{"rotulo":"🔙 Rever o que eu li","acao":"ficha_rever","destino":"ficha_rever"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_campo:kcal","ficha_campo:ptn_g","ficha_escopo"]},"ficha_ok__":{"texto":"✅ \u003cb>Ficha guardada.\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 1800 kcal\n\u003cb>Proteina no almoco:\u003c/b> 90 g\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nVou marcar no cardapio o que voce deve evitar.\n\nToque em \u003cb>Quanto pegar hoje\u003c/b> para ver o almoco pela sua ficha.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:almoco","ficha_ok"]},"ficha_cancelar__":{"texto":"📋 \u003cb>Sua ficha do nutricionista\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 1800 kcal\n\u003cb>Proteina no almoco:\u003c/b> 90 g\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\n⚠️ 1800 kcal num almoco so — esse numero parece ser do dia inteiro.\n\u003cb>Nao estou usando esse numero\u003c/b> — confira a ficha.\n\n\u003ci>Confirmada por voce em 2026-09-12.\u003c/i>\n\u003ci>O documento nao ficou guardado, so estes numeros.\u003c/i>","botoes":[{"rotulo":"📎 Mandar outra ficha em PDF","acao":"ficha_pdf","destino":"ficha_pdf"},{"rotulo":"✍️ Digitar os numeros de novo","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🗑️ Remover a ficha","acao":"ficha_remover","destino":"ficha_remover"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:almoco","ficha_cancelar"]},"ficha_ok___":{"texto":"✅ \u003cb>Ficha guardada.\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 630 kcal\n\u003cb>Proteina no almoco:\u003c/b> 31 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\nVou marcar no cardapio o que voce deve evitar.\n\nToque em \u003cb>Quanto pegar hoje\u003c/b> para ver o almoco pela sua ficha.","botoes":[{"rotulo":"🥗 Quanto pegar hoje","acao":"quanto","destino":"quanto__"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:dia","ficha_ok"]},"ficha_cancelar___":{"texto":"📋 \u003cb>Sua ficha do nutricionista\u003c/b>\n\n\u003cb>Calorias no almoco:\u003c/b> 630 kcal\n\u003cb>Proteina no almoco:\u003c/b> 31 g\n\u003ci>A ficha trazia o total do dia. Estou usando 35% dele para o almoco.\u003c/i>\n\u003cb>Evitar:\u003c/b> frituras, refrigerante\n\u003ci>Nutricionista responsavel - CRN-3 12345\u003c/i>\n\n\u003ci>Confirmada por voce em 2026-09-12.\u003c/i>\n\u003ci>O documento nao ficou guardado, so estes numeros.\u003c/i>","botoes":[{"rotulo":"📎 Mandar outra ficha em PDF","acao":"ficha_pdf","destino":"ficha_pdf"},{"rotulo":"✍️ Digitar os numeros de novo","acao":"ficha_manual","destino":"ficha_manual"},{"rotulo":"🗑️ Remover a ficha","acao":"ficha_remover","destino":"ficha_remover"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_pdf","__anexar_pdf__","ficha_escopo","ficha_escopo:dia","ficha_cancelar"]},"registrar_sugestao_":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• 2 porcoes de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 1 colher de Arroz parboilizado\n• 2 conchas de Feijao preto\n• Mix de alface a vontade\n\n\u003ci>594 kcal · 33 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.","botoes":[{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_ok","quanto","registrar_sugestao"]},"ficha_campo:ptn_g___":{"texto":"📋 \u003cb>Confira o que eu entendi da sua ficha\u003c/b>\n\u003ci>Nada disso vale enquanto voce nao confirmar.\u003c/i>\n\n⬜ \u003cb>Calorias:\u003c/b> 600 kcal\n     \u003ci>li de: “voce digitou”\u003c/i>\n⬜ \u003cb>Proteina:\u003c/b> 35 g\n     \u003ci>li de: “voce digitou”\u003c/i>\n\nToque num numero para \u003cb>tirar\u003c/b> ele, se eu li errado.","botoes":[{"rotulo":"⬜ Calorias 600 kcal","acao":"ficha_campo:kcal","destino":"ficha_campo:kcal_"},{"rotulo":"⬜ Proteina 35 g","acao":"ficha_campo:ptn_g","destino":"ficha_campo:ptn_g___"},{"rotulo":"✅ Esta certo, continuar","acao":"ficha_escopo","destino":"ficha_escopo_"},{"rotulo":"❌ Cancelar","acao":"ficha_cancelar","destino":"ficha_cancelar___"}],"caminho":["ficha","ficha_manual","ficha_escopo:almoco","ficha_rever","ficha_campo:kcal","ficha_campo:ptn_g"]},"registrar_sugestao__":{"texto":"✅ \u003cb>Refeicao de segunda-feira, 1 de setembro registrada\u003c/b>\n\n• 1 porcao de Carne assada ao molho\n• 1 colher de Macarrao alho e oleo\n• 1 colher de Arroz parboilizado\n• 1 concha de Feijao preto\n• Mix de alface a vontade\n\n\u003ci>431 kcal · 19 g de proteina\u003c/i>\n\nVoce registrou 1 de 5 dias desta semana.\n\nIsso fica no seu \u003cb>Meu dia\u003c/b>. Registrar de novo hoje substitui este.","botoes":[{"rotulo":"📊 Ver meu historico","acao":"meu_dia","destino":"meu_dia___"},{"rotulo":"🔙 Voltar","acao":"menu","destino":"menu"}],"caminho":["ficha","ficha_manual","ficha_escopo:dia","ficha_ok","quanto","registrar_sugestao"]},"piloto":{"texto":"📊 RELATORIO DO PILOTO\n2025-09-01 a 2025-09-30\n\nADESAO\n  Convidados:        16\n  Cadastrados:       16  (100% dos convidados)\n  Usaram de fato:    12  (75% de quem se cadastrou)\n  Voltaram outro dia:  8  (67% de quem usou)\n\nUSO\n  Refeicoes registradas: 20\n  Dias por pessoa:       1.7\n\nO QUE AS PESSOAS USAM\n  Registrar a refeicao         12 pessoa(s), 24 vez(es)\n  Avaliar o refeitorio         10 pessoa(s), 10 vez(es)\n  Seguir a sugestao de porcao  1 pessoa(s), 5 vez(es)\n  Guardar favorito             0 pessoa(s), 0 vez(es)\n  Ficha nutricional            0 pessoa(s), 0 vez(es)\n\nOBJETIVO DECLARADO (agregado)\n  Comer mais leve              10 pessoa(s)\n  Manter o equilibrio          6 pessoa(s)\n\nAVALIACAO DO REFEITORIO\n  Avaliacoes:        10\n  Comida boa:        70%\n  Atendimento bom:   80%\n\nQUALIDADE DO DADO DO CARDAPIO\n  Itens no cardapio:      16\n  Com informacao nutricional: 94%\n  Com alergenico declarado:   38%\n  Pessoas com restricao declarada: 1\n\nO QUE NAO ENTRA NESTE RELATORIO\n  O que cada pessoa comeu, a meta de cada pessoa e se ela bateu a meta.\n  Dado alimentar e dado de saude dentro de relacao de emprego, e o\n  funcionario aceitou o termo porque o app promete que a empresa nao ve\n  isso sobre ele. Num grupo pequeno, qualquer recorte aponta para alguem.\n\nPESSOAS POR DIA\n  2025-09-01  ▇▇▇▇▇▇▇▇▇▇▇▇ 12\n  2025-09-02  ▇▇▇▇▇▇▇▇ 8\n","botoes":[],"caminho":["piloto"],"comando":"/piloto 16 2025-09-01 2025-09-30","grupo":"administracao"},"cobertura":{"texto":"🧪 \u003cb>Cobertura de alergenicos\u003c/b>\n\n0 de 16 fichas com todos os alergenicos declarados (0%).\n6 parcialmente declaradas, 10 sem nenhuma declaracao.\nEnquanto a ficha nao estiver completa, o app avisa o funcionario que nao consegue confirmar — nunca que o prato e seguro.\n\n\u003cb>Declarar primeiro (aparecem mais no cardapio):\u003c/b>\n• ARROZ PARBOILIZADO\n• FEIJAO PRETO\n• ARROZ INTEGRAL\n• CARNE ASSADA AO MOLHO\n• FEIJAO CARIOCA\n• FEIJOADA\n• FILE DE FRANGO GRELHADO\n• MACARRAO ALHO E OLEO\n• OMELETE DE LEGUMES\n• OVO COZIDO\n\n\u003ci>Para declarar em lote: scripts/alergenicos.py --exportar, preencher no Excel e --importar.\u003c/i>","botoes":[],"caminho":["cobertura"],"comando":"/cobertura","grupo":"administracao"},"relatorio":{"texto":"📊 \u003cb>Adesao por setor\u003c/b>\n\n- Industria Exemplo · Logistica: 8 pessoas\n- Industria Exemplo · Producao: 8 pessoas\n\n\u003ci>So adesao agregada. Consumo, objetivo e restricao de pessoa identificada nao saem daqui — sao dado de saude do funcionario.\u003c/i>","botoes":[],"caminho":["relatorio"],"comando":"/relatorio","grupo":"administracao"},"atendimento":{"texto":"📊 \u003cb>Atendimento por refeitorio\u003c/b>\n\u003ci>domingo, 3 de agosto a segunda-feira, 1 de setembro\u003c/i>\n\n- \u003cb>SM\u003c/b>: 10 avaliacoes · comida boa 70% · atendimento bom 80%\n\n\u003ci>Ordenado por quem precisa de atencao primeiro. Use /atendimento &lt;refeitorio&gt; para o detalhe.\u003c/i>\n\u003ci>Avaliacao nao carrega nome, empresa nem setor de quem respondeu.\u003c/i>","botoes":[],"caminho":["atendimento"],"comando":"/atendimento","grupo":"administracao"}},"dados":{"dia":"2025-09-01","dia_amigavel":"segunda-feira, 1 de setembro","pessoa":{"nome":"Mariana","refeitorio":"SM","empresa":"Industria Exemplo","setor":"Producao","objetivo":"Manter o equilibrio","restricoes":"Leite e derivados, Ovos"},"cardapio":[{"categoria":"Prato principal","codigo":"PRATO PRINCIPAL","itens":[{"codigo":"carne_assada_ao_molho","declaracoes":{"gluten":"nao_declarado","crustaceos":"nao_declarado","ovos":"nao_declarado","peixes":"nao_declarado","amendoim":"nao_declarado","soja":"nao_declarado","leite":"nao_declarado","castanhas":"nao_declarado","latex":"nao_declarado"},"nome":"Carne assada ao molho","veredito":"atencao","etiqueta":"sem declaracao de leite e derivados, ovos","motivo":"Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.","peso":"moderado","papel":"Proteína do prato","dica":"moderado","kcal":134.0,"ptn":12.0}]},{"categoria":"Opcao ao prato principal","codigo":"OPCAO AO PP","itens":[{"codigo":"ovo_cozido","declaracoes":{"gluten":"nao_declarado","crustaceos":"nao_declarado","ovos":"contem","peixes":"nao_declarado","amendoim":"nao_declarado","soja":"nao_declarado","leite":"nao_declarado","castanhas":"nao_declarado","latex":"nao_declarado"},"nome":"Ovo cozido","veredito":"bloqueio","etiqueta":"contem ovos","motivo":"Este prato contem Ovos, que voce evita. Nao recomendo pedir.","peso":"leve","papel":"Proteína do prato","dica":"leve","kcal":78.0,"ptn":6.3}]},{"categoria":"Guarnicao","codigo":"GUARNICAO","itens":[{"codigo":"macarrao_alho_e_oleo","declaracoes":{"gluten":"contem","crustaceos":"nao_declarado","ovos":"nao_declarado","peixes":"nao_declarado","amendoim":"nao_declarado","soja":"pode_conter","leite":"nao_declarado","castanhas":"nao_declarado","latex":"nao_declarado"},"nome":"Macarrao alho e oleo","veredito":"atencao","etiqueta":"sem declaracao de leite e derivados, ovos","motivo":"Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.","peso":"moderado","papel":"Acompanhamento","dica":"moderado","kcal":126.0,"ptn":2.0}]},{"categoria":"Arroz","codigo":"ARROZ","itens":[{"codigo":"arroz_parboilizado","declaracoes":{"gluten":"nao_declarado","crustaceos":"nao_declarado","ovos":"nao_declarado","peixes":"nao_declarado","amendoim":"nao_declarado","soja":"pode_conter","leite":"nao_declarado","castanhas":"nao_declarado","latex":"nao_declarado"},"nome":"Arroz parboilizado","veredito":"atencao","etiqueta":"sem declaracao de leite e derivados, ovos","motivo":"Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.","peso":"moderado","papel":"Energia","dica":"moderado","kcal":138.0,"ptn":2.0}]},{"categoria":"Feijao","codigo":"FEIJAO","itens":[{"codigo":"feijao_preto","declaracoes":{"gluten":"nao_declarado","crustaceos":"nao_declarado","ovos":"nao_declarado","peixes":"nao_declarado","amendoim":"nao_declarado","soja":"nao_declarado","leite":"nao_declarado","castanhas":"nao_declarado","latex":"nao_declarado"},"nome":"Feijao preto","veredito":"atencao","etiqueta":"sem declaracao de leite e derivados, ovos","motivo":"Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.","peso":"leve","papel":"Fibras","dica":"leve","kcal":29.0,"ptn":2.0}]},{"categoria":"Salada","codigo":"SALADA","itens":[{"codigo":"sal_mix_de_alface","declaracoes":{"gluten":"nao_declarado","crustaceos":"nao_declarado","ovos":"nao_contem","peixes":"nao_declarado","amendoim":"nao_declarado","soja":"nao_declarado","leite":"nao_contem","castanhas":"nao_declarado","latex":"nao_declarado"},"nome":"Mix de alface","veredito":"liberado","etiqueta":"conferido para a sua ficha","motivo":"Nenhum alergenico da sua ficha aparece neste prato.","peso":"leve","papel":"Vitaminas e minerais","dica":"leve","kcal":4.0,"ptn":0.6}]}],"contagem":{"total":6,"bloqueio":1,"atencao":4,"liberado":1},"conformidade":[{"restricoes":[],"vereditos":{"arroz_parboilizado":"sem_restricao","feijao_preto":"sem_restricao","macarrao_alho_e_oleo":"sem_restricao","ovo_cozido":"sem_restricao","carne_assada_ao_molho":"sem_restricao","sal_mix_de_alface":"sem_restricao"}},{"restricoes":["ovos"],"vereditos":{"arroz_parboilizado":"atencao","feijao_preto":"atencao","macarrao_alho_e_oleo":"atencao","ovo_cozido":"bloqueio","carne_assada_ao_molho":"atencao","sal_mix_de_alface":"liberado"}},{"restricoes":["leite"],"vereditos":{"arroz_parboilizado":"atencao","feijao_preto":"atencao","macarrao_alho_e_oleo":"atencao","ovo_cozido":"atencao","carne_assada_ao_molho":"atencao","sal_mix_de_alface":"liberado"}},{"restricoes":["gluten"],"vereditos":{"arroz_parboilizado":"atencao","feijao_preto":"atencao","macarrao_alho_e_oleo":"bloqueio","ovo_cozido":"atencao","carne_assada_ao_molho":"atencao","sal_mix_de_alface":"atencao"}},{"restricoes":["ovos","leite"],"vereditos":{"arroz_parboilizado":"atencao","feijao_preto":"atencao","macarrao_alho_e_oleo":"atencao","ovo_cozido":"bloqueio","carne_assada_ao_molho":"atencao","sal_mix_de_alface":"liberado"}},{"restricoes":["gluten","soja","leite"],"vereditos":{"arroz_parboilizado":"atencao","feijao_preto":"atencao","macarrao_alho_e_oleo":"bloqueio","ovo_cozido":"atencao","carne_assada_ao_molho":"atencao","sal_mix_de_alface":"atencao"}},{"restricoes":["amendoim","castanhas","peixes","crustaceos"],"vereditos":{"arroz_parboilizado":"atencao","feijao_preto":"atencao","macarrao_alho_e_oleo":"atencao","ovo_cozido":"atencao","carne_assada_ao_molho":"atencao","sal_mix_de_alface":"atencao"}}],"alergenicos":[{"codigo":"gluten","nome":"Gluten (trigo, centeio, cevada, aveia)"},{"codigo":"crustaceos","nome":"Crustaceos"},{"codigo":"ovos","nome":"Ovos"},{"codigo":"peixes","nome":"Peixes"},{"codigo":"amendoim","nome":"Amendoim"},{"codigo":"soja","nome":"Soja"},{"codigo":"leite","nome":"Leite e derivados"},{"codigo":"castanhas","nome":"Castanhas, nozes, amendoas e pistache"},{"codigo":"latex","nome":"Latex natural"}],"objetivos":[{"nome":"Comer melhor no dia a dia","alvo":{"kcal":700,"ptn":30}},{"nome":"Manter o equilibrio","alvo":{"kcal":700,"ptn":30}},{"nome":"Comer mais leve","alvo":{"kcal":550,"ptn":25}},{"nome":"Reforcar a proteina","alvo":{"kcal":850,"ptn":45}}],"porcoes":{"itens":[{"nome":"Carne assada ao molho","medida":"2 porcoes","categoria":"Prato principal","kcal":268,"ptn":24},{"nome":"Macarrao alho e oleo","medida":"1 colher","categoria":"Guarnicao","kcal":126,"ptn":2},{"nome":"Arroz parboilizado","medida":"2 colheres","categoria":"Arroz","kcal":276,"ptn":4},{"nome":"Feijao preto","medida":"1 concha","categoria":"Feijao","kcal":29,"ptn":2},{"nome":"Mix de alface","medida":"a vontade","categoria":"Salada","kcal":4,"ptn":1}],"kcal":703,"ptn":33,"alvo_kcal":700,"alvo_ptn":30,"resumo":"Isso da 703 kcal e 33 g de proteina. E a sua meta do dia.","avisos":[]},"meu_dia":{"dias":[{"data":"2025-08-29","data_amigavel":"sexta-feira, 29 de agosto","kcal":292,"ptn":35,"incompleto":false,"itens":[{"nome":"Arroz parboilizado","quantidade":1},{"nome":"File de frango grelhado","quantidade":1},{"nome":"Mix de alface","quantidade":1}]}]},"progresso":{"pontos":25,"dias_na_semana":0,"resumo_semana":"Voce ainda nao registrou nenhuma refeicao esta semana.","conquistas":[{"nome":"Atingiu a meta de proteina do dia","vezes":1},{"nome":"Registrou a refeicao","vezes":1},{"nome":"Incluiu salada ou fruta no prato","vezes":1}]},"semana":[{"data":"2025-08-26","sigla":"Ter","hoje":false,"registrado":false,"kcal":null,"ptn":null},{"data":"2025-08-27","sigla":"Qua","hoje":false,"registrado":false,"kcal":null,"ptn":null},{"data":"2025-08-28","sigla":"Qui","hoje":false,"registrado":false,"kcal":null,"ptn":null},{"data":"2025-08-29","sigla":"Sex","hoje":false,"registrado":true,"kcal":292,"ptn":35},{"data":"2025-09-01","sigla":"Seg","hoje":true,"registrado":false,"kcal":null,"ptn":null}],"perfil":{"nome":"Mariana","iniciais":"M","refeitorio":"SM","empresa":"Industria Exemplo","setor":"Producao","objetivo":"Manter o equilibrio","alvo":{"kcal":700,"ptn":30},"restricoes":["Leite e derivados","Ovos"],"restricoes_codigos":["leite","ovos"],"restricoes_livres":[],"evitar":[],"favoritos":[],"avisos":[{"codigo":"resumo_semanal","nome":"Resumo da semana","detalhe":"Sexta, 16h. Só sobre você: não existe ranking.","ligado":true},{"codigo":"lembrete_almoco","nome":"Lembrete do almoço","detalhe":"Dia útil, 11h, só se você ainda não registrou.","ligado":false}]},"avaliacao":{"escala":[{"nota":3,"rotulo":"Bom"},{"nota":2,"rotulo":"Regular"},{"nota":1,"rotulo":"Ruim"}],"faltas":[{"codigo":"acabou","rotulo":"Acabou antes de eu chegar"},{"codigo":"pouca_quantidade","rotulo":"Pouca quantidade"},{"codigo":"sem_opcao_restricao","rotulo":"Nada que eu pudesse comer"},{"codigo":"faltou_utensilio","rotulo":"Faltou talher, prato ou copo"},{"codigo":"faltou_bebida","rotulo":"Faltou bebida"},{"codigo":"comida_fria","rotulo":"Comida fria"}]},"registro_previsto":{"pontos_antes":25,"pontos_depois":50,"ganho":25,"conquistas":[{"nome":"Registrou a refeicao","pontos":10},{"nome":"Incluiu salada ou fruta no prato","pontos":5},{"nome":"Atingiu a meta de proteina do dia","pontos":10}]},"plano_exemplo":[]},"regras":{"refeicoes":"(Caf[eé] da manh[ãa]|Cola[çc][ãa]o|Almo[çc]o|Lanche(?:\\s*-\\s*Op[çc][ãa]o\\s*\\d+)?|Jantar|Ceia)","rodape":"Digitally signed by.*?NUTRI[ÇC][ÃA]O","ancora":"\\((\\d+(?:[.,]\\d+)?)\\s*(g|ml)\\)|(À\\s*vontade|A\\s*vontade)|(\\d+(?:[.,]\\d+)?)\\s*ml","quantidade":"^(?P\u003cnome>.*?)\\s*(?P\u003cqtd>\\d+(?:[.,]\\d+)?)\\s*(?P\u003cmedida>.*)$","rotulos":{"kcal":"(?:vet|get|valor energetico(?: total)?|energia|calorias?|kcal|kilocalorias?)","ptn_g":"(?:ptn|proteinas?|prot\\b\\.?)","cho_g":"(?:cho|carboidratos?|carbo\\.?|gliciacids?)","lip_g":"(?:lip|lipideos?|lipidios?|gorduras?)"},"por_dia":"(?:/\\s*dia|por dia|ao dia|diari[oa]|total diari[oa]|/d\\b|24\\s*h)","do_almoco":"(?:almoco|refeicao principal|jantar/almoco)","limites":{"kcal_max":1500,"kcal_min":100,"ptn_max":150,"ptn_min":5,"fracao_almoco":0.35}}};</script>
 
 
 <!-- Icones desenhados aqui, em traco de 2px na grade de 24, que e a do Lucide.
@@ -628,18 +660,20 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   <symbol id="i-prancheta" viewBox="0 0 24 24"><rect x="4.5" y="4.5" width="15" height="15" rx="2.5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
   <symbol id="i-fogo" viewBox="0 0 24 24"><path d="M12 21a6 6 0 0 0 6-6c0-4.5-6-12-6-12S6 10.5 6 15a6 6 0 0 0 6 6Z"/><path d="M12 21a2.7 2.7 0 0 0 2.7-2.7c0-2-2.7-5.3-2.7-5.3s-2.7 3.3-2.7 5.3A2.7 2.7 0 0 0 12 21Z"/></symbol>
   <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4.5 7.5h3l1.4-2.2h6.2l1.4 2.2h3a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 17.5V9a1.5 1.5 0 0 1 1.5-1.5Z"/><circle cx="12" cy="13" r="3.4"/></symbol>
   <symbol id="i-casa" viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8.5Z"/><path d="M9.5 21v-6h5v6"/></symbol>
 </defs></svg>
 
 <div class="app">
-  <header class="topo marca" id="topo"><div class="barra"><button class="crculo" type="button" aria-label="Sobre esta demonstração"><svg class="icone " aria-hidden="true"><use href="#i-info"></use></svg></button><div class="titulo"><h1>Apetit</h1></div><button class="crculo" type="button" aria-label="Notificações"><svg class="icone " aria-hidden="true"><use href="#i-sino"></use></svg></button></div><p class="apoio">Alimenta o que te faz bem</p></header>
+  <header class="topo marca" id="topo"><div class="barra"><div class="titulo"><h1>Apetit</h1></div></div><p class="apoio">Alimenta o que te faz bem</p></header>
 
   <div class="instalar on" id="faixa-instalar"><p id="instalar-texto">Prévia visual · Cardápio e perfil de exemplo</p></div>
 
-  <main class="tela" id="tela" tabindex="-1" aria-live="polite"><p class="inicio-frase">Escolhas hoje, um amanhã melhor</p><section class="conquistas"><div class="conq-topo"><span class="chip"><svg class="icone " aria-hidden="true"><use href="#i-trofeu"></use></svg></span><h2>Minhas conquistas</h2></div><div class="conq-corpo"><div class="conq-lista"><div class="conq-item"><span class="tick"><svg class="icone " aria-hidden="true"><use href="#i-check"></use></svg></span><span>Meta de proteína atingida</span></div><div class="conq-item"><span class="tick"><svg class="icone " aria-hidden="true"><use href="#i-check"></use></svg></span><span>Refeição registrada</span></div><div class="conq-item"><span class="tick"><svg class="icone " aria-hidden="true"><use href="#i-check"></use></svg></span><span>Salada ou fruta no prato</span></div></div><div class="pontos"><div class="anel"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="none" stroke="rgba(245,217,78,.2)" stroke-width="5"></circle><circle cx="50" cy="50" r="40" fill="none" stroke="#F5D94E" stroke-width="5" stroke-linecap="round" stroke-dasharray="226 26" transform="rotate(-92 50 50)"></circle><path d="m51 5 1.5 3 3.5.5-2.5 2.4.6 3.5L51 12.8l-3.1 1.6.6-3.5L46 8.5l3.5-.5Z" fill="#F5D94E"></path></svg><span class="n">25</span></div><span class="l">Pontos<br>acumulados</span></div></div></section><div class="home-acoes"><button class="cta forte" type="button"><svg class="icone " aria-hidden="true"><use href="#i-talher"></use></svg><b>Montar meu prato</b><svg class="icone seta" aria-hidden="true"><use href="#i-seta"></use></svg></button><button class="cta leve" type="button"><svg class="icone " aria-hidden="true"><use href="#i-tigela"></use></svg><b>Quanto pegar hoje</b><svg class="icone seta" aria-hidden="true"><use href="#i-seta"></use></svg></button></div><div class="cabeca-secao"><h2>Ações rápidas</h2><span>Facilita o seu dia</span></div><div class="home-rapidas"><button class="item" type="button"><span class="chip"><svg class="icone " aria-hidden="true"><use href="#i-calendario"></use></svg></span><b>Cardápio</b><svg class="icone seta" aria-hidden="true"><use href="#i-seta"></use></svg></button><button class="item" type="button"><span class="chip"><svg class="icone " aria-hidden="true"><use href="#i-estrela"></use></svg></span><b>Avaliar o refeitório</b><svg class="icone seta" aria-hidden="true"><use href="#i-seta"></use></svg></button></div></main>
+  <main class="tela" id="tela" tabindex="-1" aria-live="polite"><h1 class="h1">Bem-vindo ao refeitório</h1><p class="sub">Eu te mostro o cardápio do dia, aviso o que você não pode comer e acompanho o seu almoço. Para isso preciso saber quem você é.</p><div class="cartao" style="margin-top: 20px;"><p class="paragrafo">São seis perguntas rápidas: nome, onde você almoça, empresa e setor, seu objetivo e as suas alergias.</p><p class="legenda">Sua empresa não vê o que você come. A Apetit só enxerga quantas pessoas usam, por setor.</p></div></main>
   <input type="file" id="arquivo-pdf" accept="application/pdf,.pdf" hidden>
+  <input type="file" id="arquivo-foto" accept="image/*" hidden>
   <div class="acoes" id="acoes"></div>
-  <nav class="abas" id="abas" aria-label="Seções"><button class="aba" type="button" data-aba="inicio" aria-current="page"><svg class="icone " aria-hidden="true"><use href="#i-casa"></use></svg><span>Início</span></button><button class="aba" type="button" data-aba="cardapio"><svg class="icone " aria-hidden="true"><use href="#i-talher"></use></svg><span>Cardápio</span></button><button class="aba" type="button" data-aba="progresso"><svg class="icone " aria-hidden="true"><use href="#i-barras"></use></svg><span>Progresso</span></button><button class="aba" type="button" data-aba="perfil"><svg class="icone " aria-hidden="true"><use href="#i-pessoa"></use></svg><span>Perfil</span></button></nav>
+  <nav class="abas" id="abas" aria-label="Seções" hidden=""><button class="aba" type="button" data-aba="inicio"><svg class="icone " aria-hidden="true"><use href="#i-casa"></use></svg><span>Início</span></button><button class="aba" type="button" data-aba="cardapio"><svg class="icone " aria-hidden="true"><use href="#i-talher"></use></svg><span>Cardápio</span></button><button class="aba" type="button" data-aba="progresso"><svg class="icone " aria-hidden="true"><use href="#i-barras"></use></svg><span>Progresso</span></button><button class="aba" type="button" data-aba="perfil"><svg class="icone " aria-hidden="true"><use href="#i-pessoa"></use></svg><span>Perfil</span></button></nav>
 </div>
 
 <dialog id="folha"><div class="folha" id="folha-corpo"></div></dialog>
@@ -665,6 +699,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     filtroCardapio: "todos", periodoProgresso: "semana"
   };
   try { estado.gestao = localStorage.getItem("apetit-gestao") === "sim"; } catch (e) {}
+  // `lido`, `guardar` e `esquecer` ficam mais abaixo; a leitura acima acontece
+  // antes de tudo e por isso fala direto com o navegador.
 
   var ABAS = [
     { id: "inicio",    icone: "i-casa",       nome: "Início" },
@@ -804,7 +840,9 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   var DETALHE = /^\s{2,}<b>(.*)<\/b>\s*$/;
   var CABECA  = /^(\S*)\s*<b>(.*?)<\/b>\s*$/;
   var PORCAO  = /^•\s+(\d+)\s+(\S+)\s+de\s+(.+)$/;
-  var VONTADE = /^•\s+(.+?)\s+(?:a|à)\s+vontade$/i;
+  // O travessao entre nome e medida ("Salada — a vontade") nao faz parte do
+  // nome do alimento: sem descarta-lo, ele grudava no fim do prato.
+  var VONTADE = /^•\s+(.+?)\s*[—–-]?\s*(?:a|à)\s+vontade$/i;
   var ITEM    = /^•\s+(.+)$/;
   var MEDIDA  = /^(.+?)\s+—\s+(.+)$/;
 
@@ -1075,7 +1113,9 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   function abrirSobre(){
     abrirFolha(function(c){
       c.appendChild(el("h2", "", "Sobre esta demonstração"));
-      c.appendChild(el("p", "", "Você está usando o app como a <b>Mariana</b>. " +
+      c.appendChild(el("p", "", (cadastroSalvo()
+        ? "Você está usando o app com o <b>seu cadastro</b>, guardado neste aparelho. "
+        : "Você está usando o app como a <b>Mariana</b>, o cadastro de exemplo. ") +
         "As telas foram geradas rodando o código real do bot — não são maquete."));
 
       var compartilharApp = el("button", "cta leve");
@@ -1091,7 +1131,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       c.appendChild(verEstados);
       c.appendChild(el("h3", "", "Quem você é"));
       var dl = el("dl", "");
-      var p = (DADOS && DADOS.perfil) || {};
+      var p = pessoa();
       [["Refeitório", p.refeitorio], ["Empresa", p.empresa], ["Setor", p.setor],
        ["Objetivo", p.objetivo], ["Alergias", (p.restricoes || []).join(", ")]
       ].forEach(function(par){
@@ -1288,19 +1328,60 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     if (!pilha.childElementCount) tela.appendChild(vazio("Nenhum prato nesta categoria.", "Escolha outra categoria para continuar.", "i-talher"));
     tela.appendChild(el("p", "fotos-nota", "Fotos ilustrativas. Confira os avisos antes de se servir."));
 
-    var contagem = (DADOS && DADOS.contagem) || {};
-    if (contagem.atencao){
-      var aviso = el("div", "aviso wrn");
-      aviso.appendChild(icone("i-atencao"));
-      aviso.appendChild(el("span", "", "<b>" + contagem.atencao + " pratos sem declaração " +
-        "de alergênico.</b> Não consigo garantir que são seguros para você — pergunte no balcão."));
-      tela.appendChild(aviso);
+    // O contador vem dos pratos que estao na tela, avaliados contra a lista de
+    // quem esta usando o app — nao do numero que o Python calculou para o
+    // exemplo. Dizer "3 pratos sem declaracao" a quem nao declarou alergia
+    // seria contar um aviso que nao e dela.
+    var restricoes = restricoesAtuais();
+    if (restricoes.length){
+      var pendentes = 0;
+      grupos.forEach(function(g){
+        g.itens.forEach(function(i){ if (vereditoPara(i, restricoes) === "atencao") pendentes++; });
+      });
+      if (pendentes){
+        var aviso = el("div", "aviso wrn");
+        aviso.appendChild(icone("i-atencao"));
+        aviso.appendChild(el("span", "", "<b>" + pendentes + (pendentes === 1
+          ? " prato sem declaração completa" : " pratos sem declaração completa") +
+          " dos alergênicos que você evita.</b> Não consigo garantir que são seguros " +
+          "para você — pergunte no balcão."));
+        tela.appendChild(aviso);
+      }
+    } else {
+      // Sem restricao cadastrada o app nao tem o que conferir, e nao pode deixar
+      // o silencio parecer aprovacao.
+      var neutro = el("div", "aviso okk");
+      neutro.appendChild(icone("i-escudo"));
+      neutro.appendChild(el("span", "", "<b>Você não tem alergia cadastrada.</b> " +
+        "Por isso não marquei nenhum prato — não é o mesmo que dizer que todos " +
+        "estão liberados para você."));
+      tela.appendChild(neutro);
     }
   }
 
+  // O veredito nao vem pronto do prato: ele e calculado agora, contra a lista de
+  // restricoes de quem esta usando o app. Sem isso, alguem que se cadastrasse
+  // com outra alergia veria as cores da Mariana.
+  function avaliado(i){
+    var restricoes = restricoesAtuais();
+    return {
+      veredito: vereditoPara(i, restricoes),
+      etiqueta: etiquetaPara(i, restricoes),
+      motivo: motivoPara(i, restricoes)
+    };
+  }
+
+  var CLASSE_VEREDITO = { bloqueio: "blk", liberado: "okk", atencao: "wrn", sem_restricao: "" };
+
   function linhaDoPrato(i, grupo){
-    var no = el("button", "prato " + (i.veredito === "bloqueio" ? "blk"
-             : i.veredito === "liberado" ? "okk" : "wrn"));
+    var a = avaliado(i);
+    var no = el("button", "prato " + CLASSE_VEREDITO[a.veredito]);
+    // O codigo e o veredito ficam no proprio no: e o que
+    // `scripts/conferir_vereditos.py` le para comparar prato por prato com o
+    // que o Python calculou. Conferir a cor na tela, e nao a funcao por dentro,
+    // e o que garante que a pessoa viu o aviso certo.
+    no.dataset.codigo = i.codigo || "";
+    no.dataset.veredito = a.veredito;
     no.appendChild(fotoPrato(i.nome, ICONE_CATEGORIA[grupo.codigo]));
 
     var corpo = el("div", "corpo");
@@ -1310,12 +1391,12 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     if (i.papel) selos.appendChild(el("span", "papel", escapar(i.papel)));
     // O peso e informacao neutra; a cor fica reservada para o que e seguranca.
     if (i.peso && i.peso !== "sem informacao") selos.appendChild(selo(i.peso));
-    if (i.veredito === "bloqueio"){
-      selos.appendChild(selo("Não pode: " + nomesDoBloqueio(i), "vermelho", "i-proibido"));
-    } else if (i.veredito === "liberado"){
+    if (a.veredito === "bloqueio"){
+      selos.appendChild(selo(a.etiqueta, "vermelho", "i-proibido"));
+    } else if (a.veredito === "liberado"){
       selos.appendChild(selo("Liberado", "verde", "i-liberado"));
-    } else {
-      selos.appendChild(selo("Confirme alergênicos", "laranja", "i-atencao"));
+    } else if (a.veredito === "atencao"){
+      selos.appendChild(selo(a.etiqueta || "Confirme alergênicos", "laranja", "i-atencao"));
     }
     corpo.appendChild(selos);
     no.appendChild(corpo);
@@ -1324,28 +1405,22 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     return no;
   }
 
-  function nomesDoBloqueio(i){
-    // A etiqueta ja vem pronta do dominio ("contem ovos"): aqui so sobra o que
-    // vem depois do verbo, para o selo caber na linha.
-    var m = /^(?:contem|tem)\s+(.*)$/i.exec(i.etiqueta || "");
-    var nomes = m ? m[1] : (i.etiqueta || "alergênico");
-    return nomes.charAt(0).toUpperCase() + nomes.slice(1);
-  }
-
   function abrirPrato(i, grupo){
+    var a = avaliado(i);
     abrirFolha(function(c){
       c.appendChild(el("h2", "", escapar(i.nome)));
       c.appendChild(el("p", "", escapar(grupo.categoria + (i.papel ? " · " + i.papel : ""))));
 
       var selos = el("div", "tags");
-      if (i.veredito === "bloqueio") selos.appendChild(etiquetaGrande("Não pode", "i-proibido"));
-      else if (i.veredito === "liberado") selos.appendChild(etiquetaGrande("Liberado", "i-liberado", "calma"));
-      else selos.appendChild(etiquetaGrande("Confirme no balcão", "i-atencao", "calma"));
+      if (a.veredito === "bloqueio") selos.appendChild(etiquetaGrande("Não pode", "i-proibido"));
+      else if (a.veredito === "liberado") selos.appendChild(etiquetaGrande("Liberado", "i-liberado", "calma"));
+      else if (a.veredito === "atencao") selos.appendChild(etiquetaGrande("Confirme no balcão", "i-atencao", "calma"));
+      else selos.appendChild(etiquetaGrande("Sem restrição cadastrada", "i-escudo", "calma"));
       c.appendChild(selos);
 
-      if (i.motivo){
+      if (a.motivo){
         c.appendChild(el("h3", "", "Por quê"));
-        c.appendChild(el("p", "", escapar(i.motivo)));
+        c.appendChild(el("p", "", escapar(a.motivo)));
       }
       if (i.kcal != null || i.ptn != null){
         c.appendChild(el("h3", "", "Por porção servida"));
@@ -1389,7 +1464,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     macros.appendChild(el("span", "", escapar(p.ptn) + " g de proteína"));
     var objetivo = el("div", "objetivo-resumo");
     objetivo.appendChild(icone("i-alvo"));
-    objetivo.appendChild(el("div", "", "Objetivo<b>" + escapar(((DADOS || {}).perfil || {}).objetivo || "") + "</b>"));
+    objetivo.appendChild(el("div", "", "Objetivo<b>" + escapar(pessoa().objetivo || "") + "</b>"));
     macros.appendChild(objetivo);
     ficha.appendChild(macros);
     resumo.appendChild(ficha);
@@ -1686,14 +1761,565 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     return partes;
   }
 
+  // ---------- onde as coisas ficam guardadas ----------
+  //
+  // Num quadro embutido — e e assim que a previa chega para quem so recebeu o
+  // link — o navegador bloqueia o `localStorage` do endereco de dentro. Sem
+  // alternativa, o cadastro morreria no ultimo passo, e com uma mensagem sobre
+  // espaco em disco que nem e o motivo.
+  //
+  // Entao ha dois lugares: o aparelho, quando da, e a memoria da aba, quando
+  // nao da. O app funciona nos dois. O que muda e o que ele pode prometer — e
+  // ele diz qual dos dois esta valendo, em vez de deixar a pessoa descobrir ao
+  // fechar a pagina.
+  var naMemoria = {};
+
+  function guardar(chave, valor){
+    try { localStorage.setItem(chave, valor); return "aparelho"; }
+    catch (e) { naMemoria[chave] = valor; return "memoria"; }
+  }
+  function lido(chave){
+    try {
+      var v = localStorage.getItem(chave);
+      if (v != null) return v;
+    } catch (e) {}
+    return naMemoria[chave] != null ? naMemoria[chave] : null;
+  }
+  function esquecer(chave){
+    delete naMemoria[chave];
+    try { localStorage.removeItem(chave); } catch (e) {}
+  }
+  // Uma escrita de teste responde o que `typeof localStorage` nao responde: no
+  // quadro embutido o objeto existe e so o uso e que falha.
+  function guardaNoAparelho(){
+    try {
+      localStorage.setItem("apetit-teste", "1");
+      localStorage.removeItem("apetit-teste");
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---------- cadastro ----------
+  //
+  // Na primeira vez o funcionario se cadastra do zero; depois o cadastro fica
+  // guardado e ele edita quando quiser. Os passos e a ordem sao os mesmos do
+  // bot (`ask_name` ate `ask_consent` em `bot.py`), para as duas portas de
+  // entrada pedirem a mesma coisa, na mesma sequencia, com as mesmas palavras
+  // no termo.
+  //
+  // Fica em `localStorage`, como a foto: esta demonstracao nao tem servidor, e
+  // inventar um "salvo na nuvem" seria prometer o que nao existe. No app de
+  // verdade quem guarda e o banco do bot, com o mesmo `Employee`.
+  var CADASTRO = "apetit-cadastro";
+
+  function cadastroSalvo(){
+    try { return JSON.parse(lido(CADASTRO) || "null"); } catch (e) { return null; }
+  }
+  function guardarCadastro(dados){
+    return guardar(CADASTRO, JSON.stringify(dados));
+  }
+
+  // O cadastro guardado manda no que as telas mostram. Sem ele, vale o exemplo
+  // exportado do dominio, que e como a demonstracao nasce para quem so quer ver.
+  function pessoa(){
+    var salvo = cadastroSalvo();
+    var exemplo = (DADOS && DADOS.perfil) || {};
+    if (!salvo) return exemplo;
+    return {
+      nome: salvo.nome,
+      iniciais: iniciaisDe(salvo.nome),
+      refeitorio: salvo.refeitorio,
+      empresa: salvo.empresa,
+      setor: salvo.setor,
+      objetivo: salvo.objetivo,
+      alvo: alvoDoObjetivo(salvo.objetivo),
+      restricoes: nomesDasRestricoes(salvo.restricoes),
+      restricoes_codigos: salvo.restricoes || [],
+      restricoes_livres: [],
+      evitar: [],
+      favoritos: exemplo.favoritos || [],
+      avisos: exemplo.avisos || []
+    };
+  }
+
+  function restricoesAtuais(){
+    var salvo = cadastroSalvo();
+    if (salvo) return salvo.restricoes || [];
+    return (DADOS && DADOS.perfil && DADOS.perfil.restricoes_codigos) || [];
+  }
+
+  function iniciaisDe(nome){
+    return String(nome || "").trim().split(/\s+/).slice(0, 2)
+      .map(function(p){ return p.charAt(0); }).join("").toUpperCase() || "?";
+  }
+  function alvoDoObjetivo(objetivo){
+    var achado = ((DADOS && DADOS.objetivos) || []).filter(function(o){ return o.nome === objetivo; })[0];
+    return achado ? achado.alvo : {};
+  }
+  function nomesDasRestricoes(codigos){
+    var nomes = {};
+    ((DADOS && DADOS.alergenicos) || []).forEach(function(a){ nomes[a.codigo] = a.nome; });
+    return (codigos || []).map(function(c){ return nomes[c] || c; });
+  }
+
+  // rascunho do cadastro em andamento
+  var rascunho = null;
+  var passoAtual = 0;
+
+  var PASSOS = [
+    { campo: "nome",       titulo: "Como você quer ser chamado?",
+      apoio: "É esse nome que vai aparecer no seu app. Não precisa ser o nome completo.",
+      tipo: "texto", rotulo: "Nome", exemplo: "Mariana" },
+    { campo: "refeitorio", titulo: "Onde você almoça?",
+      apoio: "A unidade da Apetit que serve o seu refeitório.",
+      tipo: "texto", rotulo: "Refeitório", exemplo: "SM" },
+    { campo: "empresa",    titulo: "Onde você trabalha?",
+      apoio: "A empresa e o setor. Isso ajuda a Apetit a ver a adesão por setor — nunca o que você come.",
+      tipo: "dupla", segundo: "setor",
+      rotulo: "Empresa", exemplo: "Indústria Exemplo",
+      rotulo2: "Setor", exemplo2: "Produção" },
+    { campo: "objetivo",   titulo: "O que você quer do app?",
+      apoio: "Isso só ajusta as dicas que eu te dou. Dá para mudar quando quiser.",
+      tipo: "objetivo" },
+    { campo: "restricoes", titulo: "Você tem alguma alergia ou intolerância?",
+      apoio: "Marque o que se aplica. Eu aviso no cardápio o que você não pode comer — e nunca afirmo que um prato é seguro sem alguém ter conferido.",
+      tipo: "alergias" },
+    { campo: "consentimento", titulo: "Antes de terminar",
+      apoio: "", tipo: "termo" }
+  ];
+
+  function novoRascunho(editando){
+    var salvo = cadastroSalvo();
+    if (editando && salvo){
+      return { nome: salvo.nome, refeitorio: salvo.refeitorio, empresa: salvo.empresa,
+               setor: salvo.setor, objetivo: salvo.objetivo,
+               restricoes: (salvo.restricoes || []).slice(), consentimento: true, editando: true };
+    }
+    return { nome: "", refeitorio: "", empresa: "", setor: "", objetivo: "",
+             restricoes: [], consentimento: false, editando: false };
+  }
+
+  function comecarCadastro(editando){
+    rascunho = novoRascunho(editando);
+    passoAtual = 0;
+    historico.length = 0;
+    mostrar("cadastro", false);
+  }
+
+  function passoCompleto(){
+    var p = PASSOS[passoAtual];
+    if (p.tipo === "texto") return !!String(rascunho[p.campo] || "").trim();
+    if (p.tipo === "dupla"){
+      return !!String(rascunho[p.campo] || "").trim() && !!String(rascunho[p.segundo] || "").trim();
+    }
+    if (p.tipo === "objetivo") return !!rascunho.objetivo;
+    if (p.tipo === "alergias") return true;      // "nenhuma" e uma resposta valida
+    return rascunho.consentimento;
+  }
+
+  // Botao de escolha unica ou multipla, com a mesma caixa de marcar que as
+  // opcoes do bot ja usam.
+  function escolha(titulo, detalhe, marcada, aoClicar){
+    var b = el("button", "opcao" + (marcada ? " marcada" : ""));
+    b.setAttribute("aria-pressed", marcada ? "true" : "false");
+    var txt = el("div", "txt");
+    txt.appendChild(el("b", "", escapar(titulo)));
+    if (detalhe) txt.appendChild(el("span", "", escapar(detalhe)));
+    b.appendChild(txt);
+    var marca = el("span", "caixa");
+    marca.appendChild(icone("i-liberado"));
+    b.appendChild(marca);
+    b.addEventListener("click", aoClicar);
+    return b;
+  }
+
+  function telaCadastro(){
+    if (!rascunho){ rascunho = novoRascunho(!!cadastroSalvo()); passoAtual = 0; }
+    var p = PASSOS[passoAtual];
+
+    topo.className = "topo simples";
+    topo.textContent = "";
+    var barra = el("div", "barra");
+    barra.appendChild(botaoIcone("i-voltar", "Voltar", function(){
+      if (passoAtual > 0){ passoAtual--; redesenhar(); return; }
+      var voltarPara = rascunho.editando ? "perfil" : "boas_vindas";
+      rascunho = null;
+      mostrar(voltarPara, false);
+    }));
+    var titulo = el("div", "titulo");
+    titulo.appendChild(el("h1", "", rascunho.editando ? "Editar cadastro" : "Seu cadastro"));
+    titulo.appendChild(el("p", "", "Passo " + (passoAtual + 1) + " de " + PASSOS.length));
+    barra.appendChild(titulo);
+    topo.appendChild(barra);
+
+    var trilho = el("div", "progresso-cadastro");
+    var feito = el("div", "feito");
+    feito.style.width = ((passoAtual + 1) / PASSOS.length * 100) + "%";
+    trilho.appendChild(feito);
+    tela.appendChild(trilho);
+
+    tela.appendChild(el("h1", "h1", escapar(p.titulo)));
+    if (p.apoio) tela.appendChild(el("p", "sub", escapar(p.apoio)));
+
+    if (p.tipo === "texto" || p.tipo === "dupla"){
+      tela.appendChild(campoTexto(p.campo, p.rotulo, p.exemplo));
+      if (p.tipo === "dupla") tela.appendChild(campoTexto(p.segundo, p.rotulo2, p.exemplo2));
+    } else if (p.tipo === "objetivo"){
+      var lista = el("div", "pilha");
+      lista.style.marginTop = "18px";
+      ((DADOS && DADOS.objetivos) || []).forEach(function(o){
+        lista.appendChild(escolha(
+          o.nome,
+          "Alvo do almoço: " + o.alvo.kcal + " kcal · " + o.alvo.ptn + " g de proteína",
+          rascunho.objetivo === o.nome,
+          function(){ rascunho.objetivo = o.nome; redesenhar(); }
+        ));
+      });
+      tela.appendChild(lista);
+      tela.appendChild(el("p", "legenda",
+        "Alvo ilustrativo. Quem define quantidade individual é o nutricionista responsável — " +
+        "se você mandar a sua ficha, o app passa a seguir ela."));
+    } else if (p.tipo === "alergias"){
+      var caixa = el("div", "pilha");
+      caixa.style.marginTop = "18px";
+      ((DADOS && DADOS.alergenicos) || []).forEach(function(a){
+        var ligada = rascunho.restricoes.indexOf(a.codigo) >= 0;
+        caixa.appendChild(escolha(a.nome, "", ligada, function(){
+          var n = rascunho.restricoes.indexOf(a.codigo);
+          if (n >= 0) rascunho.restricoes.splice(n, 1); else rascunho.restricoes.push(a.codigo);
+          redesenhar();
+        }));
+      });
+      tela.appendChild(caixa);
+      tela.appendChild(el("p", "legenda", rascunho.restricoes.length
+        ? "Se a sua restrição não está na lista, fale no balcão: eu só consigo conferir o que a " +
+          "ficha técnica do prato declara."
+        : "Você pode seguir sem marcar nada."));
+    } else {
+      var termo = el("div", "cartao");
+      termo.style.marginTop = "18px";
+      termo.appendChild(el("p", "paragrafo",
+        "Preciso guardar seu nome, onde você almoça, empresa, setor, suas restrições e o que " +
+        "você registrar que comeu."));
+      termo.appendChild(el("p", "paragrafo",
+        "<b>Sua empresa não vê nada disso sobre você.</b> Nem o que você come, nem o seu " +
+        "objetivo, nem as suas restrições. A Apetit só enxerga quantas pessoas usam, por setor, " +
+        "e mesmo assim setor com menos de 5 pessoas nem aparece."));
+      termo.appendChild(el("p", "legenda",
+        "Você vê tudo e apaga tudo quando quiser, no seu cadastro."));
+      tela.appendChild(termo);
+
+      var aceite = escolha("Li e concordo",
+        "Sem isso o app não guarda nada — e também não funciona.",
+        rascunho.consentimento,
+        function(){ rascunho.consentimento = !rascunho.consentimento; redesenhar(); });
+      aceite.style.marginTop = "12px";
+      tela.appendChild(aceite);
+
+      var resumo = el("dl", "campos");
+      resumo.style.marginTop = "18px";
+      [["Nome", rascunho.nome], ["Refeitório", rascunho.refeitorio],
+       ["Empresa", rascunho.empresa], ["Setor", rascunho.setor],
+       ["Objetivo", rascunho.objetivo],
+       ["Restrições", nomesDasRestricoes(rascunho.restricoes).join(", ") || "Nenhuma"]
+      ].forEach(function(par){
+        var linha = el("div", "campo");
+        linha.appendChild(el("dt", "", escapar(par[0])));
+        linha.appendChild(el("dd", "", escapar(par[1] || "—")));
+        resumo.appendChild(linha);
+      });
+      tela.appendChild(resumo);
+    }
+
+    var ultimo = passoAtual === PASSOS.length - 1;
+    var avancar = el("button", "cta forte");
+    avancar.appendChild(el("b", "", ultimo
+      ? (rascunho.editando ? "Salvar alterações" : "Criar meu cadastro")
+      : "Continuar"));
+    avancar.appendChild(icone(ultimo ? "i-liberado" : "i-seta", ultimo ? "" : "seta"));
+    if (!passoCompleto()) avancar.disabled = true;
+    avancar.addEventListener("click", function(){
+      if (!passoCompleto()) return;
+      if (!ultimo){ passoAtual++; redesenhar(); return; }
+      salvarCadastro();
+    });
+    acoes.appendChild(avancar);
+  }
+
+  // O rotulo fica visivel, e nao so no `placeholder`: o `placeholder` some
+  // quando a pessoa digita, e dois campos preenchidos lado a lado deixariam de
+  // dizer qual e a empresa e qual e o setor.
+  function campoTexto(campo, rotulo, exemplo){
+    var caixa = el("div", "campo-texto");
+    var nome = el("label", "", escapar(rotulo || campo));
+    nome.setAttribute("for", "campo-" + campo);
+    caixa.appendChild(nome);
+    var entrada = document.createElement("input");
+    entrada.type = "text";
+    entrada.id = "campo-" + campo;
+    entrada.value = rascunho[campo] || "";
+    entrada.placeholder = exemplo || "";
+    entrada.autocomplete = "off";
+    // Sem `redesenhar()` a cada tecla: a tela inteira seria remontada e o
+    // teclado do celular fecharia no meio da palavra.
+    entrada.addEventListener("input", function(){
+      rascunho[campo] = entrada.value;
+      var botao = acoes.querySelector(".cta");
+      if (botao) botao.disabled = !passoCompleto();
+    });
+    caixa.appendChild(entrada);
+    return caixa;
+  }
+
+  function salvarCadastro(){
+    var dados = {
+      nome: String(rascunho.nome || "").trim(),
+      refeitorio: String(rascunho.refeitorio || "").trim(),
+      empresa: String(rascunho.empresa || "").trim(),
+      setor: String(rascunho.setor || "").trim(),
+      objetivo: rascunho.objetivo,
+      restricoes: rascunho.restricoes.slice(),
+      consentimento: true
+    };
+    var editando = rascunho.editando;
+    var onde = guardarCadastro(dados);
+    rascunho = null;
+    historico.length = 0;
+    mostrar(editando ? "perfil" : "inicio", false);
+    if (editando){ recado("Cadastro atualizado."); return; }
+    recado(onde === "aparelho"
+      ? "Pronto, " + dados.nome + ". Seu cadastro está guardado neste aparelho."
+      : "Pronto, " + dados.nome + ". Aqui na prévia o cadastro vale enquanto esta " +
+        "página estiver aberta.");
+  }
+
+  function apagarCadastro(){
+    esquecer(CADASTRO);
+  }
+
+  // A primeira tela de quem nunca abriu o app. Ela nao empurra o cadastro sem
+  // alternativa: o link do piloto e compartilhado, e quem so quer olhar precisa
+  // conseguir olhar — com o exemplo da Mariana, dito com esse nome, para
+  // ninguem confundir dado de exemplo com dado seu.
+  function telaBoasVindas(){
+    topo.className = "topo marca";
+    topo.textContent = "";
+    var barra = el("div", "barra");
+    var titulo = el("div", "titulo");
+    titulo.appendChild(el("h1", "", "Apetit"));
+    barra.appendChild(titulo);
+    topo.appendChild(barra);
+    topo.appendChild(el("p", "apoio", "Alimenta o que te faz bem"));
+
+    tela.appendChild(el("h1", "h1", "Bem-vindo ao refeitório"));
+    tela.appendChild(el("p", "sub",
+      "Eu te mostro o cardápio do dia, aviso o que você não pode comer e " +
+      "acompanho o seu almoço. Para isso preciso saber quem você é."));
+
+    var cartao = el("div", "cartao");
+    cartao.style.marginTop = "20px";
+    cartao.appendChild(el("p", "paragrafo",
+      "São seis perguntas rápidas: nome, onde você almoça, empresa e setor, " +
+      "seu objetivo e as suas alergias."));
+    cartao.appendChild(el("p", "legenda",
+      "Sua empresa não vê o que você come. A Apetit só enxerga quantas pessoas " +
+      "usam, por setor."));
+    tela.appendChild(cartao);
+
+    // Dito antes de a pessoa preencher seis passos, e nao depois: descobrir no
+    // fim que nada seria guardado e pior do que saber no comeco.
+    if (!guardaNoAparelho()){
+      var aviso = el("div", "aviso wrn");
+      aviso.style.marginTop = "14px";
+      aviso.appendChild(icone("i-info"));
+      aviso.appendChild(el("span", "", "<b>Você está numa prévia embutida.</b> " +
+        "Aqui o navegador não deixa gravar nada: o cadastro vale enquanto esta " +
+        "página estiver aberta. Abrindo o link numa aba própria, ele fica guardado."));
+      tela.appendChild(aviso);
+    }
+
+    var criar = el("button", "cta forte");
+    criar.appendChild(el("b", "", "Criar meu cadastro"));
+    criar.appendChild(icone("i-seta", "seta"));
+    criar.addEventListener("click", function(){ comecarCadastro(false); });
+    acoes.appendChild(criar);
+
+    var olhar = el("button", "cta leve");
+    olhar.appendChild(icone("i-info"));
+    olhar.appendChild(el("b", "", "Só olhar, com o exemplo da Mariana"));
+    olhar.addEventListener("click", function(){
+      historico.length = 0;
+      mostrar("inicio", false);
+    });
+    acoes.appendChild(olhar);
+  }
+
   // ---------- 6. perfil ----------
+
+  // ---------- o veredito de alergenico, do lado do navegador ----------
+  //
+  // O cadastro e do proprio funcionario e mora so no aparelho, entao o
+  // navegador precisa decidir o veredito sozinho. Isso poe a regra dos tres
+  // estados em dois lugares — aqui e em `apetit/allergens.py` — que e
+  // exatamente o jeito de os dois discordarem um dia sem ninguem ver.
+  //
+  // A trava e `dados.conformidade`: o Python calcula o veredito de cada prato
+  // para varias combinacoes de alergia, e `scripts/conferir_vereditos.py` roda
+  // este codigo num navegador de verdade e falha se um unico prato divergir.
+  //
+  // A regra e curta porque o modelo e curto: contem bloqueia, pode conter e
+  // sem declaracao pedem confirmacao, e so "nao contem" libera. Ausencia de
+  // informacao nunca vira liberacao.
+  var PESO_VEREDITO = { bloqueio: 3, atencao: 2, liberado: 1, sem_restricao: 0 };
+
+  function vereditoDaDeclaracao(estado){
+    if (estado === "contem") return "bloqueio";
+    if (estado === "nao_contem") return "liberado";
+    return "atencao";                     // pode_conter e nao_declarado
+  }
+
+  function vereditoPara(item, restricoes){
+    if (!restricoes || !restricoes.length) return "sem_restricao";
+    var pior = "liberado";
+    restricoes.forEach(function(codigo){
+      var v = vereditoDaDeclaracao((item.declaracoes || {})[codigo] || "nao_declarado");
+      if (PESO_VEREDITO[v] > PESO_VEREDITO[pior]) pior = v;
+    });
+    return pior;
+  }
+
+  // O texto do motivo, montado das mesmas partes que o bot usa.
+  function motivoPara(item, restricoes){
+    var nomes = {};
+    ((DADOS && DADOS.alergenicos) || []).forEach(function(a){ nomes[a.codigo] = a.nome; });
+    var contem = [], pode = [], sem = [];
+    (restricoes || []).forEach(function(c){
+      var estado = (item.declaracoes || {})[c] || "nao_declarado";
+      if (estado === "contem") contem.push(nomes[c] || c);
+      else if (estado === "pode_conter") pode.push(nomes[c] || c);
+      else if (estado === "nao_declarado") sem.push(nomes[c] || c);
+    });
+    if (contem.length){
+      return "Este prato contém " + contem.join(", ").toLowerCase() +
+             ", que você evita. Não recomendo pedir.";
+    }
+    var partes = [];
+    if (pode.length) partes.push("pode conter " + pode.join(", ").toLowerCase());
+    if (sem.length) partes.push("não tem declaração sobre " + sem.join(", ").toLowerCase());
+    if (partes.length){
+      return "Não consigo confirmar que este prato é seguro para você: " +
+             partes.join(" e ") + ". Confirme no balcão antes de se servir.";
+    }
+    if (!restricoes || !restricoes.length) return "Você não tem restrição cadastrada.";
+    return "Nenhum alergênico da sua ficha aparece neste prato.";
+  }
+
+  function etiquetaPara(item, restricoes){
+    var nomes = {};
+    ((DADOS && DADOS.alergenicos) || []).forEach(function(a){ nomes[a.codigo] = a.nome; });
+    var contem = [], pode = [], sem = [];
+    (restricoes || []).forEach(function(c){
+      var estado = (item.declaracoes || {})[c] || "nao_declarado";
+      if (estado === "contem") contem.push(nomes[c] || c);
+      else if (estado === "pode_conter") pode.push(nomes[c] || c);
+      else if (estado === "nao_declarado") sem.push(nomes[c] || c);
+    });
+    if (contem.length) return "Não pode: " + contem.join(", ");
+    if (pode.length) return "Pode conter " + pode.join(", ").toLowerCase();
+    if (sem.length) return "Confirme alergênicos";
+    return "";
+  }
+
+  // ---------- foto de perfil ----------
+  //
+  // A foto fica **so no aparelho**, em `localStorage`, e nunca sai dele: nao ha
+  // servidor nesta demonstracao, e num app de refeitorio o rosto do funcionario
+  // e o dado mais identificavel que existe. Guardar no celular de quem tirou
+  // mantem a promessa que o resto do app faz — a empresa nao ve.
+  //
+  // A imagem e reduzida a um quadrado de 256px antes de guardar. Foto de
+  // celular tem 3-5 MB e o `localStorage` cabe ~5 MB: sem reduzir, a primeira
+  // foto estouraria a cota e derrubaria tudo que estava guardado junto.
+  var FOTO = "apetit-foto";
+  var LADO = 256;
+
+  function fotoGuardada(){
+    return lido(FOTO) || "";
+  }
+  function guardarFoto(dados){
+    return guardar(FOTO, dados);
+  }
+  function apagarFoto(){
+    esquecer(FOTO);
+  }
+
+  // Recorte quadrado pelo centro: o avatar e redondo, e esticar a foto para
+  // caber deformaria o rosto.
+  function reduzirFoto(arquivo){
+    return new Promise(function(resolve, reject){
+      if (!/^image\//.test(arquivo.type)) { reject(new Error("nao-e-imagem")); return; }
+      var url = URL.createObjectURL(arquivo);
+      var img = new Image();
+      img.onload = function(){
+        URL.revokeObjectURL(url);
+        try {
+          var lado = Math.min(img.naturalWidth, img.naturalHeight);
+          var tela = document.createElement("canvas");
+          tela.width = tela.height = LADO;
+          tela.getContext("2d").drawImage(
+            img, (img.naturalWidth - lado) / 2, (img.naturalHeight - lado) / 2,
+            lado, lado, 0, 0, LADO, LADO);
+          resolve(tela.toDataURL("image/jpeg", 0.82));
+        } catch (erro) { reject(new Error("nao-deu-para-ler")); }
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error("nao-deu-para-ler")); };
+      img.src = url;
+    });
+  }
+
+  function desenhaAvatar(p){
+    var no = el("button", "avatar");
+    no.setAttribute("aria-label", fotoGuardada() ? "Trocar a foto do perfil" : "Colocar uma foto no perfil");
+    var foto = fotoGuardada();
+    if (foto){
+      var img = document.createElement("img");
+      img.src = foto;
+      img.alt = "";
+      no.appendChild(img);
+    } else {
+      no.appendChild(el("span", "", escapar(p.iniciais || "?")));
+    }
+    var selo = el("span", "camera");
+    selo.appendChild(icone("i-camera"));
+    no.appendChild(selo);
+    no.addEventListener("click", function(){ document.getElementById("arquivo-foto").click(); });
+    return no;
+  }
+
+  document.getElementById("arquivo-foto").addEventListener("change", function(){
+    var entrada = this;
+    var arquivo = entrada.files && entrada.files[0];
+    entrada.value = "";
+    if (!arquivo) return;
+    reduzirFoto(arquivo).then(function(dados){
+      var onde = guardarFoto(dados);
+      redesenhar();
+      recado(onde === "aparelho"
+        ? "Foto atualizada. Ela fica só neste aparelho."
+        : "Foto atualizada. Aqui na prévia ela vale enquanto esta página estiver aberta.");
+    }).catch(function(erro){
+      recado(erro.message === "nao-e-imagem"
+        ? "Esse arquivo não é uma imagem. Escolha uma foto."
+        : "Não consegui abrir essa imagem. Tente outra foto.");
+    });
+  });
 
   function telaPerfil(){
     cabecalhoInterno("Apetit", "");
-    var p = (DADOS && DADOS.perfil) || {};
+    var p = pessoa();
 
     var cabeca = el("div", "perfil-topo");
-    cabeca.appendChild(el("div", "avatar", escapar(p.iniciais || "?")));
+    cabeca.appendChild(desenhaAvatar(p));
     var quem = el("div", "quem");
     quem.appendChild(el("b", "", escapar(p.nome || "")));
     quem.appendChild(el("span", "", escapar([p.empresa, p.setor].filter(Boolean).join(" · "))));
@@ -1765,21 +2391,52 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     });
     tela.appendChild(notificacoes);
 
-    secao("Conta");
+    // Quem pode por a foto tem que poder tirar, e no mesmo lugar onde ela esta.
+    if (fotoGuardada()){
+      var tirar = el("button", "cta fantasma");
+      tirar.style.marginTop = "12px";
+      tirar.appendChild(icone("i-proibido"));
+      tirar.appendChild(el("b", "", "Remover a foto do perfil"));
+      tirar.addEventListener("click", function(){
+        apagarFoto();
+        redesenhar();
+        recado("Foto removida deste aparelho.");
+      });
+      tela.appendChild(tirar);
+    }
+    tela.appendChild(el("p", "legenda", guardaNoAparelho()
+      ? "A foto fica só neste aparelho. Ela não é enviada para a Apetit nem para a sua empresa."
+      : "A foto não sai daqui. Nesta prévia ela nem chega a ser gravada: vale só " +
+        "enquanto a página estiver aberta."));
+
+    secao("Cadastro");
     var conta = el("div", "pilha");
-    [{ nome: "Meus dados e privacidade", icone: "i-cadeado", busca: "Meus dados" },
-     { nome: "Refazer cadastro", icone: "i-atualizar", busca: "Refazer cadastro" }
-    ].forEach(function(c){
-      var alvoC = alvoDeRotulo(c.busca);
-      var b = el("button", "item");
-      b.appendChild(chip(c.icone, true));
-      b.appendChild(el("b", "", c.nome));
-      b.appendChild(icone("i-seta", "seta"));
-      if (alvoC) b.addEventListener("click", function(){ mostrar(alvoC); });
-      else b.disabled = true;
-      conta.appendChild(b);
-    });
+    // O cadastro e editavel aqui, na tela onde ele esta escrito. Enquanto nao
+    // existe um, o mesmo lugar oferece criar: quem entrou pelo exemplo ve os
+    // dados da Mariana e precisa de um caminho para trocar por si.
+    var temCadastro = !!cadastroSalvo();
+    conta.appendChild(itemDeConta(
+      temCadastro ? "Editar meu cadastro" : "Criar o meu cadastro",
+      temCadastro ? "i-lapis" : "i-pessoa",
+      function(){ comecarCadastro(temCadastro); }
+    ));
+    var privacidade = alvoDeRotulo("Meus dados");
+    if (privacidade){
+      conta.appendChild(itemDeConta("Meus dados e privacidade", "i-cadeado",
+        function(){ mostrar(privacidade); }));
+    }
+    if (temCadastro){
+      conta.appendChild(itemDeConta("Apagar meu cadastro deste aparelho", "i-proibido",
+        function(){ confirmarApagar(); }));
+    }
     tela.appendChild(conta);
+    if (temCadastro){
+      tela.appendChild(el("p", "legenda", guardaNoAparelho()
+        ? "Seu cadastro fica neste aparelho, como a foto. Nada dele é enviado para " +
+          "a sua empresa."
+        : "Nada do seu cadastro é enviado para a sua empresa. Nesta prévia ele " +
+          "também não é gravado: vale enquanto esta página estiver aberta."));
+    }
 
     // A area de gestao nao aparece para funcionario. No app de verdade quem
     // libera e `ADMIN_IDS` no servidor; aqui, sem servidor, a chave fica
@@ -1827,6 +2484,38 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       });
       tela.appendChild(dl);
     }
+  }
+
+  function itemDeConta(nome, ic, aoClicar){
+    var b = el("button", "item");
+    b.appendChild(chip(ic, true));
+    b.appendChild(el("b", "", escapar(nome)));
+    b.appendChild(icone("i-seta", "seta"));
+    b.addEventListener("click", aoClicar);
+    return b;
+  }
+
+  // Apagar o cadastro e irreversivel e nao tem desfazer: a folha pergunta antes,
+  // e diz o que vai embora com ele.
+  function confirmarApagar(){
+    abrirFolha(function(c){
+      c.appendChild(el("h2", "", "Apagar o seu cadastro?"));
+      c.appendChild(el("p", "", "Vão embora deste aparelho o seu nome, refeitório, " +
+        "empresa, setor, objetivo e as suas restrições. Não tem como desfazer."));
+      c.appendChild(el("p", "", "O app volta a mostrar o exemplo da Mariana, e você " +
+        "pode se cadastrar de novo quando quiser."));
+      var apagar = el("button", "cta forte");
+      apagar.appendChild(icone("i-proibido"));
+      apagar.appendChild(el("b", "", "Apagar o meu cadastro"));
+      apagar.addEventListener("click", function(){
+        apagarCadastro();
+        if (typeof folha.close === "function") folha.close();
+        historico.length = 0;
+        mostrar("boas_vindas", false);
+        recado("Cadastro apagado deste aparelho.");
+      });
+      c.appendChild(apagar);
+    });
   }
 
   function alvoDeRotulo(texto){
@@ -1883,8 +2572,14 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   var NATIVAS = {
     inicio: telaInicio, cardapio: telaCardapio, quanto: telaQuanto,
     avaliar: telaAvaliar, progresso: telaProgresso, perfil: telaPerfil,
-    gestao: telaGestao, estados: telaEstados
+    gestao: telaGestao, estados: telaEstados,
+    boas_vindas: telaBoasVindas, cadastro: telaCadastro
   };
+
+  // Telas de antes de existir cadastro. A navegacao inferior nao aparece nelas:
+  // levar para "Progresso" quem ainda nao se cadastrou mostraria o progresso de
+  // outra pessoa.
+  var SEM_ABAS = { boas_vindas: true, cadastro: true };
 
 
   // ---------- navegacao ----------
@@ -1929,6 +2624,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       telaDoBot(t);
     }
 
+    abas.hidden = !!SEM_ABAS[alvo];
     marcarAba(alvo);
     tela.scrollTop = 0;
     tela.focus({ preventScroll: true });
@@ -1960,9 +2656,19 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       tela.appendChild(caixa);
     }
 
+    // O bot nao consegue abrir o seletor de arquivo do celular: no Telegram
+    // quem anexa e a pessoa, pelo clipe. Aqui da, e essa tela e onde ela
+    // procura — entao o botao que abre o seletor entra como acao principal,
+    // na frente do exemplo pronto que o bot oferece.
+    if (atual === "ficha_pdf"){
+      grupos.acoes.unshift({
+        rotulo: "\u{1F4CE} Anexar a minha ficha", acao: "__anexar_meu__", destino: ""
+      });
+    }
+
     var temEscolha = grupos.opcoes.length > 0;
     grupos.acoes.forEach(function(b, n){
-      acoes.appendChild(acao(b, !temEscolha && n === 0 && vivo(b)));
+      acoes.appendChild(acao(b, !temEscolha && n === 0 && (vivo(b) || b.acao === "__anexar_meu__")));
     });
 
     var cabeca = bs.filter(function(b){ return b.tipo === "titulo"; })[0];
@@ -2224,7 +2930,9 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       TELAS = par[0];
       DADOS = par[1];
       estado.pontos = (DADOS && DADOS.progresso && DADOS.progresso.pontos) || 0;
-      mostrar("inicio", false);
+      // Primeira vez: cadastro. Depois, direto para o app — a boas-vindas some
+      // e nao volta a atrapalhar quem ja se cadastrou.
+      mostrar(cadastroSalvo() ? "inicio" : "boas_vindas", false);
     }).catch(falhou);
   }
 

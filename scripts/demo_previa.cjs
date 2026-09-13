@@ -1,6 +1,12 @@
-/* Mantem a home visivel em leitores de HTML que nao executam JavaScript.
- * Executa a interface existente, captura somente os tres containers da home
- * e os inclui no documento. Num navegador, o app reassume esses containers.
+/* Mantem a primeira tela visivel em leitores de HTML que nao executam
+ * JavaScript. Executa a interface existente, captura somente os tres
+ * containers e os inclui no documento. Num navegador, o app reassume esses
+ * containers.
+ *
+ * A primeira tela agora e a de boas-vindas: quem abre o app pela primeira vez
+ * se cadastra antes de ver o resto. O leitor estatico ve exatamente isso — o
+ * snapshot nao pode mostrar uma home que o navegador nao vai abrir.
+ *
  * Uso: node scripts/demo_previa.cjs preview/Apetit-previa-visual.html
  */
 const fs = require('node:fs');
@@ -28,7 +34,7 @@ async function main() {
     await new Promise(resolve => setImmediate(resolve));
     const document = dom.window.document;
     if (errors.length) throw new Error(errors.join('\n'));
-    if (!document.querySelector('.conquistas')) throw new Error('A home nao carregou.');
+    if (!document.querySelector('.acoes .cta')) throw new Error('A tela de boas-vindas nao carregou.');
     let output = html;
     for (const [tag, id] of [['header', 'topo'], ['main', 'tela'], ['nav', 'abas']]) {
       const pattern = new RegExp(`<${tag}\\b[^>]*\\bid="${id}"[^>]*>[\\s\\S]*?</${tag}>`);
@@ -58,16 +64,38 @@ async function main() {
         clone.querySelector('.tela').removeAttribute('tabindex');
         shots.push(`<article class="preview-page"><h2 class="preview-label">${label}</h2>${clone.outerHTML}</article>`);
       };
-      capture('01. Início');
-      go('cardapio'); capture('02. Cardápio');
-      go('inicio'); click('Quanto pegar hoje'); capture('03. Quanto pegar hoje');
+      // A galeria percorre o app como uma pessoa nova: ela se cadastra e so
+      // depois chega na home. Assim as telas capturadas sao as de alguem que
+      // existe, e nao as de um exemplo que ninguem preencheu.
+      const fill = (id, value) => {
+        const input = document.getElementById(id);
+        if (!input) throw new Error(`Campo ausente: ${id}`);
+        input.value = value;
+        input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+      };
+      capture('01. Boas-vindas');
+      click('Criar meu cadastro');
+      fill('campo-nome', 'Mariana'); click('Continuar');
+      fill('campo-refeitorio', 'SM'); click('Continuar');
+      fill('campo-empresa', 'Indústria Exemplo'); fill('campo-setor', 'Produção');
+      capture('02. Cadastro · empresa e setor');
+      click('Continuar');
+      click('Manter o equilibrio'); click('Continuar');
+      click('Ovos'); click('Leite e derivados');
+      capture('03. Cadastro · alergias');
+      click('Continuar');
+      click('Li e concordo'); capture('04. Cadastro · o que fica guardado');
+      click('Criar meu cadastro');
+      capture('05. Início');
+      go('cardapio'); capture('06. Cardápio');
+      go('inicio'); click('Quanto pegar hoje'); capture('07. Quanto pegar hoje');
       go('inicio'); click('Avaliar o refeitório');
-      click('Boa'); click('Comida fria'); click('Enviar avaliação'); capture('04. Avaliar o refeitório');
-      go('progresso'); capture('05. Progresso');
-      go('perfil'); capture('06. Perfil');
-      click('Sou da gestão da Apetit'); click('Visão da Apetit'); capture('07. Gestão');
+      click('Boa'); click('Comida fria'); click('Enviar avaliação'); capture('08. Avaliar o refeitório');
+      go('progresso'); capture('09. Progresso');
+      go('perfil'); capture('10. Perfil');
+      click('Sou da gestão da Apetit'); click('Visão da Apetit'); capture('11. Gestão');
       click('Sobre esta demonstração', document.querySelector('#topo'));
-      click('Ver estados da interface', document.querySelector('dialog')); capture('08. Estados da interface');
+      click('Ver estados da interface', document.querySelector('dialog')); capture('12. Estados da interface');
       if (errors.length) throw new Error(errors.join('\n'));
       const style = document.querySelector('style').textContent;
       const symbols = document.querySelector('body > svg').outerHTML;
@@ -86,10 +114,10 @@ async function main() {
         .preview-page .estado-exemplo.loading .icone{animation:none}
         @media(max-width:440px){body{padding:18px 10px}.preview-heading h1{font-size:24px}.preview-page .app{min-height:0}.preview-grid{gap:26px}}
       `;
-      const gallery = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Apetit · As oito telas</title><style>${style}\n${css}</style></head><body>${symbols}<div class="preview-heading"><h1>Apetit · Novo visual</h1><p>As oito telas do app, com os dados da demonstração. Role para ver todas. Esta galeria é estática; as fotos de comida são ilustrativas.</p></div><div class="preview-grid">${shots.join('\n')}</div></body></html>`;
+      const gallery = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Apetit · As telas do app</title><style>${style}\n${css}</style></head><body>${symbols}<div class="preview-heading"><h1>Apetit · Novo visual</h1><p>As telas do app, do cadastro ao relatório, com os dados da demonstração. Role para ver todas. Esta galeria é estática; as fotos de comida são ilustrativas.</p></div><div class="preview-grid">${shots.join('\n')}</div></body></html>`;
       fs.writeFileSync(process.argv[3], gallery.replace(/[ \t]+$/gm, ''));
     }
-    process.stdout.write('Previa pronta: home visivel com ou sem JavaScript.\n');
+    process.stdout.write('Previa pronta: primeira tela visivel com ou sem JavaScript.\n');
   } finally {
     dom.window.close();
   }
