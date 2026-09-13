@@ -9,7 +9,7 @@
  * dados das telas, para uma republicacao chegar sem a pessoa reinstalar.
  */
 
-const VERSAO = "apetit-demo-v5";
+const VERSAO = "apetit-demo-v6";
 const SHELL = [
   ".",
   "index.html",

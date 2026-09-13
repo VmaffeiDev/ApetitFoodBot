@@ -959,18 +959,29 @@ ficam indisponíveis, e os avisos dos demais continuam visíveis na revisão.
 O bloqueio é conferido novamente no clique de registrar, inclusive se a pessoa
 trocou as restrições depois de montar o prato.
 
-Cada seleção corresponde a uma porção, como no montador do bot. Os resultados
-das 63 seleções não vazias deste cardápio são exportados por `demo_dados.py`,
-para cada objetivo, com e sem o histórico do exemplo. Macros, medidas e pontos
-continuam saindo do domínio Python. A exportação offline tem limite de dez
-alimentos para evitar crescimento exponencial; cardápios maiores precisam
-consultar o motor pelo servidor.
+Os controles de quantidade usam as medidas de `apetit/portions.py`: porções,
+colheres e conchas, dentro das faixas disponíveis na demonstração. Salada
+mantém a indicação à vontade. A faixa do demo não é uma prescrição individual.
+Os resultados das 431 combinações não vazias de alimentos e quantidades são
+exportados por `demo_dados.py`, para cada objetivo, com e sem o histórico do
+exemplo. Macros, medidas e pontos continuam saindo do domínio Python. A
+exportação offline limita o produto das opções a 4.096 combinações; acima
+disso, o cardápio precisa consultar o motor pelo servidor.
 
 Ao confirmar a sugestão ou a montagem, o app guarda uma cópia da refeição na
 memória da sessão: alimentos, medidas, totais e pontos. Home, Meu dia,
 privacidade e os três períodos do progresso consultam esse mesmo registro.
 Alterar o cadastro depois não modifica o almoço confirmado. A demonstração
 aceita um almoço por sessão e não duplica pontos ao voltar às telas.
+
+Depois do registro, a home destaca o almoço confirmado, os alimentos e seus
+totais, e oferece **Avaliar o almoço**. As conquistas aparecem abaixo. Quando
+a avaliação já foi feita, o botão passa a **Ver minha avaliação**.
+
+No perfil próprio, nome, refeitório, empresa, setor, objetivo e restrições têm
+edição direta. O app abre só o campo escolhido, oferece salvar ou cancelar e
+preserva o aceite e os demais campos. Editar o cadastro não reescreve a refeição
+já confirmada. O perfil de exemplo continua identificado como demonstração.
 
 Para conferir os fluxos sem depender da renderização de um navegador:
 
@@ -981,7 +992,8 @@ node scripts/conferir_fluxos.cjs
 
 A verificação percorre as restrições e objetivos exportados pelo Python,
 montagem manual, sugestão, bloqueio no clique final, histórico, conquistas,
-totais dos gráficos e separação entre cadastro novo e exemplo.
+totais dos gráficos, quantidades nos limites suportados, edição por campo,
+cancelamento e separação entre cadastro novo e exemplo.
 
 ### Prévia do visual, sem servidor
 

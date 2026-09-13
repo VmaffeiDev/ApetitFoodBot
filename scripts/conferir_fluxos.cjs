@@ -28,7 +28,7 @@ async function app(profile) {
   await new Promise(resolve => setImmediate(resolve));
   const d = dom.window.document;
   const button = label => {
-    const b = [...d.querySelectorAll('button')].find(b => b.textContent.trim() === label || b.querySelector('b')?.textContent === label);
+    const b = [...d.querySelectorAll('button')].find(b => b.textContent.trim() === label || b.querySelector('b')?.textContent === label || b.getAttribute('aria-label') === label);
     assert.ok(b, `Botão ausente: ${label}`); return b;
   };
   const click = label => {const b=button(label); assert.ok(!b.disabled, label); b.click();};
@@ -47,6 +47,8 @@ function checkRecorded(a, expected, prediction, prior = 0) {
   }
   assert.equal(Number(a.d.querySelector('.pontos .n').textContent), prediction.pontos_depois);
   a.tab('inicio');
+  assert.ok(a.d.querySelector('.refeicao-home').textContent.includes(expected.kcal + ' kcal'));
+  assert.ok(a.d.querySelector('.home-acoes .cta.forte').textContent.includes('Avaliar o almoço'));
   if (!prior) assert.equal(a.d.querySelectorAll('.conq-item').length, prediction.conquistas.length);
   a.tab('perfil'); a.click('Meu dia');
   assert.ok(a.text().includes('Almoço de hoje registrado.'));
@@ -71,6 +73,7 @@ async function main() {
       a.tab('progresso');
       for (const period of ['Semana','Mês','Ano']) {a.click(period); assert.ok([...a.d.querySelectorAll('.valor-dia')].every(n => n.textContent === '—'));}
       a.tab('inicio'); a.click('Montar meu prato');
+      const selected = [];
       // Percorre todas as categorias; bloqueados não podem ser escolhidos.
       for (let step=0; step<data.cardapio.length; step++) {
         for (const code of data.cardapio[step].itens.map(i => i.codigo)) {
@@ -80,10 +83,22 @@ async function main() {
           b.click();
           const updated = a.d.querySelector(`.escolha-prato[data-codigo="${code}"]`);
           assert.equal(updated.getAttribute('aria-pressed'), blocked.includes(code) ? 'false' : 'true');
+          if (!blocked.includes(code)) {
+            let quantity = 1;
+            const option = data.opcoes_montagem.find(o=>o.codigo===code);
+            if (objective === data.objetivos[data.objetivos.length-1]) {
+              while (quantity < option.maximo) {
+                a.d.querySelector(`[data-quantidade-codigo="${code}"] [data-ajuste="mais"]`).click();
+                quantity++;
+              }
+              if (option.maximo > 1) assert.ok(a.d.querySelector(`[data-quantidade-codigo="${code}"] [data-ajuste="mais"]`).disabled);
+            }
+            selected.push(...Array(quantity).fill(code));
+          }
         }
         if (step<data.cardapio.length-1) a.click('Próxima categoria');
       }
-      const selected = data.cardapio.flatMap(g => g.itens).map(i => i.codigo).filter(c => !blocked.includes(c)).sort();
+      selected.sort();
       const manual = data.montagens.find(m => m.codigos.join('|') === selected.join('|'));
       const prediction = manual.objetivos.find(o => o.objetivo === objective.nome).novo;
       a.click('Revisar meu prato'); a.click('Registrar este prato');
@@ -101,7 +116,7 @@ async function main() {
       assert.ok(codes.every(c => !blocked.includes(c)));
       b.click('Vou pegar isso — registrar');
       checkRecorded(b, combination.registro.refeicao, combination.registro);
-      b.tab('inicio'); b.click('Quanto pegar hoje');
+      b.tab('inicio'); b.click('Ver refeição registrada');
       assert.equal([...b.d.querySelectorAll('button')].filter(n => n.textContent.includes('Vou pegar isso')).length, 0);
       scenarios++;
     } finally {b.close();}
@@ -125,6 +140,45 @@ async function main() {
     checkRecorded(b, data.registro_previsto.refeicao, data.registro_previsto, data.meu_dia.dias.reduce((s,d)=>s+d.kcal,0));
     scenarios++;
   } finally {b.close();}
+  // Quantidades na revisão, edição direta com cancelamento e registro imutável.
+  const c = await app({...base, restricoes:[], objetivo:'Comer mais leve', aceite:'2026-09-01T12:00:00Z'});
+  try {
+    const saved=()=>JSON.parse(c.dom.window.localStorage.getItem('apetit-cadastro'));
+    const edit=field=>{c.tab('perfil'); c.d.querySelector(`[data-editar-campo="${field}"]`).click();};
+    const fill=(field,value)=>{const input=c.d.getElementById('campo-'+field); input.value=value; input.dispatchEvent(new c.dom.window.Event('input',{bubbles:true}));};
+    const original=saved();
+    edit('objetivo'); c.click('Reforcar a proteina'); c.click('Cancelar'); assert.deepEqual(saved(),original);
+    for (const [field,value] of [['nome','Nome novo'],['empresa','Empresa nova'],['setor','Setor novo'],['refeitorio','Unidade nova']]) {
+      const before=saved(); edit(field);
+      assert.equal(c.d.querySelectorAll('#tela input').length,1);
+      fill(field,'   '); assert.ok(c.button('Salvar alterações').disabled);
+      fill(field,value); c.click('Salvar alterações');
+      assert.deepEqual(saved(),{...before,[field]:value});
+    }
+    edit('objetivo'); c.click('Manter o equilibrio'); c.click('Salvar alterações'); assert.equal(saved().objetivo,'Manter o equilibrio');
+    edit('objetivo'); c.click('Comer mais leve'); c.click('Salvar alterações');
+    edit('restricoes'); c.click('Ovos'); c.click('Salvar alterações'); assert.deepEqual(saved().restricoes,['ovos']);
+    assert.equal(saved().aceite,original.aceite);
+    c.tab('cardapio'); assert.equal(c.d.querySelector('[data-codigo="ovo_cozido"]').dataset.veredito,'bloqueio');
+    c.tab('inicio'); c.click('Montar meu prato'); c.d.querySelector('.escolha-prato').click();
+    c.click('Aumentar quantidade de Carne assada ao molho');
+    for(let n=0;n<3;n++)c.click('Próxima categoria');
+    c.d.querySelector('.escolha-prato').click(); c.click('Revisar meu prato');
+    c.click('Aumentar quantidade de Arroz parboilizado');
+    c.click('Aumentar quantidade de Arroz parboilizado');
+    assert.ok(c.button('Aumentar quantidade de Arroz parboilizado').disabled);
+    c.click('Diminuir quantidade de Arroz parboilizado');
+    c.click('Diminuir quantidade de Arroz parboilizado');
+    assert.ok(c.button('Diminuir quantidade de Arroz parboilizado').disabled);
+    assert.ok(c.text().includes('406 kcal'));
+    const meal=data.montagens.find(m=>m.codigos.join('|')===['arroz_parboilizado','carne_assada_ao_molho','carne_assada_ao_molho'].join('|'));
+    const prediction=meal.objetivos.find(o=>o.objetivo==='Comer mais leve').novo;
+    c.click('Registrar este prato'); checkRecorded(c,meal.refeicao,prediction);
+    edit('objetivo'); c.click('Reforcar a proteina'); c.click('Salvar alterações'); checkRecorded(c,meal.refeicao,prediction);
+    c.tab('inicio'); c.click('Avaliar o almoço'); c.click('Boa'); c.click('Enviar avaliação');
+    c.tab('inicio'); assert.ok(c.button('Ver minha avaliação'));
+    scenarios++;
+  } finally {c.close();}
   console.log(`${scenarios} cenários passaram: montagem, restrições, registro, histórico, pontos e três períodos do gráfico (DOM).`);
 }
 main().catch(error => {console.error(error); process.exitCode=1;});

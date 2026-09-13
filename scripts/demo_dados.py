@@ -21,7 +21,8 @@ import sys
 import tempfile
 from dataclasses import replace
 from datetime import date, timedelta
-from itertools import combinations
+from itertools import combinations, product
+from math import prod
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -38,7 +39,7 @@ from apetit.humanize import (  # noqa: E402
 )
 from apetit.nudges import LEMBRETE_ALMOCO, RESUMO_SEMANAL  # noqa: E402
 from apetit.profile import Employee, load_employee, save_employee  # noqa: E402
-from apetit.portions import FREE_CATEGORIES, measure_label  # noqa: E402
+from apetit.portions import FREE_CATEGORIES, MEASURES, MEDIDA_PADRAO, measure_label  # noqa: E402
 from apetit.prescription import extract_meal_plan, lunch_from_plan, read_pdf  # noqa: E402
 from apetit.tracking import (  # noqa: E402
     RULES, favorites, history_by_day, log_consumption, points_breakdown,
@@ -483,28 +484,45 @@ def registro_previsto(pessoa, codigos=None) -> dict:
     }
 
 
-def montagens(pessoa) -> list[dict]:
-    """Resultados do motor para as seleções manuais do pequeno cardápio demo.
+def opcoes_montagem(pessoa) -> list[dict]:
+    """Medidas e faixas disponíveis no demo, lidas do módulo de porções.
 
-    Cada alimento pode ser escolhido uma vez, como no montador do bot. A
-    interface consulta estes resultados; não replica macros nem pontuação.
-    O limite impede uma exportação exponencial para um cardápio de produção.
+    A faixa offline é uma capacidade da interface, não uma prescrição. Salada
+    mantém a indicação à vontade do motor, sem inventar unidades adicionais.
     """
-    codigos = sorted(i["item_code"] for i in bot.load_menu(pessoa, DIA))
-    if len(codigos) > 10:
-        raise ValueError("A montagem offline suporta até 10 alimentos; use o motor no servidor para cardápios maiores.")
+    saida = []
+    for item in sorted(bot.load_menu(pessoa, DIA), key=lambda i: i["item_code"]):
+        categoria = item["category"]
+        maximo = 1 if categoria in FREE_CATEGORIES else MEASURES.get(categoria, MEDIDA_PADRAO)[2]
+        saida.append({"codigo": item["item_code"], "maximo": maximo,
+                      "medidas": ["a vontade" if categoria in FREE_CATEGORIES
+                                  else measure_label(categoria, q) for q in range(1, maximo + 1)]})
+    return saida
+
+
+def montagens(pessoa) -> list[dict]:
+    """Calcula no Python todas as quantidades suportadas pelo pequeno demo.
+
+    Códigos repetidos são porções adicionais, como em log_consumption. O
+    navegador escolhe um resultado já calculado, inclusive a pontuação.
+    """
+    opcoes = opcoes_montagem(pessoa)
+    if prod(o["maximo"] + 1 for o in opcoes) > 4096:
+        raise ValueError("O limite de combinações offline foi excedido; consulte o motor no servidor para este cardápio.")
     novato = sem_historico()
     saida = []
-    for tamanho in range(1, len(codigos) + 1):
-        for selecao in combinations(codigos, tamanho):
-            item = {"codigos": list(selecao), "objetivos": []}
-            for objetivo in bot.TARGETS:
-                novo = registro_previsto(replace(novato, goal=objetivo), list(selecao))
-                exemplo = registro_previsto(replace(pessoa, goal=objetivo), list(selecao))
-                item["refeicao"] = novo.pop("refeicao")
-                exemplo.pop("refeicao")
-                item["objetivos"].append({"objetivo": objetivo, "novo": novo, "exemplo": exemplo})
-            saida.append(item)
+    for quantidades in product(*(range(o["maximo"] + 1) for o in opcoes)):
+        selecao = [o["codigo"] for o, qtd in zip(opcoes, quantidades) for _ in range(qtd)]
+        if not selecao:
+            continue
+        item = {"codigos": selecao, "objetivos": []}
+        for objetivo in bot.TARGETS:
+            novo = registro_previsto(replace(novato, goal=objetivo), selecao)
+            exemplo = registro_previsto(replace(pessoa, goal=objetivo), selecao)
+            item["refeicao"] = novo.pop("refeicao")
+            exemplo.pop("refeicao")
+            item["objetivos"].append({"objetivo": objetivo, "novo": novo, "exemplo": exemplo})
+        saida.append(item)
     return saida
 
 
@@ -551,6 +569,7 @@ def main() -> int:
             "porcoes": porcoes(pessoa),
             "combinacoes": combinacoes(),
             "montagens": montagens(pessoa),
+            "opcoes_montagem": opcoes_montagem(pessoa),
             "meu_dia": meu_dia(pessoa),
             "progresso": progresso(pessoa),
             "semana": semana(pessoa),

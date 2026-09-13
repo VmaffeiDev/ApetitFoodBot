@@ -154,6 +154,12 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 
 /* ---------- inicio ---------- */
 .inicio-frase{font-size:12px;color:var(--texto-2);margin-bottom:18px}
+.refeicao-home{padding:20px;border:1px solid var(--verde);border-radius:var(--r-card);background:linear-gradient(140deg,var(--verde-fundo),var(--card));margin-bottom:14px}
+.refeicao-home .estado-refeicao{display:flex;align-items:center;gap:8px;color:var(--verde);font-size:12px;margin-bottom:12px}
+.refeicao-home h2{font-size:24px;line-height:1.2;margin-bottom:10px}
+.refeicao-home .resumo-almoco{font-size:17px;font-weight:700;margin-bottom:12px}
+.refeicao-home .alimentos-almoco{font-size:13px;line-height:1.6;color:var(--texto-2);margin:0}
+.home-acoes + .conquistas{margin-top:18px}
 .conquistas{border:1px solid var(--linha-2);border-radius:18px;padding:16px;
   background:radial-gradient(ellipse at 100% 0%,rgba(236,0,63,.22),transparent 65%),linear-gradient(140deg,#1B1E22,#111315);box-shadow:var(--sombra)}
 .conq-topo{display:flex;align-items:center;gap:12px}
@@ -199,6 +205,11 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .fotos-nota{font-size:10px;color:var(--texto-2)}
 .escolha-prato[aria-pressed="true"]{border-color:var(--amarelo);box-shadow:inset 0 0 0 1px var(--amarelo)}
 .escolha-prato:disabled{cursor:not-allowed}
+.controle-quantidade{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:8px 2px 12px}
+.controle-quantidade button{width:44px;min-height:44px;border:1px solid var(--linha-2);border-radius:12px;background:var(--card-2);color:var(--texto);font-size:22px;cursor:pointer}
+.controle-quantidade button:disabled{opacity:.35;cursor:default}
+.controle-quantidade output{min-width:90px;text-align:center;font-size:14px;font-weight:600}
+.controle-quantidade button:focus-visible{outline:2px solid var(--amarelo);outline-offset:2px}
 .filtros{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:1px 0 4px}
 .filtro{flex:1;min-height:44px;border:1px solid var(--linha-2);border-radius:var(--r-pill);padding:7px 10px;
   background:var(--card);color:var(--texto-2);font-size:11px;cursor:pointer;white-space:nowrap}
@@ -417,6 +428,11 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 
 /* ---------- perfil ---------- */
 .perfil-topo{display:flex;align-items:center;gap:14px;padding:10px 0}
+.campo-edicao{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:13px;background:var(--card);border:1px solid var(--linha);border-radius:12px;text-align:left;color:var(--texto);cursor:pointer}
+.campo-edicao .rotulo{font-size:13px;color:var(--texto-2);min-width:72px}
+.campo-edicao .valor{flex:1;min-width:0;font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.campo-edicao .icone{width:18px;height:18px;flex:none;color:var(--texto-2)}
+.campo-edicao:focus-visible{outline:2px solid var(--amarelo);outline-offset:2px}
 .avatar{width:64px;height:64px;border-radius:50%;flex:none;display:grid;place-items:center;
   background:linear-gradient(145deg,#77808D,#424954);border:2px solid #858D99;color:#fff;font-size:24px;font-weight:700;
   position:relative;overflow:visible;padding:0;cursor:pointer;
@@ -1293,22 +1309,44 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     cabecalhoInicio();
     tela.appendChild(el("p", "inicio-frase", "Escolhas hoje, um amanhã melhor"));
     var cartao = cartaoConquistas();
-    tela.appendChild(cartao);
+    if (estado.registro){
+      var refeicao = estado.registro.refeicao;
+      var resumo = el("section", "refeicao-home");
+      var status = el("div", "estado-refeicao");
+      status.appendChild(icone("i-liberado"));
+      status.appendChild(el("span", "", "Registrado nesta sessão"));
+      resumo.appendChild(status);
+      resumo.appendChild(el("h2", "", "Seu almoço de hoje"));
+      resumo.appendChild(el("p", "resumo-almoco", (refeicao.kcal == null ? "Energia não informada" : refeicao.kcal + " kcal") + " · " + (refeicao.ptn == null ? "Proteína não informada" : refeicao.ptn + " g de proteína")));
+      resumo.appendChild(el("p", "alimentos-almoco", refeicao.itens.map(function(i){
+        return escapar(i.nome) + " · " + escapar(i.medida === "a vontade" ? "À vontade" : i.medida);
+      }).join("<br>")));
+      if (refeicao.incompleto) resumo.appendChild(el("p", "legenda", "Totais incompletos: há alimento sem informação nutricional."));
+      tela.appendChild(resumo);
+    } else tela.appendChild(cartao);
     if (estado.pontosAnimar != null){
       contarAte(cartao._contador, estado.pontosAnimar, estado.pontos);
       estado.pontosAnimar = null;
     }
     var principais = el("div", "home-acoes");
-    principais.appendChild(atalho({id:"montar", busca:"Montar", nome:"Montar meu prato", icone:"i-talher"}, "cta forte"));
-    principais.appendChild(atalho({id:"quanto", nome:"Quanto pegar hoje", icone:"i-tigela"}, "cta leve"));
+    if (estado.registro){
+      principais.appendChild(atalho({id:"avaliar", nome:estado.avaliado ? "Ver minha avaliação" : "Avaliar o almoço", icone:"i-estrela"}, "cta forte"));
+      principais.appendChild(atalho({id:"meu_dia", nome:"Ver refeição registrada", icone:"i-prancheta"}, "cta leve"));
+    } else {
+      principais.appendChild(atalho({id:"montar", busca:"Montar", nome:"Montar meu prato", icone:"i-talher"}, "cta forte"));
+      principais.appendChild(atalho({id:"quanto", nome:"Quanto pegar hoje", icone:"i-tigela"}, "cta leve"));
+    }
     tela.appendChild(principais);
+    if (estado.registro) tela.appendChild(cartao);
     var cabeca = el("div", "cabeca-secao");
     cabeca.appendChild(el("h2", "", "Ações rápidas"));
     cabeca.appendChild(el("span", "", "Facilita o seu dia"));
     tela.appendChild(cabeca);
     var grade = el("div", "home-rapidas");
     grade.appendChild(atalho({id:"cardapio", nome:"Cardápio", icone:"i-calendario"}));
-    grade.appendChild(atalho({id:"avaliar", nome:"Avaliar o refeitório", icone:"i-estrela"}));
+    grade.appendChild(atalho(estado.registro
+      ? {id:"progresso", nome:"Meu progresso", icone:"i-tendencia"}
+      : {id:"avaliar", nome:"Avaliar o refeitório", icone:"i-estrela"}));
     tela.appendChild(grade);
   }
 
@@ -1491,6 +1529,47 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     return alvo ? {refeicao:montagem.refeicao, resultado:cadastroSalvo() ? alvo.novo : alvo.exemplo} : null;
   }
 
+  function controlesQuantidade(i){
+    var faixa = ((DADOS && DADOS.opcoes_montagem) || []).find(function(o){ return o.codigo === i.codigo; });
+    if (!faixa || faixa.maximo <= 1) return null;
+    var qtd = estado.montagem.filter(function(c){ return c === i.codigo; }).length;
+    if (!qtd) return null;
+    var grupo = el("div", "controle-quantidade");
+    grupo.dataset.quantidadeCodigo = i.codigo;
+    grupo.setAttribute("role", "group");
+    grupo.setAttribute("aria-label", "Quantidade de " + i.nome);
+    function alterar(delta){
+      if (avaliado(i).veredito === "bloqueio") { mostrar("montar"); return; }
+      var atual = estado.montagem.filter(function(c){ return c === i.codigo; }).length;
+      var proxima = atual + delta;
+      if (proxima < 1 || proxima > faixa.maximo) return;
+      estado.montagem = estado.montagem.filter(function(c){ return c !== i.codigo; }).concat(Array(proxima).fill(i.codigo));
+      redesenhar();
+      var novo = Array.from(tela.querySelectorAll('[data-quantidade-codigo]')).find(function(n){ return n.dataset.quantidadeCodigo === i.codigo; });
+      if (novo){
+        var botao = novo.querySelector(delta > 0 ? '[data-ajuste="mais"]' : '[data-ajuste="menos"]');
+        if (botao.disabled) botao = novo.querySelector(delta > 0 ? '[data-ajuste="menos"]' : '[data-ajuste="mais"]');
+        botao.focus({preventScroll:true});
+      }
+    }
+    var menos = el("button", "", "−");
+    menos.dataset.ajuste = "menos";
+    menos.setAttribute("aria-label", "Diminuir quantidade de " + i.nome);
+    menos.disabled = qtd <= 1;
+    menos.addEventListener("click", function(){ alterar(-1); });
+    grupo.appendChild(menos);
+    var valor = el("output", "", escapar(faixa.medidas[qtd-1] || "Quantidade indisponível"));
+    valor.setAttribute("aria-live", "polite");
+    grupo.appendChild(valor);
+    var mais = el("button", "", "+");
+    mais.dataset.ajuste = "mais";
+    mais.setAttribute("aria-label", "Aumentar quantidade de " + i.nome);
+    mais.disabled = qtd >= faixa.maximo;
+    mais.addEventListener("click", function(){ alterar(1); });
+    grupo.appendChild(mais);
+    return grupo;
+  }
+
   function botaoMontagem(rotulo, executar, forte){
     var b = el("button", "cta " + (forte ? "forte" : "leve"));
     b.appendChild(el("b", "", escapar(rotulo)));
@@ -1515,7 +1594,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     var grupo = grupos[estado.passoMontagem];
     tela.appendChild(el("p", "eyebrow", "Passo " + (estado.passoMontagem+1) + " de " + grupos.length));
     tela.appendChild(el("h1", "h1", escapar(grupo.categoria)));
-    tela.appendChild(el("p", "legenda", "Selecione os alimentos que vai pegar. Cada seleção corresponde a uma porção; a medida aparece na revisão."));
+    tela.appendChild(el("p", "legenda", "Selecione o que vai pegar e ajuste as medidas. Para retirar um alimento, toque nele novamente."));
     if (anteriores !== estado.montagem.length) tela.appendChild(el("p", "aviso wrn", "Retirei da seleção os alimentos bloqueados pelo seu cadastro atual."));
     var lista = el("div", "pilha");
     grupo.itens.forEach(function(i){
@@ -1534,9 +1613,13 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
         redesenhar();
       });
       lista.appendChild(b);
+      if (marcada){
+        var controle = controlesQuantidade(i);
+        if (controle) lista.appendChild(controle);
+      }
     });
     tela.appendChild(lista);
-    tela.appendChild(el("p", "legenda", estado.montagem.length + " alimento(s) selecionado(s). Fotos ilustrativas."));
+    tela.appendChild(el("p", "legenda", new Set(estado.montagem).size + " alimento(s) selecionado(s). Fotos ilustrativas."));
     if (grupo.itens.some(function(i){ return avaliado(i).veredito === "atencao"; }))
       tela.appendChild(el("p", "aviso wrn", "Os itens com aviso precisam de confirmação no balcão antes de se servir."));
     if (estado.passoMontagem < grupos.length-1){
@@ -1565,8 +1648,11 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
         linha.appendChild(el("span", "nome", escapar(i.nome)));
         linha.appendChild(el("span", "medida", escapar(i.medida === "a vontade" ? "À vontade" : i.medida)));
         lista.appendChild(linha);
+        var controle = controlesQuantidade(pratos.find(function(p){ return p.codigo === i.codigo; }));
+        if (controle) lista.appendChild(controle);
       });
       tela.appendChild(lista);
+      tela.appendChild(el("p", "legenda", "Estas são as quantidades disponíveis na demonstração. A quantidade individual deve seguir a orientação do nutricionista."));
       if (refeicao.incompleto) tela.appendChild(el("p", "aviso wrn", "O total está incompleto: há alimento sem informação nutricional."));
       pratos.filter(function(i){ return avaliado(i).veredito === "atencao"; }).forEach(function(i){
         tela.appendChild(el("p", "aviso wrn", "<b>" + escapar(i.nome) + ":</b> " + escapar(avaliado(i).motivo)));
@@ -2156,6 +2242,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   // rascunho do cadastro em andamento
   var rascunho = null;
   var passoAtual = 0;
+  var campoEdicao = null;
+  var ROTULOS_CADASTRO = {nome:"Nome", refeitorio:"Refeitório", empresa:"Empresa", setor:"Setor", objetivo:"Objetivo", restricoes:"Restrições"};
 
   var PASSOS = [
     { campo: "nome",       titulo: "Como você quer ser chamado?",
@@ -2190,15 +2278,32 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
              restricoes: [], consentimento: false, editando: false };
   }
 
-  function comecarCadastro(editando){
+  function comecarCadastro(editando, campo){
     rascunho = novoRascunho(editando);
-    passoAtual = 0;
+    campoEdicao = editando && cadastroSalvo() && Object.prototype.hasOwnProperty.call(ROTULOS_CADASTRO, campo) ? campo : null;
+    passoAtual = campoEdicao ? PASSOS.findIndex(function(p){ return p.campo === campoEdicao || p.segundo === campoEdicao; }) : 0;
     historico.length = 0;
     mostrar("cadastro", false);
   }
 
+  function passoDoCadastro(){
+    var passo = PASSOS[passoAtual];
+    if (campoEdicao && passo.tipo === "dupla"){
+      return Object.assign({}, passo, {tipo:"texto", campo:campoEdicao,
+        titulo:"Editar " + ROTULOS_CADASTRO[campoEdicao].toLowerCase(),
+        rotulo:ROTULOS_CADASTRO[campoEdicao], exemplo:campoEdicao === passo.segundo ? passo.exemplo2 : passo.exemplo});
+    }
+    return passo;
+  }
+
+  function cancelarEdicaoDireta(){
+    campoEdicao = null;
+    rascunho = null;
+    mostrar("perfil", false);
+  }
+
   function passoCompleto(){
-    var p = PASSOS[passoAtual];
+    var p = passoDoCadastro();
     if (p.tipo === "texto") return !!String(rascunho[p.campo] || "").trim();
     if (p.tipo === "dupla"){
       return !!String(rascunho[p.campo] || "").trim() && !!String(rascunho[p.segundo] || "").trim();
@@ -2226,20 +2331,21 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   function telaCadastro(){
     if (!rascunho){ rascunho = novoRascunho(!!cadastroSalvo()); passoAtual = 0; }
-    var p = PASSOS[passoAtual];
+    var p = passoDoCadastro();
 
     topo.className = "topo simples";
     topo.textContent = "";
     var barra = el("div", "barra");
     barra.appendChild(botaoIcone("i-voltar", "Voltar", function(){
+      if (campoEdicao){ cancelarEdicaoDireta(); return; }
       if (passoAtual > 0){ passoAtual--; redesenhar(); return; }
       var voltarPara = rascunho.editando ? "perfil" : "boas_vindas";
       rascunho = null;
       mostrar(voltarPara, false);
     }));
     var titulo = el("div", "titulo");
-    titulo.appendChild(el("h1", "", rascunho.editando ? "Editar cadastro" : "Seu cadastro"));
-    titulo.appendChild(el("p", "", "Passo " + (passoAtual + 1) + " de " + PASSOS.length));
+    titulo.appendChild(el("h1", "", campoEdicao ? "Editar " + ROTULOS_CADASTRO[campoEdicao].toLowerCase() : (rascunho.editando ? "Editar cadastro" : "Seu cadastro")));
+    titulo.appendChild(el("p", "", campoEdicao ? "Salve quando terminar" : "Passo " + (passoAtual + 1) + " de " + PASSOS.length));
     barra.appendChild(titulo);
     topo.appendChild(barra);
 
@@ -2247,7 +2353,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     var feito = el("div", "feito");
     feito.style.width = ((passoAtual + 1) / PASSOS.length * 100) + "%";
     trilho.appendChild(feito);
-    tela.appendChild(trilho);
+    if (!campoEdicao) tela.appendChild(trilho);
 
     tela.appendChild(el("h1", "h1", escapar(p.titulo)));
     if (p.apoio) tela.appendChild(el("p", "sub", escapar(p.apoio)));
@@ -2322,7 +2428,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       tela.appendChild(resumo);
     }
 
-    var ultimo = passoAtual === PASSOS.length - 1;
+    if (campoEdicao && estado.registro) tela.appendChild(el("p", "legenda", "A alteração vale para as próximas escolhas. O almoço já registrado mantém os dados da confirmação."));
+    var ultimo = !!campoEdicao || passoAtual === PASSOS.length - 1;
     var avancar = el("button", "cta forte");
     avancar.appendChild(el("b", "", ultimo
       ? (rascunho.editando ? "Salvar alterações" : "Criar meu cadastro")
@@ -2335,6 +2442,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       salvarCadastro();
     });
     acoes.appendChild(avancar);
+    if (campoEdicao) acoes.appendChild(botaoMontagem("Cancelar", cancelarEdicaoDireta));
   }
 
   // O rotulo fica visivel, e nao so no `placeholder`: o `placeholder` some
@@ -2376,8 +2484,22 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       aceite: (cadastroSalvo() || {}).aceite || new Date().toISOString()
     };
     var editando = rascunho.editando;
+    if (campoEdicao){
+      var atual = cadastroSalvo();
+      if (!atual){
+        campoEdicao = null; rascunho = null;
+        mostrar("boas_vindas", false);
+        recado("O cadastro foi removido. Crie um cadastro para continuar.");
+        return;
+      }
+      // Atualiza somente o campo editado e preserva o aceite e os demais dados.
+      var valor = dados[campoEdicao];
+      dados = Object.assign({}, atual);
+      dados[campoEdicao] = valor;
+    }
     var onde = guardarCadastro(dados);
     rascunho = null;
+    campoEdicao = null;
     historico.length = 0;
     // Cadastro novo comeca do zero: nada do exemplo continua valendo.
     if (!editando) zerarSessao();
@@ -2763,13 +2885,18 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     secao("Dados pessoais");
     // Nao ha e-mail: o app fala por Telegram e nunca pediu endereco nenhum.
     // Campo que o cadastro nao coleta nao vira linha vazia na tela.
-    campos([["Nome", p.nome], ["Refeitório", p.refeitorio],
+    if (cadastroSalvo()){
+      var pessoais = el("div", "pilha");
+      ["nome", "refeitorio", "empresa", "setor"].forEach(function(campo){ pessoais.appendChild(campoEditavel(campo, p[campo])); });
+      tela.appendChild(pessoais);
+    } else campos([["Nome", p.nome], ["Refeitório", p.refeitorio],
             ["Empresa", p.empresa], ["Setor", p.setor]]);
 
     secao("Objetivo");
     var alvo = p.alvo || {};
-    campos([["Objetivo", p.objetivo],
-            ["Alvo do almoço", alvo.kcal ? alvo.kcal + " kcal · " + alvo.ptn + " g ptn" : null]]);
+    if (cadastroSalvo()) tela.appendChild(campoEditavel("objetivo", p.objetivo));
+    else campos([["Objetivo", p.objetivo]]);
+    campos([["Alvo do almoço", alvo.kcal ? alvo.kcal + " kcal · " + alvo.ptn + " g ptn" : null]]);
     var explicaAlvo=el("details","discreto");
     explicaAlvo.appendChild(el("summary","","Sobre seu objetivo"));
     explicaAlvo.appendChild(el("p","","O alvo é ilustrativo. A faixa individual deve ser definida pelo nutricionista. Envie sua ficha para seguir as orientações dele."));
@@ -2777,7 +2904,9 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
     secao("Restrições alimentares");
     var restricoes = (p.restricoes || []).concat(p.restricoes_livres || []);
-    if (restricoes.length){
+    if (cadastroSalvo()){
+      tela.appendChild(campoEditavel("restricoes", restricoes.join(", ") || "Nenhuma cadastrada"));
+    } else if (restricoes.length){
       var tags = el("div", "tags");
       restricoes.forEach(function(r){
         var t = el("span", "tag");
@@ -2915,6 +3044,17 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       });
       tela.appendChild(dl);
     }
+  }
+
+  function campoEditavel(campo, valor){
+    var b = el("button", "campo-edicao");
+    b.dataset.editarCampo = campo;
+    b.setAttribute("aria-label", "Editar " + ROTULOS_CADASTRO[campo].toLowerCase());
+    b.appendChild(el("span", "rotulo", escapar(ROTULOS_CADASTRO[campo])));
+    b.appendChild(el("span", "valor", escapar(valor || "—")));
+    b.appendChild(icone("i-lapis"));
+    b.addEventListener("click", function(){ comecarCadastro(true, campo); });
+    return b;
   }
 
   function itemDeConta(nome, ic, aoClicar){
