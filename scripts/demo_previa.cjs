@@ -36,7 +36,7 @@ async function main() {
     if (errors.length) throw new Error(errors.join('\n'));
     if (!document.querySelector('.acoes .cta')) throw new Error('A tela de boas-vindas nao carregou.');
     let output = html;
-    for (const [tag, id] of [['header', 'topo'], ['main', 'tela'], ['nav', 'abas']]) {
+    for (const [tag, id] of [['header', 'topo'], ['main', 'tela'], ['div', 'acoes'], ['nav', 'abas']]) {
       const pattern = new RegExp(`<${tag}\\b[^>]*\\bid="${id}"[^>]*>[\\s\\S]*?</${tag}>`);
       if (!pattern.test(output)) throw new Error(`Container ausente: ${id}`);
       const element = document.getElementById(id);
@@ -88,14 +88,20 @@ async function main() {
       click('Criar meu cadastro');
       capture('05. Início');
       go('cardapio'); capture('06. Cardápio');
-      go('inicio'); click('Quanto pegar hoje'); capture('07. Quanto pegar hoje');
+      go('inicio'); click('Montar meu prato');
+      document.querySelector('.escolha-prato:not(:disabled)').click();
+      capture('07. Montar meu prato');
+      click('Revisar meu prato'); capture('08. Revisar a montagem');
+      go('inicio'); click('Quanto pegar hoje'); capture('09. Quanto pegar hoje');
+      click('Vou pegar isso — registrar');
       go('inicio'); click('Avaliar o refeitório');
-      click('Boa'); click('Comida fria'); click('Enviar avaliação'); capture('08. Avaliar o refeitório');
-      go('progresso'); capture('09. Progresso');
-      go('perfil'); capture('10. Perfil');
-      click('Sou da gestão da Apetit'); click('Visão da Apetit'); capture('11. Gestão');
+      click('Boa'); click('Comida fria'); click('Enviar avaliação'); capture('10. Avaliar o refeitório');
+      go('progresso'); capture('11. Progresso');
+      click('Ver meu histórico'); capture('12. Meu dia');
+      go('perfil'); capture('13. Perfil');
+      click('Sou da gestão da Apetit'); click('Visão da Apetit'); capture('14. Gestão');
       click('Sobre esta demonstração', document.querySelector('#topo'));
-      click('Ver estados da interface', document.querySelector('dialog')); capture('12. Estados da interface');
+      click('Ver estados da interface', document.querySelector('dialog')); capture('15. Estados da interface');
       if (errors.length) throw new Error(errors.join('\n'));
       const style = document.querySelector('style').textContent;
       const symbols = document.querySelector('body > svg').outerHTML;

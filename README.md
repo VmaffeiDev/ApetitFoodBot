@@ -856,6 +856,10 @@ reorganização visual não muda os vereditos nem as regras de pontuação.
 
 ### O "monta o prato", e por que uma tela nao basta como id
 
+Esta seção descreve a captura do bot. No app, a montagem agora é nativa e lê
+o cadastro atual, conforme a seção seguinte; as telas capturadas continuam
+servindo aos demais caminhos da demonstração.
+
 Um relato de teste: selecionar um alimento no passo 1 pulava direto para o
 passo 6. O defeito estava na captura, nao no app. As telas eram ligadas aos
 botoes **pela ultima acao do caminho**:
@@ -892,6 +896,37 @@ o futuro. A assinatura agora leva junto os alimentos ja escolhidos, e **so
 dentro do fluxo**: fora dele a distincao multiplicaria as outras setenta telas
 por cada combinacao de escolha, e o arquivo passaria de um megabyte. Dentro, o
 custo medido e 9 KB -> 19 KB comprimidos, que e o que a pessoa baixa.
+
+### Montagem e histórico do app com o mesmo registro
+
+O montador do app percorre as categorias do cardápio atual. Alimentos bloqueados
+ficam indisponíveis, e os avisos dos demais continuam visíveis na revisão.
+O bloqueio é conferido novamente no clique de registrar, inclusive se a pessoa
+trocou as restrições depois de montar o prato.
+
+Cada seleção corresponde a uma porção, como no montador do bot. Os resultados
+das 63 seleções não vazias deste cardápio são exportados por `demo_dados.py`,
+para cada objetivo, com e sem o histórico do exemplo. Macros, medidas e pontos
+continuam saindo do domínio Python. A exportação offline tem limite de dez
+alimentos para evitar crescimento exponencial; cardápios maiores precisam
+consultar o motor pelo servidor.
+
+Ao confirmar a sugestão ou a montagem, o app guarda uma cópia da refeição na
+memória da sessão: alimentos, medidas, totais e pontos. Home, Meu dia,
+privacidade e os três períodos do progresso consultam esse mesmo registro.
+Alterar o cadastro depois não modifica o almoço confirmado. A demonstração
+aceita um almoço por sessão e não duplica pontos ao voltar às telas.
+
+Para conferir os fluxos sem depender da renderização de um navegador:
+
+```bash
+npm ci --prefix scripts
+node scripts/conferir_fluxos.cjs
+```
+
+A verificação percorre as restrições e objetivos exportados pelo Python,
+montagem manual, sugestão, bloqueio no clique final, histórico, conquistas,
+totais dos gráficos e separação entre cadastro novo e exemplo.
 
 ### Prévia do visual, sem servidor
 

@@ -197,6 +197,8 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .foto-salada{background-position:33.333% 100%}
 .foto-refeicao{background-position:66.667% 100%}
 .fotos-nota{font-size:10px;color:var(--texto-2)}
+.escolha-prato[aria-pressed="true"]{border-color:var(--amarelo);box-shadow:inset 0 0 0 1px var(--amarelo)}
+.escolha-prato:disabled{cursor:not-allowed}
 .filtros{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:1px 0 4px}
 .filtro{flex:1;min-height:44px;border:1px solid var(--linha-2);border-radius:var(--r-pill);padding:7px 10px;
   background:var(--card);color:var(--texto-2);font-size:11px;cursor:pointer;white-space:nowrap}
@@ -711,7 +713,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   // dizer que gravou no servidor seria mentir sobre o que aconteceu.
   var estado = {
     nota: null, faltas: [], avaliado: false,
-    registrado: false, pontos: 0, conquistaNova: null, gestao: false,
+    registrado: false, registro: null, montagem: [], passoMontagem: 0,
+    pontos: 0, conquistaNova: null, gestao: false,
     filtroCardapio: "todos", periodoProgresso: "semana"
   };
   try { estado.gestao = localStorage.getItem("apetit-gestao") === "sim"; } catch (e) {}
@@ -1257,7 +1260,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     cartao.appendChild(cabeca);
     var corpo = el("div", "conq-corpo");
     var lista = el("div", "conq-lista");
-    var conquistas = estado.registrado ? (((DADOS || {}).registro_previsto || {}).conquistas || []) : (p.conquistas || []);
+    var conquistas = p.conquistas || [];
     if (conquistas.length){
       conquistas.forEach(function(c){
         var item = el("div", "conq-item" + (estado.conquistaNova === c.nome ? " nova" : ""));
@@ -1475,6 +1478,112 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     return t;
   }
 
+  // ---------- montagem manual com o cadastro atual ----------
+  function itensDoCardapio(){
+    return ((DADOS && DADOS.cardapio) || []).flatMap(function(g){ return g.itens; });
+  }
+
+  function resultadoMontagem(){
+    var chave = estado.montagem.slice().sort().join("|");
+    var montagem = ((DADOS && DADOS.montagens) || []).find(function(m){ return m.codigos.join("|") === chave; });
+    if (!montagem) return null;
+    var alvo = montagem.objetivos.find(function(o){ return o.objetivo === pessoa().objetivo; });
+    return alvo ? {refeicao:montagem.refeicao, resultado:cadastroSalvo() ? alvo.novo : alvo.exemplo} : null;
+  }
+
+  function botaoMontagem(rotulo, executar, forte){
+    var b = el("button", "cta " + (forte ? "forte" : "leve"));
+    b.appendChild(el("b", "", escapar(rotulo)));
+    b.addEventListener("click", executar);
+    return b;
+  }
+
+  function telaMontar(){
+    var grupos = (DADOS && DADOS.cardapio) || [];
+    cabecalhoInterno("Montar meu prato", DADOS ? DADOS.dia_amigavel : "");
+    if (!grupos.length){
+      tela.appendChild(vazio("Cardápio indisponível.", "Tente novamente quando o cardápio estiver disponível.", "i-talher"));
+      return;
+    }
+    var todos = itensDoCardapio();
+    var anteriores = estado.montagem.length;
+    estado.montagem = estado.montagem.filter(function(c){
+      var i = todos.find(function(p){ return p.codigo === c; });
+      return i && avaliado(i).veredito !== "bloqueio";
+    });
+    estado.passoMontagem = Math.min(estado.passoMontagem, grupos.length-1);
+    var grupo = grupos[estado.passoMontagem];
+    tela.appendChild(el("p", "eyebrow", "Passo " + (estado.passoMontagem+1) + " de " + grupos.length));
+    tela.appendChild(el("h1", "h1", escapar(grupo.categoria)));
+    tela.appendChild(el("p", "legenda", "Selecione os alimentos que vai pegar. Cada seleção corresponde a uma porção; a medida aparece na revisão."));
+    if (anteriores !== estado.montagem.length) tela.appendChild(el("p", "aviso wrn", "Retirei da seleção os alimentos bloqueados pelo seu cadastro atual."));
+    var lista = el("div", "pilha");
+    grupo.itens.forEach(function(i){
+      var a = avaliado(i), marcada = estado.montagem.includes(i.codigo);
+      // Reutiliza a apresentação do cardápio, sem o evento que abre detalhes.
+      var b = linhaDoPrato(i, grupo).cloneNode(true);
+      b.classList.add("escolha-prato");
+      b.setAttribute("aria-pressed", marcada ? "true" : "false");
+      b.disabled = a.veredito === "bloqueio";
+      var seta = b.querySelector(".seta");
+      if (seta) seta.remove();
+      b.appendChild(icone(marcada ? "i-check" : "i-mais"));
+      b.addEventListener("click", function(){
+        if (avaliado(i).veredito === "bloqueio") return;
+        estado.montagem = marcada ? estado.montagem.filter(function(c){ return c !== i.codigo; }) : estado.montagem.concat([i.codigo]);
+        redesenhar();
+      });
+      lista.appendChild(b);
+    });
+    tela.appendChild(lista);
+    tela.appendChild(el("p", "legenda", estado.montagem.length + " alimento(s) selecionado(s). Fotos ilustrativas."));
+    if (grupo.itens.some(function(i){ return avaliado(i).veredito === "atencao"; }))
+      tela.appendChild(el("p", "aviso wrn", "Os itens com aviso precisam de confirmação no balcão antes de se servir."));
+    if (estado.passoMontagem < grupos.length-1){
+      acoes.appendChild(botaoMontagem("Próxima categoria", function(){ estado.passoMontagem++; redesenhar(); }, true));
+    }
+    var revisar = botaoMontagem("Revisar meu prato", function(){ mostrar("montagem_resumo"); }, estado.passoMontagem === grupos.length-1);
+    revisar.disabled = !estado.montagem.length;
+    acoes.appendChild(revisar);
+    if (estado.passoMontagem > 0) acoes.appendChild(botaoMontagem("Categoria anterior", function(){ estado.passoMontagem--; redesenhar(); }));
+  }
+
+  function telaMontagemResumo(){
+    cabecalhoInterno("Montar meu prato", "Revise antes de registrar");
+    tela.appendChild(el("h1", "h1", "Seu prato"));
+    var resultado = resultadoMontagem();
+    var pratos = itensDoCardapio().filter(function(i){ return estado.montagem.includes(i.codigo); });
+    var bloqueado = pratos.some(function(i){ return avaliado(i).veredito === "bloqueio"; });
+    if (!resultado || bloqueado){
+      tela.appendChild(vazio("Revise a seleção.", bloqueado ? "Um alimento foi bloqueado pelas suas restrições atuais." : "Não tenho um resultado calculado para esta seleção e objetivo.", "i-atencao"));
+    } else {
+      var refeicao = resultado.refeicao;
+      tela.appendChild(el("p", "sub", (refeicao.kcal == null ? "Energia não informada" : refeicao.kcal + " kcal") + " · " + (refeicao.ptn == null ? "Proteína não informada" : refeicao.ptn + " g de proteína")));
+      var lista = el("div", "pilha");
+      refeicao.itens.forEach(function(i){
+        var linha = el("div", "linha-porcao");
+        linha.appendChild(el("span", "nome", escapar(i.nome)));
+        linha.appendChild(el("span", "medida", escapar(i.medida === "a vontade" ? "À vontade" : i.medida)));
+        lista.appendChild(linha);
+      });
+      tela.appendChild(lista);
+      if (refeicao.incompleto) tela.appendChild(el("p", "aviso wrn", "O total está incompleto: há alimento sem informação nutricional."));
+      pratos.filter(function(i){ return avaliado(i).veredito === "atencao"; }).forEach(function(i){
+        tela.appendChild(el("p", "aviso wrn", "<b>" + escapar(i.nome) + ":</b> " + escapar(avaliado(i).motivo)));
+      });
+      tela.appendChild(notaDeSimulacao("Nesta demonstração, o registro vale apenas enquanto a página estiver aberta e não é enviado à Apetit."));
+      if (estado.registro){
+        tela.appendChild(el("p", "aviso okk", "O almoço desta sessão já está registrado. Esta seleção não altera o histórico."));
+        acoes.appendChild(botaoMontagem("Ver refeição registrada", function(){ mostrar("meu_dia"); }, true));
+      } else acoes.appendChild(botaoMontagem("Registrar este prato", function(){
+        // Reavalia objetivo e restrições no clique, inclusive após edição do cadastro.
+        var r = resultadoMontagem();
+        if (r) registrarRefeicao(r.refeicao, r.resultado);
+      }, true));
+    }
+    acoes.appendChild(botaoMontagem("Mudar o prato", function(){ mostrar("montar"); }));
+  }
+
   // ---------- 3. quanto pegar hoje ----------
   //
   // A sugestao nao e calculada aqui. `apetit/portions.py` decide quanto alguem
@@ -1585,14 +1694,18 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       tela.appendChild(a);
     });
 
-    if (estado.registrado){
+    if (estado.registro){
       var feito = el("button", "cta feito");
       feito.appendChild(icone("i-liberado"));
-      feito.appendChild(el("b", "", "Refeição registrada nesta sessão"));
+      feito.appendChild(el("b", "", "Você já registrou o almoço nesta sessão"));
       feito.disabled = true;
       acoes.appendChild(feito);
       tela.appendChild(notaDeSimulacao(
         "Registro desta demonstração: ele some ao recarregar a página, e não chega à Apetit."));
+      var verRegistro = el("button", "cta leve");
+      verRegistro.appendChild(el("b", "", "Ver refeição registrada"));
+      verRegistro.addEventListener("click", function(){ mostrar("meu_dia"); });
+      acoes.appendChild(verRegistro);
     } else {
       var registrar = el("button", "cta forte");
       registrar.appendChild(icone("i-liberado"));
@@ -1627,6 +1740,32 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     var previsto = (cadastroSalvo()
       ? (combinacao && combinacao.registro)
       : (DADOS && DADOS.registro_previsto)) || {};
+    registrarRefeicao(previsto.refeicao, previsto);
+  }
+
+  // Uma fotografia do registro alimenta todas as telas. Alterar objetivo,
+  // restrições ou rascunho depois não reescreve o almoço já confirmado.
+  function registrarRefeicao(refeicao, previsto){
+    if (!refeicao || !refeicao.itens || !refeicao.itens.length || !previsto ||
+        typeof previsto.pontos_depois !== "number"){
+      recado("Não tenho o resultado deste prato. Revise a montagem.");
+      return;
+    }
+    var cardapio = itensDoCardapio();
+    if (refeicao.itens.some(function(i){
+      var prato = cardapio.find(function(p){ return p.codigo === i.codigo; });
+      return !prato || avaliado(prato).veredito === "bloqueio";
+    })){
+      recado("Suas restrições mudaram. Revise os alimentos antes de registrar.");
+      mostrar("montar");
+      return;
+    }
+    if (estado.registro){
+      recado("O almoço desta sessão já está registrado.");
+      mostrar("meu_dia");
+      return;
+    }
+    estado.registro = JSON.parse(JSON.stringify({refeicao: refeicao, resultado: previsto}));
     estado.registrado = true;
     estado.pontosAnimar = estado.pontos;
     estado.pontos = previsto.pontos_depois != null ? previsto.pontos_depois : estado.pontos;
@@ -1778,8 +1917,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
     var vezes = {};
     (p.conquistas || []).forEach(function(c){ vezes[c.nome] = c.vezes; });
-    if (estado.registrado) (((DADOS || {}).registro_previsto || {}).conquistas || []).forEach(function(c){vezes[c.nome]=(vezes[c.nome] || 0) + 1;});
-    var registros = (meuHistorico().meu_dia.dias || []).length + (estado.registrado ? 1 : 0);
+    var registros = (meuHistorico().meu_dia.dias || []).length;
 
     var cabeca2 = el("div", "cabeca-secao");
     cabeca2.appendChild(el("h2", "", "Como você está indo"));
@@ -1806,9 +1944,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     cabeca3.appendChild(el("h2", "", "Conquistas recentes"));
     tela.appendChild(cabeca3);
 
-    var conquistas = estado.registrado
-      ? (DADOS.registro_previsto.conquistas || []).map(function(c){ return { nome: c.nome, vezes: 1 }; })
-      : (p.conquistas || []);
+    var conquistas = p.conquistas || [];
     if (conquistas.length){
       var pilha = el("div", "pilha");
       conquistas.forEach(function(c){
@@ -1843,13 +1979,10 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   }
 
   function serieProgresso(periodo){
-    if(periodo === "semana") return meuHistorico().semana.map(function(d){
-      return d.hoje && estado.registrado ? Object.assign({},d,{registrado:true,kcal:DADOS.porcoes.kcal}) : d;
-    });
+    if(periodo === "semana") return meuHistorico().semana;
     var dia=(DADOS && DADOS.dia) || "", hoje=new Date(dia + "T12:00:00Z");
     if(!isFinite(hoje.getTime())) return [];
-    var dias=(((DADOS || {}).meu_dia || {}).dias || []).slice();
-    if(estado.registrado) dias.push({data:dia,kcal:DADOS.porcoes.kcal});
+    var dias=meuHistorico().meu_dia.dias;
     var mensal=periodo === "mes", numero=mensal ? 5 : 12, partes=[];
     for(var n=0;n<numero;n++){
       var inicio, fim;
@@ -1956,20 +2089,34 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   // a ela refeicoes que nunca fez e pontos que nunca ganhou. E o app ficaria
   // dizendo, na tela de privacidade, que guarda sobre ela o que e de outro.
   function meuHistorico(){
-    if (cadastroSalvo()){
-      return {
-        progresso: { pontos: 0, dias_na_semana: 0, resumo_semana: "", conquistas: [] },
-        meu_dia: { dias: [] },
-        semana: [],
-        favoritos: []
-      };
+    var novo = !!cadastroSalvo();
+    var base = novo ? {pontos:0, conquistas:[]} : ((DADOS && DADOS.progresso) || {pontos:0, conquistas:[]});
+    var progresso = JSON.parse(JSON.stringify(base));
+    var dias = novo ? [] : (((DADOS || {}).meu_dia || {}).dias || []).slice();
+    if (estado.registro){
+      var r = estado.registro;
+      dias = dias.filter(function(d){ return d.data !== r.refeicao.data; }).concat([r.refeicao]);
+      progresso.pontos = r.resultado.pontos_depois;
+      (r.resultado.conquistas || []).forEach(function(c){
+        var existente = progresso.conquistas.find(function(a){ return a.nome === c.nome; });
+        if (existente) existente.vezes++;
+        else progresso.conquistas.push({nome:c.nome, vezes:1});
+      });
     }
-    return {
-      progresso: (DADOS && DADOS.progresso) || { pontos: 0, conquistas: [] },
-      meu_dia: (DADOS && DADOS.meu_dia) || { dias: [] },
-      semana: (DADOS && DADOS.semana) || [],
-      favoritos: (DADOS && DADOS.perfil && DADOS.perfil.favoritos) || []
-    };
+    dias.sort(function(a,b){ return b.data.localeCompare(a.data); });
+    progresso.resumo_semana = dias.length ? dias.length + (dias.length === 1 ? " dia com refeição registrada." : " dias com refeições registradas.") : "Registre o almoço para acompanhar seu progresso.";
+    var semana = [], cursor = new Date(((DADOS || {}).dia || "") + "T12:00:00Z");
+    while (isFinite(cursor.getTime()) && semana.length < 5){
+      if (cursor.getUTCDay() !== 0 && cursor.getUTCDay() !== 6){
+        var data = cursor.toISOString().slice(0,10);
+        var refeicao = dias.find(function(d){ return d.data === data; });
+        semana.unshift({data:data, sigla:["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"][cursor.getUTCDay()],
+          hoje:data === DADOS.dia, registrado:!!refeicao, kcal:refeicao ? refeicao.kcal : null});
+      }
+      cursor.setUTCDate(cursor.getUTCDate()-1);
+    }
+    return {progresso:progresso, meu_dia:{dias:dias}, semana:semana,
+      favoritos:novo ? [] : (((DADOS || {}).perfil || {}).favoritos || [])};
   }
 
   // O que muda quando a pessoa deixa de ser o exemplo, ou volta a ser.
@@ -1978,6 +2125,9 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     estado.faltas = [];
     estado.avaliado = false;
     estado.registrado = false;
+    estado.registro = null;
+    estado.montagem = [];
+    estado.passoMontagem = 0;
     estado.conquistaNova = null;
     estado.pontosAnimar = null;
     estado.pontos = meuHistorico().progresso.pontos;
@@ -2345,7 +2495,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
     var contas = el("dl", "campos");
     contas.style.marginTop = "12px";
-    [["Dias com refeição registrada", (h.meu_dia.dias || []).length + (estado.registrado ? 1 : 0)],
+    [["Dias com refeição registrada", (h.meu_dia.dias || []).length],
      ["Pratos guardados", (p.favoritos || []).length],
      ["Pontos", estado.pontos],
      ["Avaliações do refeitório", estado.avaliado ? 1 : 0]
@@ -2421,7 +2571,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       (d.itens || []).forEach(function(i){
         var linha = el("div", "linha-porcao");
         linha.appendChild(el("span", "nome", escapar(i.nome)));
-        linha.appendChild(el("span", "medida", escapar(String(i.quantidade))));
+        linha.appendChild(el("span", "medida", escapar(i.medida === "a vontade" ? "À vontade" : (i.medida || String(i.quantidade)))));
         cartao.appendChild(linha);
       });
       if (d.incompleto){
@@ -2840,6 +2990,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   var NATIVAS = {
     inicio: telaInicio, cardapio: telaCardapio, quanto: telaQuanto,
+    montar: telaMontar, montagem_resumo: telaMontagemResumo,
     avaliar: telaAvaliar, progresso: telaProgresso, perfil: telaPerfil,
     gestao: telaGestao, estados: telaEstados,
     boas_vindas: telaBoasVindas, cadastro: telaCadastro,
@@ -2862,6 +3013,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   function destinoReal(id){
     if (NATIVAS[id]) return id;
+    // Nenhum atalho antigo pode voltar ao montador gravado da Mariana.
+    if (/^(pick:|flow_|registrar(?:_|$))/.test(id)) return "montar";
     for (var i = 0; i < TRONCOS.length; i++){
       if (id.indexOf(TRONCOS[i]) === 0) return TRONCOS[i];
     }
@@ -2954,7 +3107,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   function abaDe(id){
     if (id === "inicio") return "inicio";
-    if (/^(montar|pick:|quanto|cardapio)/.test(id)) return "cardapio";
+    if (/^(montar|montagem_|pick:|quanto|cardapio)/.test(id)) return "cardapio";
     if (/^(ficha|perfil|avisos|aviso:|favoritos|gestao|meus_dados|meu_dia)/.test(id)) return "perfil";
     var achou = "";
     ABAS.forEach(function(a){

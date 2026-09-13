@@ -429,7 +429,7 @@ def avaliacao() -> dict:
     }
 
 
-def registro_previsto(pessoa) -> dict:
+def registro_previsto(pessoa, codigos=None) -> dict:
     """O que a pessoa ganha se registrar o prato sugerido hoje.
 
     Roda o registro de verdade num banco descartavel e le o resultado. A tela
@@ -437,10 +437,13 @@ def registro_previsto(pessoa) -> dict:
     calcular isso no navegador seria uma segunda implementacao das regras de
     pontuacao — que um dia discordaria desta.
     """
-    sugestao = bot.build_suggestion(pessoa, DIA)
-    if not sugestao or not sugestao.portions:
+    if codigos is None:
+        sugestao = bot.build_suggestion(pessoa, DIA)
+        if not sugestao or not sugestao.portions:
+            return {}
+        codigos = [p.code for p in sugestao.portions for _ in range(p.quantity)]
+    if not codigos:
         return {}
-    codigos = [p.code for p in sugestao.portions for _ in range(p.quantity)]
 
     conn = bot.db()
     try:
@@ -449,6 +452,18 @@ def registro_previsto(pessoa) -> dict:
         regras = score_day(conn, pessoa.telegram_id, DIA,
                            protein_target_g=bot.target_for(pessoa)["ptn"])
         depois = total_points(conn, pessoa.telegram_id)
+        dia = next(d for d in history_by_day(conn, pessoa.telegram_id, days=36500)
+                   if d.service_date == DIA)
+        refeicao = {
+            "data": DIA, "data_amigavel": friendly_date(DIA),
+            "kcal": round(dia.kcal) if dia.known_items else None,
+            "ptn": round(dia.ptn_g) if dia.known_items else None,
+            "incompleto": dia.incomplete,
+            "itens": [{"codigo": l["item_code"], "nome": clean_dish_name(l["name"]),
+                       "quantidade": l["quantity"],
+                       "medida": "a vontade" if l["category"] in FREE_CATEGORIES
+                       else measure_label(l["category"], l["quantity"])} for l in dia.items],
+        }
         # O banco e temporario e morre no fim do script, mas desfazer aqui
         # mantem as outras exportacoes lendo o estado de antes do registro.
         conn.execute("DELETE FROM consumption WHERE telegram_id = ? AND service_date = ?",
@@ -464,7 +479,33 @@ def registro_previsto(pessoa) -> dict:
         "pontos_depois": depois,
         "ganho": depois - antes,
         "conquistas": [{"nome": r.label, "pontos": r.points} for r in regras],
+        "refeicao": refeicao,
     }
+
+
+def montagens(pessoa) -> list[dict]:
+    """Resultados do motor para as seleções manuais do pequeno cardápio demo.
+
+    Cada alimento pode ser escolhido uma vez, como no montador do bot. A
+    interface consulta estes resultados; não replica macros nem pontuação.
+    O limite impede uma exportação exponencial para um cardápio de produção.
+    """
+    codigos = sorted(i["item_code"] for i in bot.load_menu(pessoa, DIA))
+    if len(codigos) > 10:
+        raise ValueError("A montagem offline suporta até 10 alimentos; use o motor no servidor para cardápios maiores.")
+    novato = sem_historico()
+    saida = []
+    for tamanho in range(1, len(codigos) + 1):
+        for selecao in combinations(codigos, tamanho):
+            item = {"codigos": list(selecao), "objetivos": []}
+            for objetivo in bot.TARGETS:
+                novo = registro_previsto(replace(novato, goal=objetivo), list(selecao))
+                exemplo = registro_previsto(replace(pessoa, goal=objetivo), list(selecao))
+                item["refeicao"] = novo.pop("refeicao")
+                exemplo.pop("refeicao")
+                item["objetivos"].append({"objetivo": objetivo, "novo": novo, "exemplo": exemplo})
+            saida.append(item)
+    return saida
 
 
 def plano_exemplo(ficha: Path | None) -> list[dict]:
@@ -509,6 +550,7 @@ def main() -> int:
             ],
             "porcoes": porcoes(pessoa),
             "combinacoes": combinacoes(),
+            "montagens": montagens(pessoa),
             "meu_dia": meu_dia(pessoa),
             "progresso": progresso(pessoa),
             "semana": semana(pessoa),
