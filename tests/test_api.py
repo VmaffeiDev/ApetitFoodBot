@@ -13,7 +13,8 @@ from pathlib import Path
 
 from tornado.testing import AsyncHTTPTestCase
 
-from apetit.api import criar_app
+from apetit import identidade
+from apetit.api import criar_app, preparar
 from apetit.catalog import init_schema
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -187,6 +188,55 @@ class ApiTest(AsyncHTTPTestCase):
         corpo = json.loads(self.fetch("/api/saude").body)
         self.assertTrue(corpo["ok"])
         self.assertTrue(corpo["publicacao"], "o token esta configurado neste teste")
+
+
+class BancoNovoTest(AsyncHTTPTestCase):
+    """Servidor subindo contra um banco que ainda nao existe.
+
+    Este teste nasceu de um defeito de verdade. Quem criava as tabelas ao subir
+    era o `bot.py`, e a API pegava carona; apagado o bot, um servidor novo
+    respondia o primeiro `GET /api/dia` com **500** e `no such table:
+    menu_entry`, em vez de "ainda nao ha cardapio".
+
+    Nenhum outro teste pegava isso porque todos criam o esquema no `setUp` — o
+    caminho que faltava era justamente o de quem segue o README e roda o
+    servidor pela primeira vez. Por isso aqui o `init_schema` **nao** e chamado
+    a mao: quem tem de cria-lo e o `preparar` que o `main` chama.
+    """
+
+    def get_app(self):
+        self.pasta = tempfile.TemporaryDirectory()
+        self.addCleanup(self.pasta.cleanup)
+        self.banco = Path(self.pasta.name) / "nunca-existiu.db"
+        preparar(str(self.banco))
+        return criar_app(self.abrir, TOKEN)
+
+    def abrir(self):
+        conn = sqlite3.connect(self.banco)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def test_banco_novo_responde_404_e_nao_500(self):
+        resposta = self.fetch(f"/api/dia?unidade=SM&dia={DIA}")
+        self.assertEqual(resposta.code, 404, resposta.body)
+        self.assertTrue(json.loads(resposta.body)["vazio"])
+
+    def test_publicar_num_banco_novo_funciona(self):
+        corpo = (FIXTURES / "cardapio_largo.csv").read_bytes()
+        resposta = self.fetch(
+            "/api/cardapio?unidade=SM&refeicao=almoco", method="POST", body=corpo,
+            headers={"Authorization": f"Bearer {TOKEN}", "Content-Type": "text/csv"},
+        )
+        self.assertEqual(resposta.code, 200, resposta.body)
+        self.assertEqual(self.fetch(f"/api/dia?unidade=SM&dia={DIA}").code, 200)
+
+    def test_entrar_num_banco_novo_nao_estoura(self):
+        """As tabelas de identidade tambem precisam nascer com o banco."""
+        conn = self.abrir()
+        try:
+            self.assertEqual(identidade.autorizados(conn), [])
+        finally:
+            conn.close()
 
 
 if __name__ == "__main__":

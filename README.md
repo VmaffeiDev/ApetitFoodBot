@@ -1,10 +1,23 @@
-# ApetitFoodBot
+# Apetit
 
-Bot de controle nutricional para funcionarios atendidos pela Apetit.
+Acompanhamento nutricional para funcionarios atendidos pela **Apetit Servicos de
+Alimentacao**.
 
 A empresa serve o refeitorio; o funcionario acompanha o que come. **Nao ha venda,
 preco, carrinho nem pedido.** O cardapio da operacao e importado, validado e
 publicado, e o funcionario monta o prato e registra o consumo.
+
+> Este projeto comecou como um bot de Telegram, e o nome do repositorio guarda
+> isso. O Telegram foi removido: hoje sao um app web, um servidor pequeno e o
+> pacote `apetit/`, onde moram todas as regras.
+
+## As tres pecas
+
+| Peca | O que e |
+|---|---|
+| `apetit/` | Todas as regras: alergenico, porcao, ficha, pontos, relatorios, identidade. Nao depende de nenhuma camada de entrega — ha teste que verifica isso. |
+| `apetit/api.py` | Um servidor Tornado com seis rotas. Publica cardapio, serve o dia, e cuida da entrada por e-mail. |
+| `demo/` | O app que o funcionario abre: um PWA, instalavel, que funciona sem servidor. |
 
 ## O que o funcionario faz
 
@@ -12,59 +25,68 @@ publicado, e o funcionario monta o prato e registra o consumo.
 - ve o cardapio do dia **ja conferido contra as proprias alergias**
 - monta o prato e ve kcal e macros somarem contra o alvo do objetivo
 - registra o almoco e acumula pontos
-- guarda pratos favoritos e e avisado quando voltam ao cardapio
+- guarda pratos favoritos
+- guarda a ficha do proprio nutricionista, so no aparelho dele
 - **avalia o refeitorio** — comida, atendimento e o que faltou — sem se
   identificar para a empresa
 - consulta e apaga os proprios dados quando quiser
 
-## Comandos
+## As rotas
 
-| Comando | O que faz |
-|---|---|
-| `/start` | Cadastro ou menu principal |
-| `/quanto_pegar` | Quantas conchas e colheres pegar para bater a meta |
-| `/montar` | Monta o prato passo a passo, na ordem da fila |
-| `/cardapio` | Cardapio de hoje com alerta de alergenico |
-| `/avaliar` | Avalia o refeitorio de hoje (comida, atendimento, falta) |
-| `/meu_dia` | O que comeu hoje e nos dias anteriores |
-| `/favoritos` | Pratos guardados |
-| `/progresso` | Sequencia e conquistas da pessoa |
-| `/ficha` | Ficha do nutricionista da propria pessoa |
-| `/avisos` | Liga e desliga o resumo semanal e o lembrete do almoco |
-| `/ajuda` | Como usar |
-| `/meus_dados` `/excluir_dados` | LGPD |
-| `/recadastrar` | Refaz o cadastro |
+| Rota | O que faz | Quem pode |
+|---|---|---|
+| `GET /api/dia` | O cardapio do dia da unidade | qualquer um |
+| `POST /api/cardapio` | Publica o cardapio da semana (CSV) | quem tem o token |
+| `POST /api/entrar` | Manda o codigo de seis digitos para o e-mail | qualquer um |
+| `POST /api/codigo` | Confere o codigo e abre a sessao | qualquer um |
+| `GET /api/eu` | De quem e esta sessao | quem tem a sessao |
+| `POST /api/sair` | Encerra a sessao deste aparelho | quem tem a sessao |
+| `GET /api/saude` | Se o servidor esta de pe | qualquer um |
 
-Os comandos sao publicados no menu do Telegram (`setMyCommands`), entao aparecem
-sozinhos na interface.
-
-Administracao e nutricionista:
-
-| Comando | O que faz |
-|---|---|
-| **anexar .csv/.xlsx** | **Publica o cardapio da semana** — e so mandar o arquivo |
-| `/importar` | Explica como publicar o cardapio |
-| `/pendencias` | Fila de revisao da importacao |
-| `/alergenico <prato> <alergenico> <estado>` | Declara alergenico de um prato |
-| `/relatorio` | Adesao **agregada** por setor |
-| `/piloto [convidados] [desde] [ate]` | Relatorio do piloto, **sem individualizar ninguem** |
-| `/atendimento [refeitorio]` | Como cada refeitorio esta sendo avaliado, **sempre agregado** |
-| `/avisar_favoritos` | Dispara aviso de prato favorito voltando |
+`GET /api/dia` ser publico nao e descuido: o cardapio e igual para todo mundo da
+unidade, e exigir login para ler o cardapio faria o servidor saber quem quis ver
+o que — sem ganhar nada em troca. O que e de pessoa (alergia, objetivo,
+historico) fica no aparelho.
 
 ## Rodar localmente
 
-```powershell
+```bash
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+source .venv/bin/activate        # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item .env.example .env
-python bot.py
+cp .env.example .env
+
+python -m apetit.api                  # o servidor, na porta 8000
+python -m http.server 8080 -d demo    # o app, noutra janela
+```
+
+O servidor cria as tabelas ao subir, entao o primeiro `GET /api/dia` responde
+**404 "ainda nao ha cardapio publicado"**, e nao um erro.
+
+O app abre e funciona **sem o servidor**: ele le `demo/dados.json`, publicado ao
+lado da pagina. Para apontar para um servidor, preencha a `<meta name="apetit-api">`
+do `demo/index.html` — ou, so para testar, rode no console do navegador:
+
+```js
+localStorage.setItem("apetit-api", "https://seu-servidor")
+```
+
+Quem entra no app e definido pela lista fechada do piloto:
+
+```bash
+python scripts/autorizar.py --unidade SM --arquivo equipe.txt
+python scripts/autorizar.py --listar
+python scripts/autorizar.py --tirar alguem@empresa.com.br
 ```
 
 Testes:
 
-```powershell
-python -m unittest discover -s tests
+```bash
+python -m unittest discover -s tests        # 393 testes
+node scripts/conferir_fluxos.cjs            # 67 cenarios em jsdom
+python scripts/conferir_vereditos.py        # 8 alergias x 4 objetivos, num Chromium
+python scripts/conferir_fonte.py            # servidor x fotografia, e a data do cardapio
+python scripts/conferir_cardapio.py         # a pagina de conferencia x o importador
 ```
 
 ## Decisoes de interface
@@ -183,51 +205,45 @@ A partir dali o valor para de mudar sozinho.
 
 ## Publicar o cardapio da semana
 
-**Mande o arquivo para o bot.** Toda semana, quem tem o cardapio anexa o `.csv`
-ou `.xlsx` na conversa do Telegram, do jeito que a operacao exporta. Sem
-terminal, sem repositorio, sem Python, sem lembrar flag nenhuma.
+Toda semana quem tem o cardapio manda o `.csv` para o servidor, do jeito que a
+operacao exporta:
 
-```
-📄 Cardapio_17_a_2108.xlsx
-
-Refeitorio: Refeitorio Central
-Periodo: segunda-feira, 17 de agosto
-         ate sexta-feira, 21 de agosto
-mes e ano vieram de o nome do arquivo (17_a_2108)
-
-80 itens em 5 dia(s) · 58 pratos diferentes
-⚠️ 80 sem informacao nutricional
-
-Confira o periodo antes de publicar.
-
-[ ✅ Publicar este cardapio ]
-[ 📅 Trocar o mes ]  [ 🏢 Trocar o refeitorio ]  [ ❌ Cancelar ]
+```bash
+curl -X POST "https://servidor/api/cardapio?unidade=SM&refeicao=almoco&mes=8&ano=2025" \
+     -H "Authorization: Bearer $APETIT_PUBLICAR_TOKEN" \
+     -H "Content-Type: text/csv" \
+     --data-binary @Cardapio_17_a_2108.csv
 ```
 
-A planilha traz so o numero do dia, sem mes nem ano. Pelo terminal isso virava
-`--mes 8 --ano 2025` digitado a mao toda semana — campo que alguem erra em
-novembro e publica a semana no dia errado. Agora o mes sai do nome do arquivo
-(`Cardapio_17_a_2108` diz 21/08) e a pessoa so **confirma**.
+A resposta diz o que aconteceu: quantos itens foram publicados, em que dias, o
+que ficou bloqueado por macro inconsistente e o que vai sem informacao
+nutricional.
 
-O palpite nunca publica sozinho. A tela mostra as **datas ja montadas**, nao
-"mes 8": data por extenso e o que alguem consegue conferir de relance. Sem
-confirmacao, nada vai para o ar.
+Pelo terminal, com o banco na mao, o mesmo caminho:
 
-Tres protecoes que sobreviveram a mudanca:
+```bash
+python scripts/import_cardapio.py Cardapio_17_a_2108.xlsx --unidade SM --mes 8 --ano 2025
+```
+
+**A planilha de planejamento traz so o numero do dia**, sem mes nem ano — por
+isso `--mes` e `--ano` sao obrigatorios com ela. Chutar o mes publicaria a
+semana no dia errado, e e o tipo de erro que ninguem ve ate alguem almocar.
+
+Tres protecoes:
 
 - **Sem refeitorio nao publica.** O funcionario ve o cardapio filtrado pela
   unidade dele; publicar sem unidade e publicar para ninguem, e some sem erro
   nenhum — a pior forma de falhar.
 - **Fim de semana vira aviso.** Se as datas montadas caem no sabado ou domingo,
-  o mes ou o ano do palpite quase certamente esta errado: os dias vem da
-  planilha, entao o que nao bate e o mes/ano. O proprio calendario denuncia o
-  palpite, sem precisar de outro palpite. Fica como aviso, porque existe
-  refeitorio que serve no fim de semana.
+  o mes ou o ano quase certamente esta errado: os dias vem da planilha, entao o
+  que nao bate e o mes/ano. O proprio calendario denuncia o palpite. Fica como
+  aviso, porque existe refeitorio que serve no fim de semana.
 - **Reenviar o mesmo periodo substitui.** E como a operacao corrige uma semana
   ja publicada: manda o arquivo corrigido de novo.
 
-`/importar` explica isso dentro do bot. O caminho por terminal continua valendo
-para carga em lote:
+**Publicar e a acao de maior privilegio do sistema** — quem publica define o que
+quinze pessoas leem sobre alergenico. A rota exige `APETIT_PUBLICAR_TOKEN`, e
+sem ele no ambiente ela recusa tudo: melhor uma porta ausente que destrancada.
 
 ### Conferir antes de mandar (`demo/cardapio.html`)
 
@@ -238,13 +254,12 @@ de publicar. A pagina de conferencia fica no mesmo endereco do app:
 
 A pessoa arrasta o `.csv` e ve, antes de qualquer coisa ir para o ar: as datas
 que o importador montou, os itens e categorias de cada dia, o que ficou
-bloqueado por macro inconsistente e o que vai sem informacao nutricional. Depois
-ela manda o mesmo arquivo para o bot, que publica.
+bloqueado por macro inconsistente e o que vai sem informacao nutricional.
+Depois ela manda o mesmo arquivo para o servidor, que publica.
 
-**A pagina nao publica** — nao ha servidor para onde mandar nada, e o arquivo
-nao sai do computador de quem abriu. Publicar continua sendo uma acao de admin
-no bot, que e onde ela deve ficar: quem publica define o que as pessoas leem
-sobre alergenico.
+**A pagina nao publica** — ela e so leitura, e o arquivo nao sai do computador
+de quem abriu. Publicar exige o token, e continua sendo acao de quem tem ele:
+quem publica define o que as pessoas leem sobre alergenico.
 
 **E ela nao reimplementa nada.** `apetit/csv_import.py` tem 524 linhas de
 leitura em tres layouts; uma segunda implementacao em JavaScript discordaria da
@@ -494,7 +509,8 @@ ocorrencias** do cardapio. A planilha sai ordenada pelos pratos que mais
 aparecem, entao declarar arroz, feijao e refresco ja resolve boa parte do
 cardapio.
 
-**3. Prato a prato**, pelo `/alergenico` no Telegram.
+**3. Prato a prato**, por `set_item_allergens` — o caminho que a pagina de
+conferencia e os scripts usam.
 
 **4. Pela planilha de receitas da operacao** — o caminho que cobre mais de uma vez:
 
@@ -555,7 +571,7 @@ teste garantindo que nenhuma se apoie em deficit ou peso.
 Os alvos de kcal e proteina por objetivo sao **ilustrativos**. Quem define faixa
 individual e o nutricionista responsavel: o app informa e acompanha, nao prescreve.
 
-## A ficha do nutricionista (`/ficha`)
+## A ficha do nutricionista
 
 Quem faz acompanhamento tem numero de verdade, nao o alvo ilustrativo de um
 objetivo generico. O funcionario manda a ficha em PDF (ou digita os numeros, que
@@ -599,7 +615,7 @@ PDF escaneado ou foto volta vazio de proposito: **nao ha OCR**. Reconhecer letra
 imagem erra, e errar aqui vira orientacao errada a partir do documento clinico de
 alguem. O app admite que nao leu e oferece digitar os numeros.
 
-## Avisos de progresso (`/avisos`)
+## Avisos de progresso
 
 Ate aqui o app so respondia. Uma mensagem que ele manda sozinho e outra coisa:
 ela chega no celular da pessoa, num app da empresa, sobre o que ela come. Isso
@@ -619,9 +635,6 @@ quem ja decidiu nao usar — o jeito mais rapido de a pessoa passar a ignorar
 tudo, inclusive o alerta de alergenico. A primeira semana em branco convida
 ("sem pressa"); a segunda nao chega.
 
-**Bloquear o bot desliga o aviso**, em vez de render uma tentativa por semana
-para sempre.
-
 Dois avisos:
 
 | Aviso | Quando | Padrao |
@@ -638,13 +651,16 @@ O horario e fixo no fuso de Brasilia (UTC-3, sem horario de verao desde 2019),
 nao em UTC: um lembrete de almoco precisa cair na hora do almoco de quem recebe.
 
 Nada e enviado duas vezes — o envio fica marcado por periodo, entao reiniciar o
-bot no meio do dia nao reenvia. E a marca so e gravada **depois** que o Telegram
-aceitou: marcar antes faria uma queda de rede virar um resumo que a pessoa nunca
-recebe e que nunca seria reenviado.
+servidor no meio do dia nao reenvia. E a marca so e gravada **depois** que a
+entrega e aceita: marcar antes faria uma queda de rede virar um resumo que a
+pessoa nunca recebe e que nunca seria reenviado.
 
-Os envios rodam na `JobQueue` do python-telegram-bot (extra `job-queue`). Se ela
-faltar, o bot sobe do mesmo jeito e avisa no log: cardapio e alergenico nao caem
-por causa do resumo semanal.
+> **Hoje nao sai aviso nenhum.** As regras acima (`apetit/nudges.py`) continuam
+> testadas e valendo, mas quem entregava era o Telegram. Num app web, entregar
+> exige permissao de notificacao no aparelho e um servidor que empurre, e nenhum
+> dos dois existe ainda. A tela de avisos guarda a escolha da pessoa e **diz que
+> nada esta saindo** — prometer um toque no ombro que nunca vem seria pior que
+> nao ter a tela.
 
 ## Avaliacao do refeitorio
 
@@ -732,29 +748,33 @@ O app guarda dado de saude de funcionario dentro de uma relacao de emprego, o qu
 exige cuidado alem do aviso de consentimento:
 
 - a empresa **nunca ve dado individual** — nem consumo, nem objetivo, nem restricao
-- `/relatorio` mostra so adesao agregada por setor
-- `/atendimento` mostra so media de refeitorio, suprimida abaixo de 5 avaliacoes,
-  e a avaliacao nao guarda empresa nem setor de quem respondeu
+- a adesao sai **agregada por setor**, e nada mais
+- a avaliacao sai como media do refeitorio, suprimida abaixo de 5 avaliacoes, e
+  nao guarda empresa nem setor de quem respondeu
 - recorte com menos de **5 pessoas** e suprimido, porque setor pequeno mais dado
   alimentar reidentifica alguem sem precisar do nome
-- `/excluir_dados` apaga cadastro, restricoes, consumo, favoritos, pontos e ficha
+- **Apagar tudo** apaga cadastro, restricoes, consumo, favoritos, pontos e ficha
 - a ficha do nutricionista entra como **numeros**: o documento nao e guardado
 
-## Demonstracao instalavel no celular (`demo/`)
+## O app (`demo/`)
 
-O bot vive no Telegram, e para o piloto as 15 pessoas precisam ver o app antes
-de existir bot no ar. A pasta `demo/` e um **PWA**: abre no navegador do
-celular, instala na tela inicial e roda em tela cheia, sem barra de navegador —
-"como se ja estivesse instalado".
+A pasta `demo/` e o aplicativo: um **PWA** que abre no navegador do celular,
+instala na tela inicial e roda em tela cheia, sem barra de navegador.
 
-```powershell
-python scripts/demo_telas.py demo/telas.json Receitas-Cardapio-Nutri.xlsx
+```bash
+python scripts/demo_dados.py demo/dados.json Receitas-Cardapio-Nutri.xlsx
 python scripts/demo_icone.py demo/
-cd demo; python -m http.server        # http://localhost:8000
+python -m http.server -d demo         # http://localhost:8000
 ```
 
-As telas sao **geradas rodando o `bot.py` de verdade** (ver `scripts/demo_telas.py`),
-entao o simulador nao envelhece sozinho: mudou o bot, roda o script de novo.
+**Todas as telas sao escritas em `demo/index.html`.** Ate a remocao do Telegram,
+setenta delas eram transcricoes capturadas do Telegram, desenhadas por um
+interpretador de texto — fiel ao bot e errado como aplicativo: a tela de
+favoritos nao sabia o que a pessoa tinha guardado.
+
+O conteudo que essas telas mostram continua saindo do Python, em
+`demo/dados.json`: o veredito de alergenico, a sugestao de porcao, os pontos e
+os relatorios sao calculados por `apetit/`, nunca reescritos em JavaScript.
 
 O `sw.js` existe por dois motivos. Sem service worker o navegador nao oferece
 instalar na tela inicial. E o refeitorio costuma ter sinal ruim: um "app" que
@@ -794,9 +814,8 @@ folgada porque o Android recorta o icone na forma do lancador.
 ### O cadastro, na primeira vez e depois
 
 Quem abre o app pela primeira vez cai numa tela de boas-vindas e se cadastra do
-zero: nome, refeitório, empresa e setor, objetivo, alergias e o termo — os
-mesmos passos, na mesma ordem, com as mesmas palavras que o bot usa em
-`ask_name` até `ask_consent`. Depois disso o cadastro fica guardado e a pessoa
+zero: nome, refeitório, empresa e setor, objetivo, alergias e o termo. Depois
+disso o cadastro fica guardado e a pessoa
 edita quando quiser, no **Perfil → Editar meu cadastro**, ou apaga tudo ali
 mesmo.
 
@@ -860,18 +879,14 @@ Cadastro novo comeca **vazio**: zero ponto, nenhuma conquista, nenhum dia
 registrado, nenhum favorito. Herdar os 25 pontos e os dois almocos da Mariana
 daria a pessoa refeicoes que ela nunca fez.
 
-Das ~70 telas que saem do texto do bot, tres traziam o nome do exemplo, e duas
-ja eram nativas. Sobrava `meus_dados` — justamente a tela que promete listar
-**tudo o que o app guarda sobre voce**, e que mostrava o nome, a empresa e as
-alergias de outra pessoa. A tela da promessa desmentindo a promessa. Ela e
-`meu_dia` (que nao traz o nome, mas traz as refeicoes da Mariana) viraram
-nativas, lendo o cadastro de quem esta usando o app, com as palavras do
-`meus_dados` do `bot.py`.
+O caso que mais importava era `meus_dados` — justamente a tela que promete
+listar **tudo o que o app guarda sobre voce**, e que mostrava o nome, a empresa
+e as alergias de outra pessoa. A tela da promessa desmentindo a promessa.
 
 ### Registro e avaliacao sao simulacao, e dizem isso
 
-O cadastro fica guardado; o registro da refeicao e a avaliacao, nao — no app de
-verdade quem grava isso e o servidor do bot, e aqui nao ha servidor. A diferenca
+O cadastro fica guardado; o registro da refeicao e a avaliacao, nao — quem
+gravaria isso e o servidor, e o app do piloto ainda roda sem um. A diferenca
 aparece **na propria confirmacao**, e nao ao recarregar a pagina e ver os pontos
 voltarem. Descobrir assim e a pior forma de saber: a pessoa passa a duvidar de
 tudo que o app confirmou antes.
@@ -895,9 +910,9 @@ download.
 
 ### Onde o cadastro fica guardado
 
-Em `localStorage`, como a foto de perfil: esta demonstração não tem servidor, e
-inventar um "salvo na nuvem" seria prometer o que não existe. No app de verdade
-quem guarda é o banco do bot, com o mesmo `Employee`.
+Em `localStorage`, como a foto de perfil: enquanto o app roda sem servidor,
+inventar um "salvo na nuvem" seria prometer o que não existe. Com servidor, quem
+guarda é o banco, com o mesmo `Employee`.
 
 Num quadro embutido — e é assim que a prévia chega para quem só recebeu o link —
 o navegador bloqueia o `localStorage` do endereço de dentro. Sem alternativa, o
@@ -918,56 +933,17 @@ Os avisos de alergênicos mantêm cores próprias: coral para bloqueio, âmbar p
 confirmação e verde para liberação. Cor, ícone e texto aparecem juntos. A
 reorganização visual não muda os vereditos nem as regras de pontuação.
 
-### O "monta o prato", e por que uma tela nao basta como id
-
-Esta seção descreve a captura do bot. No app, a montagem agora é nativa e lê
-o cadastro atual, conforme a seção seguinte; as telas capturadas continuam
-servindo aos demais caminhos da demonstração. O defeito abaixo já não afeta o
-montador — mas a correção da ligação entre botão e tela vale para todos os
-outros fluxos capturados, e por isso fica registrada.
+### O "monta o prato"
 
 Um relato de teste: selecionar um alimento no passo 1 pulava direto para o
-passo 6. O defeito estava na captura, nao no app. As telas eram ligadas aos
-botoes **pela ultima acao do caminho**:
+passo 6. O defeito estava na captura das telas do Telegram, e a licao vale
+alem dela: **deduplicar por conteudo perde o futuro num fluxo com estado.** A
+tela do passo 2 e igual tendo ou nao marcado a carne — mas o fim do fluxo nao e.
 
-```python
-destino_de = {tela["caminho"][-1]: ident for ...}
-```
-
-Cinco telas distintas — os passos 2 a 6 — tem `flow_next` como ultima acao, e o
-dicionario ficava com a ultima. Todo "Proximo" apontava para a salada do passo
-6. Agora a ligacao e pelo **caminho inteiro** (`caminho + [acao]`), e quando o
-caminho nao foi visitado so vale adivinhar pela acao se ela produzir uma tela
-so: com varias, palpite errado leva a pessoa para onde ela nao pediu, que era
-exatamente o defeito.
-
-Junto vieram dois vizinhos:
-
-- **A varredura parava no meio do fluxo.** Com `PROFUNDIDADE = 6` os passos 5 e
-  6 ficavam com "Proximo" sem destino. O grafo do bot fecha em 10 — de 10 para
-  cima saem sempre as mesmas telas — e a varredura leva segundos, entao ela
-  agora vai ate 12.
-
-- **A tela do prato montado nao tinha saida.** `classificar` tira o "Voltar"
-  (a seta do cabecalho ja faz isso) e tira o que repete o menu inicial. No fim
-  do fluxo os dois filtros comiam os unicos botoes e a pessoa ficava presa.
-  Agora, se a limpeza esvaziar a tela, os descartados que levam a algum lugar
-  voltam: limpar a tela nunca pode custar o caminho para sair dela.
-
-E um defeito que o teste do fluxo revelou, com uma licao que sobreviveu a
-correcao: quem marcava a carne no passo 1 terminava com **o prato vazio**. A
-deduplicacao e so pelo texto, e a tela do passo 2 e identica tendo ou nao
-marcado a carne — mas o "Terminei de montar" dela leva a pratos diferentes.
-**Deduplicar por conteudo perde o futuro num fluxo com estado.**
-
-Chegamos a distinguir as telas pelos alimentos ja escolhidos, o que resolvia ao
-custo de 385 telas a mais (9 KB -> 19 KB comprimidos). A montagem nativa da
-secao seguinte tornou aquilo desnecessario, e o codigo saiu: `montar` resolve
-para a tela nativa, entao as 385 viraram peso morto inalcancavel. A varredura
-voltou a 96 telas e 78 KB.
-
-Fica a regra: **captura de texto serve para tela que so mostra; fluxo que
-acumula escolha precisa do dominio.**
+A resolucao veio por outro caminho: a montagem virou **nativa**. Ela percorre as
+categorias do cardapio atual, alimentos bloqueados ficam indisponiveis, e o
+bloqueio e conferido de novo no clique de registrar — inclusive se a pessoa
+trocou as restricoes depois de montar.
 
 ### Montagem e histórico do app com o mesmo registro
 
@@ -1040,14 +1016,14 @@ Sem `--documento`, o script mantém o formato de fragmento para incorporação.
 
 O cardápio permite filtrar categorias. A avaliação só é confirmada depois de
 selecionar uma nota e tocar em **Enviar avaliação**, mantendo os códigos de
-motivo do bot. Os períodos do gráfico somam apenas registros disponíveis na
+motivo de `apetit/feedback.py`. Os períodos do gráfico somam apenas registros disponíveis na
 demonstração; números da referência visual não são dados do app.
 
 As fotos foram geradas para ilustrar os pratos de exemplo; não são fotos da
 operação nem comprovam ingredientes ou tamanho de porção. A origem e o mapa
 do arquivo estão em [demo/assets/README.md](demo/assets/README.md).
 
-## O relatorio do piloto (`/piloto`)
+## O relatorio do piloto
 
 O piloto responde uma pergunta: **isso funciona na vida real do refeitorio?**
 `/piloto 15 2026-09-01 2026-09-30` monta o retrato para levar a empresa.
@@ -1076,46 +1052,60 @@ nao como relatorio incompleto.
 Taxa sem base volta como `—`, nao como `0%`: "0% de adesao" mentiria dizendo que
 ninguem aderiu, quando o que houve foi ninguem ter sido contado.
 
-## Seguranca do token
+## Seguranca dos segredos
 
-Se um token foi colado em chat, issue, commit ou qualquer lugar publico, gere outro
-no BotFather. Nao salve o token no codigo.
+`APETIT_SEGREDO`, `APETIT_PUBLICAR_TOKEN` e a senha de SMTP nunca entram no
+codigo. Se um deles for colado em chat, issue, commit ou qualquer lugar publico,
+gere outro — e trate o antigo como conhecido por estranhos.
 
 **Este repositorio e publico por decisao do projeto.** Isso significa que qualquer
 coisa commitada aqui e visivel para qualquer pessoa, para sempre — inclusive o que
 for removido depois, porque o valor antigo continua no historico do Git.
 
-Um token de verdade ja esteve versionado no `.env.example` deste repositorio. O
-valor foi removido do arquivo, mas continua acessivel no historico do Git, entao **esse token precisa ser revogado no BotFather** (`/revoke`) mesmo com o
-arquivo atual limpo. Remover num commit posterior nao invalida a credencial.
+Um token do Telegram ja esteve versionado no `.env.example` deste repositorio. O
+valor foi removido do arquivo, mas continua acessivel no historico do Git —
+entao **esse token precisa ser revogado no BotFather** (`/revoke`) mesmo com o
+Telegram fora do projeto e o arquivo atual limpo. Remover num commit posterior
+nao invalida credencial nenhuma; so a revogacao invalida.
 
-## Comandos administrativos
+## Quem pode o que
 
-Sao restritos: **publicar cardapio** (mandar o arquivo para o bot), `/importar`,
-`/pendencias`, `/alergenico`, `/cobertura`, `/relatorio`, `/piloto`,
-`/atendimento` e `/avisar_favoritos`.
+Dois privilegios, e nenhum deles mora em variavel de ambiente por acaso:
 
-A lista de administradores e obrigatoria: enquanto `ADMIN_TELEGRAM_IDS` estiver
-vazio, **ninguem** usa esses comandos. Isso e proposital: publicar cardapio muda o
-que o refeitorio inteiro ve, `/avisar_favoritos` dispara mensagem para a base e
-`/alergenico` altera informacao de seguranca alimentar.
+- **Publicar cardapio** exige `APETIT_PUBLICAR_TOKEN`. Quem publica define o que
+  quinze pessoas leem sobre alergenico — e a acao de maior privilegio do
+  sistema. Sem o token no ambiente a rota recusa tudo.
+- **Entrar no app** exige estar na lista de `scripts/autorizar.py`, e receber um
+  codigo de seis digitos no e-mail da empresa. A lista mora no banco, e nao no
+  ambiente, porque ela muda quando alguem entra ou sai da empresa — e tirar da
+  lista precisa derrubar a sessao aberta na hora, sem reiniciar nada.
 
-```env
-TELEGRAM_BOT_TOKEN=seu_token
-ADMIN_TELEGRAM_IDS=123456789,987654321
-APETIT_DB_PATH=apetit.db
-```
+A lista de quem entra e por linha de comando, e nao por tela: quem escreve nela
+escolhe quem le o cardapio de alergenico de quem, e seria a porta mais valiosa
+do sistema exposta na internet.
+
+> **Um privilegio ainda sem tranca.** As quatro telas de gestao aparecem por uma
+> chave no proprio aparelho e leem numeros de demonstracao de um arquivo
+> publico. Enquanto o conteudo e inventado isso e aceitavel; antes de qualquer
+> numero verdadeiro entrar ali, elas precisam de rota autenticada.
 
 ## Deploy
 
-O bot e o app vao para lugares diferentes, de proposito: o bot e um processo que
-precisa de banco e segredo, e o `demo/` e um punhado de arquivo estatico que so
-precisa de HTTPS. Ver [Demonstracao instalavel no celular](#demonstracao-instalavel-no-celular-demo)
-para o GitHub Pages; o que vem abaixo e o bot.
+O servidor e o app vao para lugares diferentes, de proposito: o servidor precisa
+de banco e segredo, e o `demo/` e um punhado de arquivo estatico que so precisa
+de HTTPS.
 
-```powershell
-docker build -t apetitfoodbot .
-docker run -d --name apetit --env-file .env -v apetit-dados:/data apetitfoodbot
+**O app** sobe no GitHub Pages por `.github/workflows/pages.yml`, so de `main`:
+
+> **https://vmaffeidev.github.io/ApetitFoodBot/**
+
+Para ligar, uma vez so: Settings → Pages → Source: **GitHub Actions**.
+
+**O servidor** roda em qualquer lugar que aceite um container:
+
+```bash
+docker build -t apetit .
+docker run -d --name apetit --env-file .env -v apetit-dados:/data -p 8000:8000 apetit
 ```
 
 O `-v apetit-dados:/data` nao e detalhe: **sem volume o banco some no proximo
@@ -1123,52 +1113,20 @@ deploy**, levando cadastro, historico e avaliacoes de todo mundo junto. O
 container guarda o banco em `/data/apetit.db` e a imagem declara `/data` como
 volume justamente para essa pegadinha nao passar despercebida.
 
-### Subir em tres passos (Render)
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/VmaffeiDev/ApetitFoodBot)
-
-1. **Token novo no BotFather.** No Telegram, `@BotFather` > `/newbot` (ou
-   `/revoke` no bot que ja existe, para invalidar o token antigo e gerar outro).
-   Guarde o token que ele devolve.
-2. **Seu ID do Telegram.** Fale com `@userinfobot`; ele responde com o seu ID
-   numerico. E o que libera publicar cardapio e ver relatorio.
-3. **Deploy.** O botao acima abre o Render ja lendo o `render.yaml`: ele cria o
-   worker com o disco persistente e pergunta `TELEGRAM_BOT_TOKEN` e
-   `ADMIN_TELEGRAM_IDS`. Cole os dois valores e confirme.
-
-Em um a dois minutos o bot responde `/start` no Telegram. Sem cardapio
-importado ele diz que ainda nao ha cardapio publicado — mande a planilha da
-semana como anexo e ele publica.
-
-> O plano gratuito do Render nao tem disco persistente. Sem disco o bot roda,
-> mas o banco some a cada deploy: serve para demonstrar, nao para operar.
-
-### Outros provedores
-
-O mesmo `Dockerfile` serve em qualquer lugar. O bot sobe em **polling** quando
-`TELEGRAM_WEBHOOK_URL` esta vazio — sem URL publica, sem certificado, sem porta
-aberta.
-
 | Provedor | Como | Cuidado |
 |---|---|---|
+| **Render** | Le o `render.yaml` | O plano gratuito nao tem disco persistente: o banco some a cada deploy |
 | **Railway** | Deploy from repo, detecta o Dockerfile | Crie um **Volume** montado em `/data` |
 | **Fly.io** | `fly launch` | `fly volumes create apetit_dados --size 1` e monte em `/data` |
-| **VPS** | `docker run` da secao acima | Use `--restart unless-stopped` |
+| **VPS** | `docker run` acima | Use `--restart unless-stopped` |
 
-Em qualquer um: `TELEGRAM_BOT_TOKEN` e `ADMIN_TELEGRAM_IDS` entram como variavel
+`APETIT_SEGREDO`, `APETIT_PUBLICAR_TOKEN` e a senha de SMTP entram como variavel
 de ambiente secreta, nunca versionadas.
 
-### Webhook, quando fizer sentido
-
-Com `TELEGRAM_WEBHOOK_URL` preenchido o bot troca polling por webhook. Vale
-quando o volume de mensagem crescer; para piloto, polling basta.
-
-```env
-TELEGRAM_WEBHOOK_URL=https://seu-app.onrender.com
-TELEGRAM_WEBHOOK_PATH=telegram-webhook
-TELEGRAM_WEBHOOK_SECRET_TOKEN=um-segredo-forte
-PORT=8000
-```
+Depois de subir, aponte o app para o servidor pela `<meta name="apetit-api">` do
+`demo/index.html`. Sem isso o app continua funcionando com a fotografia
+publicada ao lado dele — e dizendo, em toda tela que fala de comida, que aquele
+nao e o cardapio de hoje.
 
 ### Banco
 
@@ -1202,17 +1160,25 @@ apetit/
   nudges.py      quem recebe qual aviso, e quando o app cala
   recipes.py     alergenico deduzido da lista de ingredientes
   pilot.py       relatorio do piloto, sem individualizar ninguem
-bot.py           camada do Telegram
-demo/            PWA de demonstracao, instalavel no celular
-scripts/         gera as telas, os dados e os icones do demo;
-                 conferir_vereditos.py confere o app contra o Python
+  preflight.py   decide o que publicar, sem tocar em disco
+  payload.py     o dia da unidade, impessoal, como o app o consome
+  diario.py      o dia de uma pessoa: cardapio conferido e alvo
+  identidade.py  quem entra: e-mail, codigo de seis digitos, sessao
+  entrega_email.py  o unico pedaco que fala com o mundo (SMTP)
+  api.py         as rotas HTTP
+demo/            o app: PWA instalavel, e a pagina de conferencia
+scripts/         gera os dados e os icones do app; autoriza quem entra;
+                 e os conferidores que provam o app contra o Python
 LICENSE          todos os direitos reservados
 Dockerfile       imagem, com o banco em /data
 render.yaml      blueprint do Render, ja com disco persistente
 ```
 
-A regra de dominio fica fora do `bot.py` de proposito, para servir depois a um
-painel do nutricionista sem reescrita.
+**Nada em `apetit/` depende de uma camada de entrega.** Foi o que permitiu
+apagar o Telegram sem reescrever regra nenhuma, e `tests/test_independencia.py`
+verifica que continua assim — por leitura de AST e por import num interpretador
+novo, porque um import tardio dentro de uma funcao passaria despercebido numa
+revisao.
 
 ## Licenca
 
@@ -1231,7 +1197,7 @@ flowchart TD
     B -->|"barrado"| D["Fila de revisao do nutricionista"]
     D --> B
 
-    E["Funcionario abre o bot"] --> F{Tem cadastro?}
+    E["Funcionario abre o app"] --> F{Tem cadastro?}
     F -- Nao --> G["Nome, unidade, empresa, setor, objetivo, restricoes"]
     G --> H{Aceita o termo?}
     H -- Nao --> X["Nada e salvo"]

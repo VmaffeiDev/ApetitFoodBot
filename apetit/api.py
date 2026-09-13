@@ -41,7 +41,7 @@ from tornado.ioloop import IOLoop
 from tornado.web import Application, HTTPError, RequestHandler
 
 from . import identidade
-from .catalog import import_menu_rows
+from .catalog import connect, import_menu_rows, init_schema
 from .csv_import import read_rows
 from .entrega_email import montar as montar_remetente
 from .payload import do_dia
@@ -443,6 +443,23 @@ def abrir_padrao(caminho: str):
     return conn
 
 
+def preparar(caminho: str) -> None:
+    """Cria as tabelas se o banco ainda nao as tem.
+
+    Quem fazia isso ao subir era o `bot.py`, e a API pegava carona. Apagado o
+    bot, um servidor novo atendia o primeiro `GET /api/dia` com 500 e
+    `no such table: menu_entry` — nao com "nao ha cardapio publicado".
+
+    O defeito nao aparecia em teste porque todo teste cria o esquema no setUp.
+    Apareceu ao rodar o comando que o README manda rodar.
+    """
+    conn = connect(caminho)
+    try:
+        init_schema(conn)
+    finally:
+        conn.close()
+
+
 def main() -> int:
     """Sobe so a API, sem o bot. Serve para desenvolver e para conferir."""
     import asyncio
@@ -450,6 +467,7 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     caminho = os.getenv("APETIT_DB_PATH", "apetit.db")
     porta = int(os.getenv("PORT", "8000"))
+    preparar(caminho)
     app = criar_app(
         lambda: abrir_padrao(caminho),
         os.getenv("APETIT_PUBLICAR_TOKEN", ""),
