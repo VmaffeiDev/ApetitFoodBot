@@ -1,13 +1,13 @@
-APScheduler==3.11.3
-anyio==4.13.0
-certifi==2026.5.20
-h11==0.16.0
-httpcore==1.0.9
-httpx==0.28.1
-idna==3.16
+# Tornado atende a API (`apetit/api.py`). Vinha de carona no
+# python-telegram-bot[webhooks]; com o Telegram fora, entra como dependencia
+# propria — que e o que sempre foi.
+tornado==6.5.8
+
+# Planilha de cardapio e de receitas.
 openpyxl==3.1.5
+
+# Ficha do nutricionista em PDF.
 pypdf==6.18.1
+
+# `.env` nos scripts de operacao.
 python-dotenv==1.2.2
-python-telegram-bot[job-queue,webhooks]==22.7
-typing_extensions==4.15.0
-tzlocal==5.4.4

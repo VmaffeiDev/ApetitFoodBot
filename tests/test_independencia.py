@@ -1,12 +1,14 @@
 """O pacote `apetit/` nao depende do Telegram — verificado, e nao prometido.
 
-Esta e a unica garantia que sustenta apagar o `bot.py`. Enquanto uma regra de
-comida morar no arquivo do Telegram, o app web precisa do Telegram para saber o
-alvo de alguem, e apagar o bot deixa de ser arrumacao e passa a ser uma quebra.
+Foi esta garantia que sustentou apagar o `bot.py`: enquanto uma regra de comida
+morasse no arquivo do Telegram, apagar o bot deixaria de ser arrumacao e passaria
+a ser uma quebra.
 
-O teste falha no dia em que alguem importar `bot` (ou `telegram`) de dentro de
-`apetit/` — inclusive por acidente, dentro de uma funcao. E dessa vez o aviso
-chega no CI, e nao no dia da migracao.
+O bot ja nao existe, e o teste continua porque o que ele impede nao acabou: o
+caminho curto para voltar a ter uma dependencia de mensageria e alguem importar
+uma biblioteca dessas dentro de `apetit/` para mandar um aviso. O teste falha no
+dia em que isso acontecer — inclusive por acidente, dentro de uma funcao — e o
+aviso chega no CI, e nao numa migracao seis meses depois.
 """
 
 import ast

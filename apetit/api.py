@@ -1,19 +1,23 @@
 """A porta HTTP: a operacao publica o cardapio, o app do funcionario o recebe.
 
-Ate aqui o app web era um retrato: `dados.json` gerado por um script e publicado
+Ate aqui o app era um retrato: `dados.json` gerado por um script e publicado
 junto com o site. Publicar um cardapio novo nao chegava a ninguem.
 
-Estas duas rotas fecham o circuito:
+As rotas:
 
     POST /api/cardapio   a operacao manda o arquivo; o importador de verdade roda
     GET  /api/dia        o app pergunta o cardapio de hoje da unidade dele
+    POST /api/entrar     manda o codigo de seis digitos para o e-mail
+    POST /api/codigo     confere o codigo e abre a sessao
+    GET  /api/eu         de quem e esta sessao
+    POST /api/sair       encerra a sessao deste aparelho
 
-Roda no processo do bot, com o mesmo banco. Nao e um sistema novo — e uma porta
-para o que ja existe, e por isso a publicacao pelo Telegram e a publicacao pela
-web chegam no mesmo lugar, pelo mesmo caminho, com as mesmas validacoes.
+Nao e um sistema novo: e uma porta para o que ja existe em `apetit/`, com as
+mesmas validacoes que sempre valeram na importacao de cardapio.
 
-Tornado porque ele ja vem com o `python-telegram-bot[webhooks]`: uma dependencia
-a menos para auditar num projeto que lida com alergia alimentar.
+Tornado porque era o servidor que o projeto ja carregava; com o Telegram fora,
+ele ficou como dependencia propria — uma so, e pequena, num projeto que lida
+com alergia alimentar e onde cada dependencia e mais codigo para auditar.
 
 **Quem le nao se identifica.** O cardapio do dia e igual para todo mundo da
 unidade, entao `GET /api/dia` e publico. Alergia, objetivo e historico continuam
@@ -407,7 +411,7 @@ def criar_app(abrir, token: str = "", segredo: str = "", enviar=None) -> Applica
     if not token:
         logger.warning(
             "APETIT_PUBLICAR_TOKEN vazio: a rota de publicar fica recusando tudo. "
-            "Publicar pelo Telegram continua funcionando."
+            "Publicar continua possivel por scripts/import_cardapio.py, no servidor."
         )
     if not segredo:
         logger.warning(

@@ -94,7 +94,6 @@ def empacotar(documento: bool = False) -> str:
     )
 
     dados = {
-        "telas": json.loads((DEMO / "telas.json").read_text(encoding="utf-8")),
         "dados": json.loads((DEMO / "dados.json").read_text(encoding="utf-8")),
         "regras": json.loads((DEMO / "regras.json").read_text(encoding="utf-8")),
     }

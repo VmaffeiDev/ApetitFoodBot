@@ -9,7 +9,6 @@ const {JSDOM, VirtualConsole} = require('jsdom');
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'demo/index.html'), 'utf8');
 const data = JSON.parse(fs.readFileSync(path.join(root, 'demo/dados.json'), 'utf8'));
-const telas = JSON.parse(fs.readFileSync(path.join(root, 'demo/telas.json'), 'utf8'));
 const regras = JSON.parse(fs.readFileSync(path.join(root, 'demo/regras.json'), 'utf8'));
 let scenarios = 0;
 const base = {nome:'Teste', refeitorio:'SM', empresa:'Teste', setor:'TI', consentimento:true};
@@ -19,7 +18,7 @@ async function app(profile) {
   console.on('jsdomError', e => errors.push(e.message));
   const dom = new JSDOM(source, {runScripts:'dangerously', url:'https://apetit.test', virtualConsole:console,
     beforeParse(w) {
-      w.__APETIT__ = {dados: structuredClone(data), telas: structuredClone(telas), regras};
+      w.__APETIT__ = {dados: structuredClone(data), regras};
       w.matchMedia = () => ({matches:true});
       w.HTMLDialogElement.prototype.showModal = function(){this.setAttribute('open','');};
       w.HTMLDialogElement.prototype.close = function(){this.removeAttribute('open');};

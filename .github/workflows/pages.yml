@@ -6,10 +6,10 @@
 # quadro embutido tambem nao instala, porque a instalacao sai do documento de
 # topo.
 #
-# O que sobe e o que esta commitado em `demo/`, sem gerar nada aqui: as telas e
-# os dados saem de `scripts/demo_telas.py` e `scripts/demo_dados.py`, que
-# precisam da planilha da empresa e nao entram no repositorio. Gerar no CI
-# publicaria um app montado a partir de dados que ninguem conferiu.
+# O que sobe e o que esta commitado em `demo/`, sem gerar nada aqui: o
+# `dados.json` sai de `scripts/demo_dados.py`, que pode usar a planilha da
+# empresa e por isso nao roda no CI. Gerar aqui publicaria um app montado a
+# partir de dados que ninguem conferiu.
 #
 # So publica de `main`. O endereco e o que as pessoas do piloto vao abrir: ele
 # segue o que ja passou por revisao, nao o galho da vez.

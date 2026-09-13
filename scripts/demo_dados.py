@@ -2,17 +2,20 @@
 
     python scripts/demo_dados.py demo/dados.json [Receitas.xlsx]
 
-O `demo_telas.py` captura a tela do bot como ela sai no Telegram: um bloco de
-texto com os botoes embaixo. Isso serve para mostrar o bot, e e fiel — mas um
-bot de Telegram **e** uma conversa com botoes, e uma tela de aplicativo nao e.
+A interface precisa do dado, nao do paragrafo: o cardapio como lista de pratos
+com veredito de alergenico, a sugestao como medidas separadas do nome, o
+progresso como numero. Entao o conteudo sai daqui ja em JSON.
 
-Para o app parecer aplicativo, a interface precisa do dado, nao do paragrafo:
-o cardapio como lista de pratos com veredito de alergenico, a sugestao como
-medidas separadas do nome, o progresso como numero. Entao aqui o conteudo sai
-das mesmas funcoes de dominio que o bot usa, ja em JSON.
+O que ele exporta e de duas naturezas, e a divisao importa:
 
-Fiel continua sendo fiel: o veredito de alergenico, a sugestao de porcao e o
-historico saem de `apetit/`, nao de texto reescrito a mao.
+* o que e **do dia e igual para a unidade inteira** sai de `apetit/payload.py`,
+  o mesmo modulo que o servidor usa para responder `GET /api/dia`. Uma fonte so,
+  senao a demonstracao e a producao mostram coisas diferentes;
+* o que e **do exemplo** — o perfil da Mariana, o historico dela, os relatorios
+  da gestao — so existe aqui, porque o servidor nao devolve nada disso.
+
+Fiel continua sendo fiel: o veredito de alergenico, a sugestao de porcao, os
+pontos e os relatorios saem de `apetit/`, nao de texto reescrito a mao.
 """
 
 import json
@@ -21,51 +24,50 @@ import sys
 import tempfile
 from dataclasses import replace
 from datetime import date, timedelta
-from itertools import combinations, product
+from itertools import product
 from math import prod
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "demo")
 
-import bot  # noqa: E402
 from apetit.allergens import ALLERGENS, Declaration, Restriction, Verdict, check_item  # noqa: E402
 from apetit.catalog import item_allergens  # noqa: E402
 from apetit.allergen_sheet import coverage_summary  # noqa: E402
 from apetit.catalog import allergen_coverage  # noqa: E402
-from apetit.feedback import MISSING_TAGS, SCALE, all_unit_reports  # noqa: E402
+from apetit.feedback import all_unit_reports  # noqa: E402
 from apetit.pilot import pilot_report  # noqa: E402
 from apetit.profile import aggregate_by_sector  # noqa: E402
 from apetit.humanize import DIAS  # noqa: E402
 from apetit.humanize import (  # noqa: E402
-    category_label, clean_dish_name, dish_hint, dish_role, dish_weight,
-    friendly_date, order_categories, week_summary,
+    category_label, clean_dish_name, friendly_date, week_summary,
 )
 from apetit import payload  # noqa: E402
 from apetit.diario import (  # noqa: E402
     alvo_de, cardapio_de, descrever_restricoes, inicio_da_semana, sugestao_de,
 )
 from apetit.nudges import LEMBRETE_ALMOCO, RESUMO_SEMANAL  # noqa: E402
-from apetit.profile import Employee, load_employee, save_employee  # noqa: E402
+from apetit.profile import TARGETS, Employee, load_employee, save_employee  # noqa: E402
 from apetit.portions import FREE_CATEGORIES, MEASURES, MEDIDA_PADRAO, measure_label  # noqa: E402
 from apetit.prescription import extract_meal_plan, lunch_from_plan, read_pdf  # noqa: E402
 from apetit.tracking import (  # noqa: E402
     RULES, favorites, history_by_day, log_consumption, points_breakdown,
     score_day, total_points,
 )
-from scripts.demo_telas import DIA, USUARIO, preparar_banco  # noqa: E402
+from scripts.demo_banco import DIA, USUARIO, abrir, preparar_banco  # noqa: E402
 
 # Uma conexao para o script inteiro. Abrir uma por chamada — `cardapio_de(banco(),
 # ...)` — vazava um descritor a cada uso; some quando o processo sai, mas e o
 # tipo de coisa que vira defeito de verdade no dia em que este codigo virar
 # servidor.
 _CONEXAO = None
+_CAMINHO = None
 
 
 def banco():
     global _CONEXAO
     if _CONEXAO is None:
-        _CONEXAO = bot.db()
+        _CONEXAO = abrir(_CAMINHO)
     return _CONEXAO
 
 
@@ -138,7 +140,7 @@ def conformidade(pessoa) -> list[dict]:
     discordarem um dia. Esta tabela e a trava: `scripts/conferir_vereditos.py`
     roda o app num navegador de verdade e falha se um unico prato divergir.
     """
-    conn = bot.db()
+    conn = abrir(_CAMINHO)
     try:
         codigos = [
             linha["item_code"]
@@ -210,12 +212,12 @@ NOVATO = 999_000_001
 
 def sem_historico():
     """Alguem que acabou de se cadastrar: existe, e nao fez nada ainda."""
-    conn = bot.db()
+    conn = abrir(_CAMINHO)
     try:
         quem = Employee(
             telegram_id=NOVATO, name="Novato", apetit_unit="SM",
             client_company="Industria Exemplo", sector="Producao",
-            goal=next(iter(bot.TARGETS)), consent_accepted=True,
+            goal=next(iter(TARGETS)), consent_accepted=True,
         )
         save_employee(conn, quem)
         conn.commit()
@@ -225,7 +227,7 @@ def sem_historico():
 
 
 def meu_dia(pessoa) -> dict:
-    conn = bot.db()
+    conn = abrir(_CAMINHO)
     try:
         dias = history_by_day(conn, pessoa.telegram_id, days=14)
     finally:
@@ -249,7 +251,7 @@ def meu_dia(pessoa) -> dict:
 
 
 def progresso(pessoa) -> dict:
-    conn = bot.db()
+    conn = abrir(_CAMINHO)
     try:
         pontos = total_points(conn, pessoa.telegram_id)
         extrato = points_breakdown(conn, pessoa.telegram_id)
@@ -280,7 +282,7 @@ def semana(pessoa) -> list[dict]:
     vazio. Cinco dias uteis ate hoje mostra o que existe sem inventar dia
     nenhum — e o dia sem registro aparece como o que e, um dia sem registro.
     """
-    conn = bot.db()
+    conn = abrir(_CAMINHO)
     try:
         registrados = {
             linha["service_date"]: linha
@@ -323,7 +325,7 @@ def perfil(pessoa) -> dict:
     Campo que o cadastro nao coleta nao vira linha vazia na tela — inventar
     um lugar para ele seria prometer que existe.
     """
-    conn = bot.db()
+    conn = abrir(_CAMINHO)
     try:
         guardados = [
             {"nome": clean_dish_name(f["name"]), "codigo": f["item_code"]}
@@ -372,7 +374,7 @@ def registro_previsto(pessoa, codigos=None) -> dict:
     if not codigos:
         return {}
 
-    conn = bot.db()
+    conn = abrir(_CAMINHO)
     try:
         antes = total_points(conn, pessoa.telegram_id)
         log_consumption(conn, pessoa.telegram_id, DIA, codigos)
@@ -458,7 +460,7 @@ def montagens(pessoa) -> list[dict]:
         if not selecao:
             continue
         item = {"codigos": selecao, "objetivos": []}
-        for objetivo in bot.TARGETS:
+        for objetivo in TARGETS:
             novo = registro_previsto(replace(novato, goal=objetivo), selecao)
             exemplo = registro_previsto(replace(pessoa, goal=objetivo), selecao)
             item["refeicao"] = novo.pop("refeicao")
@@ -564,10 +566,11 @@ def main() -> int:
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
     tmp.close()
     try:
-        preparar_banco(Path(tmp.name), receitas)
-        bot.today = lambda: DIA
-        pessoa = bot.current_employee(_FakeUpdate(USUARIO))
+        global _CAMINHO
+        _CAMINHO = Path(tmp.name)
+        preparar_banco(_CAMINHO, receitas)
         conn_demo = banco()
+        pessoa = load_employee(conn_demo, USUARIO)
         try:
             dados = {
                 # O que e do dia e igual para todo mundo da unidade sai de
@@ -612,13 +615,6 @@ def main() -> int:
           f"{len(dados['plano_exemplo'])} itens de plano")
     return 0
 
-
-class _FakeUpdate:
-    """O minimo que `current_employee` precisa."""
-
-    def __init__(self, user_id: int):
-        from types import SimpleNamespace
-        self.effective_user = SimpleNamespace(id=user_id)
 
 
 if __name__ == "__main__":

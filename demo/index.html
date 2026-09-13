@@ -725,7 +725,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 (function(){
   "use strict";
 
-  var TELAS = {}, DADOS = null, historico = [], atual = "inicio";
+  var DADOS = null, historico = [], atual = "inicio";
   var tela = document.getElementById("tela");
   var acoes = document.getElementById("acoes");
   var abas = document.getElementById("abas");
@@ -781,25 +781,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   };
 
   // ---------- utilitarios ----------
-  var PERMITIDAS = /^\/?(b|i|u|s|code|em|strong)$/i;
   function escapar(s){
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  }
-  function inline(texto){
-    var saida = "", resto = String(texto), re = /<([^>]{1,12})>/g, m, fim = 0;
-    while ((m = re.exec(resto)) !== null){
-      saida += escapar(resto.slice(fim, m.index));
-      saida += PERMITIDAS.test(m[1]) ? "<" + m[1] + ">" : escapar(m[0]);
-      fim = m.index + m[0].length;
-    }
-    return saida + escapar(resto.slice(fim));
-  }
-  function semTags(t){ return String(t).replace(/<[^>]{1,12}>/g, "").trim(); }
-  function semEmoji(t){
-    return String(t)
-      .replace(/[←-⇿⌀-➿⬀-⯿️‍]/g, "")
-      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
-      .replace(/\s{2,}/g, " ").trim();
   }
   function el(tag, classe, html){
     var n = document.createElement(tag);
@@ -849,246 +832,22 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     })(inicio);
   }
 
-  var VEREDITO = {
-    "⛔": { classe: "blk", icone: "i-proibido" },
-    "⚠️": { classe: "wrn", icone: "i-atencao" },
-    "✅": { classe: "okk", icone: "i-liberado" }
-  };
   var COR = { bloqueio: "vermelho", atencao: "laranja", liberado: "verde" };
   var ICONE_VEREDITO = { bloqueio: "i-proibido", atencao: "i-atencao", liberado: "i-liberado" };
 
-  var DO_ROTULO = [
-    [/\u{1F4CE}/u, "i-clipe"], [/✍/u, "i-lapis"], [/\u{1F4C5}/u, "i-calendario"],
-    [/\u{1F957}/u, "i-tigela"], [/\u{1F37D}/u, "i-talher"], [/⭐/u, "i-estrela"],
-    [/\u{1F4C8}/u, "i-tendencia"], [/\u{1F4CB}/u, "i-ficha"], [/\u{1F4CA}/u, "i-barras"],
-    [/\u{1F464}/u, "i-pessoa"], [/\u{1F514}/u, "i-sino"], [/❓/u, "i-ajuda"],
-    [/➡/u, "i-pular"], [/✋/u, "i-mao"], [/✅/u, "i-liberado"],
-    [/\u{1F519}/u, "i-voltar"], [/\u{1F3C6}/u, "i-trofeu"], [/\u{1F4C4}/u, "i-arquivo"],
-    [/\u{1F512}/u, "i-cadeado"], [/\u{1F5D1}/u, "i-proibido"]
-  ];
-  function iconeDoRotulo(rotulo){
-    for (var i = 0; i < DO_ROTULO.length; i++){
-      if (DO_ROTULO[i][0].test(rotulo)) return DO_ROTULO[i][1];
-    }
-    return "";
-  }
 
-  // ---------- a tela do bot lida como estrutura ----------
+// ---------- para onde os itens de menu levam ----------
   //
-  // Cinco telas ja sao nativas e saem de `dados.json`. As outras setenta —
-  // montar o prato, a ficha, os favoritos, os relatorios — continuam saindo do
-  // texto que o bot escreve, lido em blocos. Reescrever as setenta a mao seria
-  // trocar conteudo verdadeiro por conteudo mantido em dois lugares.
-  var PRATO_TXT = /^(⛔|⚠️|✅|⬜|☑️)\s+([^<].*?)\s+—\s+<i>(.*?)<\/i>\s*(.*)$/;
-  var MARCADO = /^(⛔|⚠️|✅)\s+(.*)$/;
-  var DETALHE = /^\s{2,}<b>(.*)<\/b>\s*$/;
-  var CABECA  = /^(\S*)\s*<b>(.*?)<\/b>\s*$/;
-  var PORCAO  = /^•\s+(\d+)\s+(\S+)\s+de\s+(.+)$/;
-  // O travessao entre nome e medida ("Salada — a vontade") nao faz parte do
-  // nome do alimento: sem descarta-lo, ele grudava no fim do prato.
-  var VONTADE = /^•\s+(.+?)\s*[—–-]?\s*(?:a|à)\s+vontade$/i;
-  var ITEM    = /^•\s+(.+)$/;
-  var MEDIDA  = /^(.+?)\s+—\s+(.+)$/;
+  // Aqui moravam ~200 linhas que liam a mensagem do bot e a desenhavam como
+  // tela: um interpretador de texto do Telegram com regex para prato,
+  // porcao, secao e aviso. Ele existia porque reescrever setenta telas a mao
+  // teria criado uma segunda copia do conteudo. Com todas as telas nativas,
+  // o conteudo passou a ter um dono so, e o interpretador virou peso morto.
 
-  function blocos(texto){
-    var linhas = String(texto).split("\n"), saida = [], i, m;
-    for (i = 0; i < linhas.length; i++){
-      var linha = linhas[i];
-      if (!linha.trim()) continue;
-
-      m = DETALHE.exec(linha);
-      if (m && saida.length && saida[saida.length - 1].tipo === "prato"){
-        saida[saida.length - 1].porque = m[1];
-        continue;
-      }
-      m = PRATO_TXT.exec(linha);
-      if (m){
-        var v = VEREDITO[m[1]] || VEREDITO[(m[4] || "").trim()] ||
-                { classe: "neutro", icone: "i-talher" };
-        saida.push({ tipo: "prato", estado: v.classe, simbolo: v.icone,
-                     nome: m[2], dica: m[3], porque: "" });
-        continue;
-      }
-      m = MARCADO.exec(linha);
-      if (m){
-        if (/^=/.test(m[2])){ saida.push({ tipo: "nota", texto: semEmoji(m[1] + " " + m[2]) }); continue; }
-        saida.push({ tipo: "aviso", estado: VEREDITO[m[1]].classe,
-                     simbolo: VEREDITO[m[1]].icone, texto: m[2] });
-        continue;
-      }
-      m = PORCAO.exec(linha);
-      if (m){ saida.push({ tipo: "linha", nome: m[3], medida: m[1] + " " + m[2] }); continue; }
-      m = VONTADE.exec(linha);
-      if (m){ saida.push({ tipo: "linha", nome: m[1], medida: "à vontade" }); continue; }
-      m = ITEM.exec(linha);
-      if (m){
-        var partes = MEDIDA.exec(m[1]);
-        saida.push(partes ? { tipo: "linha", nome: partes[1], medida: partes[2] }
-                          : { tipo: "linha", nome: m[1], medida: "" });
-        continue;
-      }
-      if (/^<b>Passo /.test(linha)){ saida.push({ tipo: "passo", texto: linha }); continue; }
-
-      m = CABECA.exec(linha);
-      if (m && (!saida.length || !/[.!?]$/.test(semTags(m[2])))){
-        saida.push({ tipo: saida.length ? "secao" : "titulo", texto: m[2] });
-        continue;
-      }
-      if (/^<i>[\s\S]*<\/i>$/.test(linha.trim())){
-        saida.push({ tipo: "nota", texto: linha.trim().slice(3, -4) });
-        continue;
-      }
-      saida.push({ tipo: "paragrafo", texto: linha });
-    }
-    return saida;
-  }
-
-  function chave(texto){
-    return semTags(texto).replace(/^[^0-9A-Za-zÀ-ÿ]+/, "").trim().toLowerCase();
-  }
-
-  function pratoDoTexto(b, escolha){
-    var no = el(escolha ? "button" : "div", "prato " + b.estado);
-    if (escolha){
-      if (vivo(escolha)) no.addEventListener("click", function(){ mostrar(escolha.destino); });
-      else no.disabled = true;
-    }
-    no.appendChild(icone(b.simbolo));
-    var corpo = el("div", "corpo");
-    corpo.appendChild(el("div", "nome", inline(b.nome)));
-    if (b.dica) corpo.appendChild(el("div", "papel", inline(b.dica)));
-    if (b.porque){
-      var selos = el("div", "selos");
-      selos.appendChild(selo(semEmoji(semTags(b.porque)), COR[b.estado === "blk" ? "bloqueio" : "atencao"]));
-      corpo.appendChild(selos);
-    }
-    no.appendChild(corpo);
-    return no;
-  }
-
-  function desenhar(bs, destino, escolhas){
-    var pilha = null, prosa = null;
-    function por(no, agrupavel){
-      if (agrupavel){
-        if (!prosa){ prosa = el("div", "prosa"); destino.appendChild(prosa); }
-        prosa.appendChild(no);
-        return;
-      }
-      destino.appendChild(no);
-    }
-    bs.forEach(function(b){
-      if (b.tipo !== "linha") pilha = null;
-      if (b.tipo !== "paragrafo" && b.tipo !== "nota") prosa = null;
-
-      if (b.tipo === "titulo") return;
-      if (b.tipo === "secao"){ por(el("p", "secao", inline(b.texto))); return; }
-      if (b.tipo === "nota"){ por(el("p", "nota", inline(b.texto)), true); return; }
-      if (b.tipo === "paragrafo"){ por(el("p", "paragrafo", inline(b.texto)), true); return; }
-      if (b.tipo === "passo"){
-        var caixa = el("div", "");
-        caixa.appendChild(el("span", "passo", inline(b.texto)));
-        por(caixa);
-        return;
-      }
-      if (b.tipo === "aviso"){
-        var aviso = el("div", "aviso " + b.estado);
-        aviso.appendChild(icone(b.simbolo));
-        aviso.appendChild(el("span", "", inline(b.texto)));
-        por(aviso);
-        return;
-      }
-      if (b.tipo === "prato"){
-        var escolha = escolhas && escolhas[chave(b.nome)];
-        if (escolha) escolha.usado = true;
-        por(pratoDoTexto(b, escolha && escolha.botao));
-        return;
-      }
-      if (b.tipo === "linha"){
-        if (!pilha){ pilha = el("div", "pilha"); destino.appendChild(pilha); }
-        var linha = el("div", "linha");
-        linha.appendChild(el("span", "", inline(b.nome)));
-        if (b.medida) linha.appendChild(el("span", "medida", inline(b.medida)));
-        pilha.appendChild(linha);
-      }
-    });
-    destino.querySelectorAll(".prosa").forEach(function(c){
-      if (c.childElementCount < 2) c.classList.remove("prosa");
-    });
-  }
-
-
-  // ---------- botoes das telas do bot ----------
-  function noMenu(rotulo){
-    var botoes = (TELAS.inicio || {}).botoes || [], i;
-    for (i = 0; i < botoes.length; i++) if (botoes[i].rotulo === rotulo) return true;
-    return false;
-  }
-  // "Voltar" sai porque a seta do cabecalho ja faz isso, e o que repete o menu
-  // inicial sai para a tela nao virar uma segunda copia da navegacao.
-  //
-  // Os dois juntos podiam esvaziar uma tela inteira: no fim do "monta o prato",
-  // "Montar meu prato" caia por estar no menu e "Voltar" caia pela seta, e
-  // sobrava uma tela sem nenhuma saida — a pessoa chegava ao fim do fluxo e
-  // ficava presa. Limpar a tela nunca pode custar o caminho para sair dela.
-  function classificar(botoes){
-    var out = { opcoes: [], acoes: [] }, descartados = [];
-    (botoes || []).forEach(function(b){
-      if (/^(pick:|aval_|aviso:|fav_)/.test(b.acao || "")){ out.opcoes.push(b); return; }
-      if (/^(⬜|☑️)/.test(b.rotulo)){ out.opcoes.push(b); return; }
-      if (/voltar/i.test(b.rotulo) || noMenu(b.rotulo)){ descartados.push(b); return; }
-      out.acoes.push(b);
-    });
-    if (!out.acoes.length && !out.opcoes.length){
-      out.acoes = descartados.filter(vivo);
-    }
-    return out;
-  }
-  function vivo(b){ return !!(b.destino && (TELAS[b.destino] || NATIVAS[destinoReal(b.destino)])); }
-
-  function acao(b, forte){
-    var no = el("button", "cta " + (forte ? "forte" : "leve"));
-    var ic = iconeDoRotulo(b.rotulo);
-    if (ic) no.appendChild(icone(ic));
-    no.appendChild(el("b", "", escapar(semEmoji(b.rotulo))));
-    if (b.acao === "__anexar_pdf__" || b.acao === "__anexar_meu__"){
-      no.classList.remove("forte");
-      no.classList.add("leve", "anexo");
-    }
-    if (b.acao === "__anexar_meu__"){
-      no.addEventListener("click", function(){ document.getElementById("arquivo-pdf").click(); });
-      return no;
-    }
-    if (vivo(b)){
-      no.appendChild(icone("i-seta", "seta"));
-      no.addEventListener("click", function(){ mostrar(b.destino); });
-    } else {
-      no.disabled = true;
-      no.appendChild(el("span", "so-bot", "só no bot"));
-    }
-    return no;
-  }
-
-  function opcao(b){
-    var marcada = /^(☑️|✅)/.test(b.rotulo);
-    var no = el("button", "opcao" + (marcada ? " marcada" : ""));
-    var caixa = el("span", "caixa");
-    caixa.appendChild(icone("i-check"));
-    no.appendChild(caixa);
-    no.appendChild(el("span", "", escapar(semEmoji(b.rotulo))));
-    if (vivo(b)) no.addEventListener("click", function(){ mostrar(b.destino); });
-    else no.disabled = true;
-    return no;
-  }
-
-  // Onde um item do menu principal leva de verdade.
+  // Onde um item do menu leva. Sobrou uma linha: antes era preciso procurar o
+  // destino entre os botoes capturados do bot quando a tela nao era nativa.
   function alvoDe(item){
-    if (NATIVAS[item.id]) return item.id;
-    if (TELAS[item.id]) return item.id;
-    var botoes = (TELAS.inicio || {}).botoes || [], alvo = item.busca || item.nome, i;
-    for (i = 0; i < botoes.length; i++){
-      if (botoes[i].rotulo.indexOf(alvo) >= 0 && vivo(botoes[i])) return botoes[i].destino;
-    }
-    return "";
+    return NATIVAS[item.id] ? item.id : "";
   }
 
 
@@ -3113,6 +2872,41 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     var minha = fichaSalva();
     tela.appendChild(el("h1", "h1", "Minha ficha nutricional"));
 
+    // Ficha que veio de PDF costuma ser plano alimentar: alimento e medida, sem
+    // caloria nenhuma. Mostrar "— kcal / — g" para ela seria dizer que a leitura
+    // falhou, quando na verdade a ficha nao tem esses numeros.
+    if (minha && (minha.plano || []).length){
+      tela.appendChild(el("p", "sub", "Plano alimentar guardado neste aparelho."));
+      var itensPlano = el("div", "pilha");
+      itensPlano.style.marginTop = "14px";
+      minha.plano.forEach(function(i){
+        var linha = el("div", "item");
+        linha.appendChild(chip("i-folha", true));
+        linha.appendChild(el("span", "item-texto", "<b>" + escapar(i.nome) + "</b>" +
+          (i.medida ? "<small>" + escapar(i.medida) + "</small>" : "")));
+        itensPlano.appendChild(linha);
+      });
+      tela.appendChild(itensPlano);
+
+      var nota = el("div", "aviso wrn");
+      nota.appendChild(icone("i-info"));
+      nota.appendChild(el("span", "", "<b>A sugestão de porções ainda usa o seu objetivo.</b> " +
+        "Comparar este plano com o cardápio do dia depende do servidor da Apetit, " +
+        "que ainda não está ligado neste teste."));
+      tela.appendChild(nota);
+
+      var tirar = el("button", "cta fantasma");
+      tirar.appendChild(icone("i-proibido"));
+      tirar.appendChild(el("b", "", "Remover a ficha"));
+      tirar.addEventListener("click", function(){
+        esquecer(MINHA_FICHA);
+        mostrar("ficha", false);
+        recado("Ficha removida deste aparelho.");
+      });
+      acoes.appendChild(tirar);
+      return;
+    }
+
     if (minha){
       tela.appendChild(el("p", "sub", "Guardada neste aparelho."));
       var numeros = el("dl", "campos");
@@ -3463,11 +3257,28 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     return (DADOS && DADOS.gestao) || null;
   }
 
+  // Estes numeros sao do piloto inventado que monta a demonstracao — quinze
+  // cadastros de exemplo, nenhum deles de gente de verdade. Dito em cada tela,
+  // e nao so no "sobre": quem abre um relatorio direto precisa saber o que esta
+  // lendo, e "75% de adesao" e o tipo de numero que vira slide.
+  //
+  // A area de gestao nao tem tranca: ela aparece por uma chave no proprio
+  // aparelho, e o arquivo que alimenta estas telas e publico. Isso e aceitavel
+  // enquanto o conteudo e inventado, e deixa de ser no dia em que for real.
+  function notaDeExemplo(){
+    var caixa = el("div", "aviso wrn");
+    caixa.appendChild(icone("i-info"));
+    caixa.appendChild(el("span", "", "<b>Números de demonstração.</b> Saem de um piloto " +
+      "inventado para estas telas existirem; não são dados de nenhuma empresa."));
+    tela.appendChild(caixa);
+  }
+
   function telaPiloto(){
     cabecalhoInterno("Apetit", "Gestão");
     var g = gestaoDados();
     tela.appendChild(el("h1", "h1", "Relatório do piloto"));
     if (!g){ semDados("Relatório indisponível."); return; }
+    notaDeExemplo();
     tela.appendChild(el("p", "sub",
       g.periodo.desde_amigavel + " a " + g.periodo.ate_amigavel));
 
@@ -3530,6 +3341,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     var g = gestaoDados();
     tela.appendChild(el("h1", "h1", "Adesão por setor"));
     if (!g){ semDados("Relatório indisponível."); return; }
+    notaDeExemplo();
 
     var setores = g.setores || [];
     if (!setores.length){ semDados("Nenhum setor com cadastro ainda."); return; }
@@ -3558,6 +3370,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     var g = gestaoDados();
     tela.appendChild(el("h1", "h1", "Resultados das avaliações"));
     if (!g){ semDados("Relatório indisponível."); return; }
+    notaDeExemplo();
 
     var unidades = g.refeitorios || [];
     if (!unidades.length){ semDados("Nenhuma avaliação no período."); return; }
@@ -3591,6 +3404,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     var g = gestaoDados();
     tela.appendChild(el("h1", "h1", "Cobertura de alergênicos"));
     if (!g){ semDados("Relatório indisponível."); return; }
+    notaDeExemplo();
 
     var c = g.cobertura;
     linhasDe([
@@ -3632,7 +3446,6 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     var grade=el("div","grade uma");
     grade.style.marginTop="22px";
     ADMIN.forEach(function(a){
-      if(!TELAS[a.id]) return;
       var b=el("button","item");
       b.appendChild(chip(a.icone));
       b.appendChild(el("span","item-texto","<b>"+escapar(a.nome)+"</b><small>"+escapar(a.detalhe)+"</small>"));
@@ -3670,6 +3483,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     boas_vindas: telaBoasVindas, cadastro: telaCadastro,
     meus_dados: telaMeusDados, meu_dia: telaMeuDia,
     ficha: telaFicha, ficha_manual: telaFichaManual,
+    ficha_plano: telaFichaPlano, ficha_recado: telaFichaRecado,
     favoritos: telaFavoritos, avisos: telaAvisos, ajuda: telaAjuda,
     piloto: telaPiloto, relatorio: telaRelatorio,
     atendimento: telaAtendimento, cobertura: telaCobertura
@@ -3714,8 +3528,10 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   function mostrar(id, guardar){
     var alvo = destinoReal(id);
     var nativa = NATIVAS[alvo];
-    var t = TELAS[alvo];
-    if (!nativa && !t) return;
+    // Sem tela nativa nao ha o que mostrar. Antes existia um terceiro caso — a
+    // transcricao capturada do bot — e ele sumiu junto com o bot: todas as
+    // telas do app sao escritas aqui agora.
+    if (!nativa) return;
     if (guardar !== false && atual !== alvo) historico.push(atual);
     atual = alvo;
 
@@ -3725,15 +3541,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     void tela.offsetWidth;
     tela.classList.add("entrando");
 
-    if (nativa){
-      nativa();
-    } else if (t.grupo === "administracao"){
-      cabecalhoInterno("Visão da Apetit", "agregado · sem nomes");
-      tela.appendChild(el("p", "nota", "Número agregado, nunca pessoa."));
-      tela.appendChild(el("div", "tabela", inline(semEmoji(t.texto))));
-    } else {
-      telaDoBot(t);
-    }
+    nativa();
 
     abas.hidden = !!SEM_ABAS[alvo];
     marcarAba(alvo);
@@ -3743,55 +3551,6 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   function redesenhar(){ mostrar(atual, false); }
 
-  function telaDoBot(t){
-    var anexo = t.arquivo || (t.caminho || []).slice(-1)[0] === "__anexar_pdf__";
-    if (anexo){
-      var faixa = el("div", "aviso okk");
-      faixa.appendChild(icone("i-arquivo"));
-      faixa.appendChild(el("span", "",
-        "<b>" + escapar(t.arquivo || "ficha_nutricionista.pdf") + "</b> — enviado"));
-      tela.appendChild(faixa);
-    }
-
-    var bs = blocos(t.texto);
-    var grupos = classificar(t.botoes);
-    var escolhas = {};
-    grupos.opcoes.forEach(function(b){ escolhas[chave(b.rotulo)] = { botao: b, usado: false }; });
-
-    desenhar(bs, tela, escolhas);
-
-    var sobraram = grupos.opcoes.filter(function(b){ return !escolhas[chave(b.rotulo)].usado; });
-    if (sobraram.length){
-      var caixa = el("div", "pilha");
-      sobraram.forEach(function(b){ caixa.appendChild(opcao(b)); });
-      tela.appendChild(caixa);
-    }
-
-    // O bot nao consegue abrir o seletor de arquivo do celular: no Telegram
-    // quem anexa e a pessoa, pelo clipe. Aqui da, e essa tela e onde ela
-    // procura — entao o botao que abre o seletor entra como acao principal,
-    // na frente do exemplo pronto que o bot oferece.
-    if (atual === "ficha_pdf"){
-      grupos.acoes.unshift({
-        rotulo: "\u{1F4CE} Anexar a minha ficha", acao: "__anexar_meu__", destino: ""
-      });
-    }
-
-    var temEscolha = grupos.opcoes.length > 0;
-    grupos.acoes.forEach(function(b, n){
-      acoes.appendChild(acao(b, !temEscolha && n === 0 && (vivo(b) || b.acao === "__anexar_meu__")));
-    });
-
-    var cabeca = bs.filter(function(b){ return b.tipo === "titulo"; })[0];
-    var nome = cabeca ? semEmoji(semTags(cabeca.texto)) : "";
-    var data = DADOS ? DADOS.dia_amigavel : "";
-    if (nome.length > 22){
-      tela.insertBefore(el("h1", "cabeca-tela", escapar(nome)), tela.firstChild);
-      cabecalhoInterno("Apetit", nome === data ? "" : data);
-    } else {
-      cabecalhoInterno(nome || "Apetit", nome === data ? "" : data);
-    }
-  }
 
   function abaDe(id){
     if (id === "inicio") return "inicio";
@@ -3979,39 +3738,107 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     return partes.join(" ");
   }
 
+  // O plano lido do PDF e o recado de leitura, guardados aqui para as telas
+  // nativas desenharem. Eram duas entradas sinteticas em `TELAS`, montadas em
+  // JavaScript e renderizadas pelo desenhista de transcricao do bot — o ultimo
+  // lugar do app que ainda dependia daquele formato.
+  var planoLido = null, recadoDaFicha = null;
+
   function telaDoPlano(itens, nomeArquivo){
-    var linhas = itens.map(function(i){
+    planoLido = { itens: itens, arquivo: nomeArquivo };
+    mostrar("ficha_plano");
+  }
+
+  function telaFichaPlano(){
+    cabecalhoInterno("Apetit", "Ficha do nutricionista");
+    var dados = planoLido || { itens: [], arquivo: "" };
+
+    if (dados.arquivo){
+      var faixa = el("div", "aviso okk");
+      faixa.appendChild(icone("i-arquivo"));
+      faixa.appendChild(el("span", "", "<b>" + escapar(dados.arquivo) + "</b> — lido"));
+      tela.appendChild(faixa);
+    }
+
+    tela.appendChild(el("h1", "h1", "Seu nutricionista pediu isso no almoço"));
+    tela.appendChild(el("p", "sub", "Confira antes de valer."));
+
+    var lista = el("div", "pilha");
+    lista.style.marginTop = "14px";
+    dados.itens.forEach(function(i){
       var medida = medidaDe(i);
-      return "• " + i.nome + (medida ? " — " + medida : "");
-    }).join("\n");
-    TELAS.__minha_ficha__ = {
-      texto: "<b>Seu nutricionista pediu isso no almoço</b>\n" +
-        "<i>Confira antes de valer.</i>\n\n" + linhas + "\n\n" +
-        "<i>Sua ficha é um plano alimentar: ela lista alimento e medida, não " +
-        "caloria. Vou usar essa lista para te mostrar o que mais se parece com " +
-        "ela no cardápio de hoje.</i>\n" +
-        "<i>O documento não fica guardado — só esta lista.</i>",
-      grupo: "", caminho: ["__minha_ficha__"], arquivo: nomeArquivo,
-      botoes: [
-        { rotulo: "✅ É isso, pode guardar", acao: "ficha_ok", destino: "ficha_ok" },
-        { rotulo: "📎 Anexar outra ficha", acao: "__anexar_meu__", destino: "" },
-        { rotulo: "🔙 Voltar", acao: "ficha", destino: "ficha" }
-      ]
-    };
-    mostrar("__minha_ficha__");
+      var linha = el("div", "item");
+      linha.appendChild(chip("i-folha", true));
+      linha.appendChild(el("span", "item-texto",
+        "<b>" + escapar(i.nome) + "</b>" + (medida ? "<small>" + escapar(medida) + "</small>" : "")));
+      lista.appendChild(linha);
+    });
+    tela.appendChild(lista);
+
+    var explica = el("div", "cartao");
+    explica.style.marginTop = "16px";
+    explica.appendChild(el("p", "paragrafo",
+      "Sua ficha é um plano alimentar: ela lista alimento e medida, não caloria."));
+    explica.appendChild(el("p", "legenda",
+      "O documento não fica guardado — só esta lista."));
+    tela.appendChild(explica);
+
+    var guardar_ = el("button", "cta forte");
+    guardar_.appendChild(icone("i-liberado"));
+    guardar_.appendChild(el("b", "", "É isso, pode guardar"));
+    guardar_.addEventListener("click", function(){
+      guardar(MINHA_FICHA, JSON.stringify({
+        kcal: null, ptn: null, profissional: "",
+        plano: dados.itens.map(function(i){
+          return { nome: i.nome, medida: medidaDe(i) };
+        }),
+        em: new Date().toISOString()
+      }));
+      mostrar("ficha", false);
+      recado("Ficha guardada neste aparelho.");
+    });
+    acoes.appendChild(guardar_);
+
+    var outra = el("button", "cta fantasma");
+    outra.appendChild(icone("i-arquivo"));
+    outra.appendChild(el("b", "", "Anexar outra ficha"));
+    outra.addEventListener("click", function(){
+      document.getElementById("arquivo-pdf").click();
+    });
+    acoes.appendChild(outra);
   }
 
   function telaDeAviso(tituloAviso, corpo){
-    TELAS.__aviso_ficha__ = {
-      texto: "<b>" + tituloAviso + "</b>\n\n" + corpo,
-      grupo: "", caminho: ["__aviso_ficha__"],
-      botoes: [
-        { rotulo: "📎 Tentar outro arquivo", acao: "__anexar_meu__", destino: "" },
-        { rotulo: "✍️ Digitar os números", acao: "ficha_manual", destino: "ficha_manual" },
-        { rotulo: "🔙 Voltar", acao: "ficha", destino: "ficha" }
-      ]
-    };
-    mostrar("__aviso_ficha__");
+    recadoDaFicha = { titulo: tituloAviso, corpo: corpo };
+    mostrar("ficha_recado");
+  }
+
+  function telaFichaRecado(){
+    cabecalhoInterno("Apetit", "Ficha do nutricionista");
+    var r = recadoDaFicha || { titulo: "", corpo: "" };
+    tela.appendChild(el("h1", "h1", escapar(r.titulo)));
+    var caixa = el("div", "cartao");
+    caixa.style.marginTop = "14px";
+    // O corpo e escrito aqui no arquivo, com <b> e <i> de propósito; nao vem
+    // de fora.
+    String(r.corpo).split("\n\n").forEach(function(p){
+      if (p.trim()) caixa.appendChild(el("p", "paragrafo", p));
+    });
+    tela.appendChild(caixa);
+
+    var outra = el("button", "cta forte");
+    outra.appendChild(icone("i-arquivo"));
+    outra.appendChild(el("b", "", "Tentar outro arquivo"));
+    outra.addEventListener("click", function(){
+      document.getElementById("arquivo-pdf").click();
+    });
+    acoes.appendChild(outra);
+
+    var digitar = el("button", "cta fantasma");
+    digitar.appendChild(icone("i-lapis"));
+    digitar.appendChild(el("b", "", "Digitar os números"));
+    digitar.addEventListener("click", function(){ mostrar("ficha_manual"); });
+    acoes.appendChild(digitar);
   }
 
   var entrada = document.getElementById("arquivo-pdf");
@@ -4173,20 +4000,17 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   function carregar(){
     esqueleto();
+    // Um arquivo so agora. O segundo era `telas.json`, com as telas capturadas
+    // do bot; com todas as telas escritas aqui, ele deixou de existir.
     var embutido = window.__APETIT__;
     var local = embutido
-      ? Promise.resolve([embutido.telas, embutido.dados || null])
-      : Promise.all([
-          fetch("telas.json").then(function(r){
-            if (!r.ok) throw new Error("telas");
-            return r.json();
-          }),
-          fetch("dados.json").then(function(r){ return r.json(); }).catch(function(){ return null; })
-        ]);
+      ? Promise.resolve(embutido.dados || null)
+      : fetch("dados.json").then(function(r){
+          if (!r.ok) throw new Error("dados");
+          return r.json();
+        });
 
-    local.then(function(par){
-      TELAS = par[0];
-      var fotografia = par[1];
+    local.then(function(fotografia){
       // O servidor so e consultado depois de a fotografia estar em maos: assim
       // um servidor fora do ar nunca deixa o app sem cardapio nenhum.
       return buscarDoServidor(fotografia).then(function(doDia){
