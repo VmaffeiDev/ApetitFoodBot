@@ -416,7 +416,18 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 /* ---------- perfil ---------- */
 .perfil-topo{display:flex;align-items:center;gap:14px;padding:10px 0}
 .avatar{width:64px;height:64px;border-radius:50%;flex:none;display:grid;place-items:center;
-  background:linear-gradient(145deg,#77808D,#424954);border:2px solid #858D99;color:#fff;font-size:24px;font-weight:700}
+  background:linear-gradient(145deg,#77808D,#424954);border:2px solid #858D99;color:#fff;font-size:24px;font-weight:700;
+  position:relative;overflow:visible;padding:0;cursor:pointer;
+  transition:border-color var(--medio) var(--curva),transform var(--rapido) var(--curva)}
+.avatar:hover{border-color:var(--vermelho-alto)}
+.avatar:active{transform:scale(.97)}
+.avatar:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:3px}
+.avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+/* O selo da camera diz que o circulo e tocavel. Sem ele, a foto parece
+   decoracao e ninguem descobre que da para trocar. */
+.avatar .camera{position:absolute;right:-3px;bottom:-3px;width:24px;height:24px;border-radius:50%;
+  display:grid;place-items:center;background:var(--vermelho);border:2px solid var(--fundo);color:#fff}
+.avatar .camera .icone{width:12px;height:12px}
 
 .perfil-topo .quem{min-width:0}
 .perfil-topo .quem b{display:block;font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
@@ -640,6 +651,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   <symbol id="i-prancheta" viewBox="0 0 24 24"><rect x="4.5" y="4.5" width="15" height="15" rx="2.5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
   <symbol id="i-fogo" viewBox="0 0 24 24"><path d="M12 21a6 6 0 0 0 6-6c0-4.5-6-12-6-12S6 10.5 6 15a6 6 0 0 0 6 6Z"/><path d="M12 21a2.7 2.7 0 0 0 2.7-2.7c0-2-2.7-5.3-2.7-5.3s-2.7 3.3-2.7 5.3A2.7 2.7 0 0 0 12 21Z"/></symbol>
   <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4.5 7.5h3l1.4-2.2h6.2l1.4 2.2h3a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 17.5V9a1.5 1.5 0 0 1 1.5-1.5Z"/><circle cx="12" cy="13" r="3.4"/></symbol>
   <symbol id="i-casa" viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8.5Z"/><path d="M9.5 21v-6h5v6"/></symbol>
 </defs></svg>
 
@@ -654,6 +666,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   <main class="tela" id="tela" tabindex="-1" aria-live="polite"></main>
   <input type="file" id="arquivo-pdf" accept="application/pdf,.pdf" hidden>
+  <input type="file" id="arquivo-foto" accept="image/*" hidden>
   <div class="acoes" id="acoes"></div>
   <nav class="abas" id="abas" aria-label="Seções"></nav>
 </div>
@@ -820,7 +833,9 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   var DETALHE = /^\s{2,}<b>(.*)<\/b>\s*$/;
   var CABECA  = /^(\S*)\s*<b>(.*?)<\/b>\s*$/;
   var PORCAO  = /^•\s+(\d+)\s+(\S+)\s+de\s+(.+)$/;
-  var VONTADE = /^•\s+(.+?)\s+(?:a|à)\s+vontade$/i;
+  // O travessao entre nome e medida ("Salada — a vontade") nao faz parte do
+  // nome do alimento: sem descarta-lo, ele grudava no fim do prato.
+  var VONTADE = /^•\s+(.+?)\s*[—–-]?\s*(?:a|à)\s+vontade$/i;
   var ITEM    = /^•\s+(.+)$/;
   var MEDIDA  = /^(.+?)\s+—\s+(.+)$/;
 
@@ -1704,12 +1719,97 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   // ---------- 6. perfil ----------
 
+  // ---------- foto de perfil ----------
+  //
+  // A foto fica **so no aparelho**, em `localStorage`, e nunca sai dele: nao ha
+  // servidor nesta demonstracao, e num app de refeitorio o rosto do funcionario
+  // e o dado mais identificavel que existe. Guardar no celular de quem tirou
+  // mantem a promessa que o resto do app faz — a empresa nao ve.
+  //
+  // A imagem e reduzida a um quadrado de 256px antes de guardar. Foto de
+  // celular tem 3-5 MB e o `localStorage` cabe ~5 MB: sem reduzir, a primeira
+  // foto estouraria a cota e derrubaria tudo que estava guardado junto.
+  var FOTO = "apetit-foto";
+  var LADO = 256;
+
+  function fotoGuardada(){
+    try { return localStorage.getItem(FOTO) || ""; } catch (e) { return ""; }
+  }
+  function guardarFoto(dados){
+    try { localStorage.setItem(FOTO, dados); return true; } catch (e) { return false; }
+  }
+  function apagarFoto(){
+    try { localStorage.removeItem(FOTO); } catch (e) {}
+  }
+
+  // Recorte quadrado pelo centro: o avatar e redondo, e esticar a foto para
+  // caber deformaria o rosto.
+  function reduzirFoto(arquivo){
+    return new Promise(function(resolve, reject){
+      if (!/^image\//.test(arquivo.type)) { reject(new Error("nao-e-imagem")); return; }
+      var url = URL.createObjectURL(arquivo);
+      var img = new Image();
+      img.onload = function(){
+        URL.revokeObjectURL(url);
+        try {
+          var lado = Math.min(img.naturalWidth, img.naturalHeight);
+          var tela = document.createElement("canvas");
+          tela.width = tela.height = LADO;
+          tela.getContext("2d").drawImage(
+            img, (img.naturalWidth - lado) / 2, (img.naturalHeight - lado) / 2,
+            lado, lado, 0, 0, LADO, LADO);
+          resolve(tela.toDataURL("image/jpeg", 0.82));
+        } catch (erro) { reject(new Error("nao-deu-para-ler")); }
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error("nao-deu-para-ler")); };
+      img.src = url;
+    });
+  }
+
+  function desenhaAvatar(p){
+    var no = el("button", "avatar");
+    no.setAttribute("aria-label", fotoGuardada() ? "Trocar a foto do perfil" : "Colocar uma foto no perfil");
+    var foto = fotoGuardada();
+    if (foto){
+      var img = document.createElement("img");
+      img.src = foto;
+      img.alt = "";
+      no.appendChild(img);
+    } else {
+      no.appendChild(el("span", "", escapar(p.iniciais || "?")));
+    }
+    var selo = el("span", "camera");
+    selo.appendChild(icone("i-camera"));
+    no.appendChild(selo);
+    no.addEventListener("click", function(){ document.getElementById("arquivo-foto").click(); });
+    return no;
+  }
+
+  document.getElementById("arquivo-foto").addEventListener("change", function(){
+    var entrada = this;
+    var arquivo = entrada.files && entrada.files[0];
+    entrada.value = "";
+    if (!arquivo) return;
+    reduzirFoto(arquivo).then(function(dados){
+      if (!guardarFoto(dados)){
+        recado("Não consegui guardar a foto: o armazenamento do navegador está cheio.");
+        return;
+      }
+      redesenhar();
+      recado("Foto atualizada. Ela fica só neste aparelho.");
+    }).catch(function(erro){
+      recado(erro.message === "nao-e-imagem"
+        ? "Esse arquivo não é uma imagem. Escolha uma foto."
+        : "Não consegui abrir essa imagem. Tente outra foto.");
+    });
+  });
+
   function telaPerfil(){
     cabecalhoInterno("Apetit", "");
     var p = (DADOS && DADOS.perfil) || {};
 
     var cabeca = el("div", "perfil-topo");
-    cabeca.appendChild(el("div", "avatar", escapar(p.iniciais || "?")));
+    cabeca.appendChild(desenhaAvatar(p));
     var quem = el("div", "quem");
     quem.appendChild(el("b", "", escapar(p.nome || "")));
     quem.appendChild(el("span", "", escapar([p.empresa, p.setor].filter(Boolean).join(" · "))));
@@ -1780,6 +1880,22 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       notificacoes.appendChild(b);
     });
     tela.appendChild(notificacoes);
+
+    // Quem pode por a foto tem que poder tirar, e no mesmo lugar onde ela esta.
+    if (fotoGuardada()){
+      var tirar = el("button", "cta fantasma");
+      tirar.style.marginTop = "12px";
+      tirar.appendChild(icone("i-proibido"));
+      tirar.appendChild(el("b", "", "Remover a foto do perfil"));
+      tirar.addEventListener("click", function(){
+        apagarFoto();
+        redesenhar();
+        recado("Foto removida deste aparelho.");
+      });
+      tela.appendChild(tirar);
+    }
+    tela.appendChild(el("p", "legenda",
+      "A foto fica só neste aparelho. Ela não é enviada para a Apetit nem para a sua empresa."));
 
     secao("Conta");
     var conta = el("div", "pilha");
@@ -1976,9 +2092,19 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       tela.appendChild(caixa);
     }
 
+    // O bot nao consegue abrir o seletor de arquivo do celular: no Telegram
+    // quem anexa e a pessoa, pelo clipe. Aqui da, e essa tela e onde ela
+    // procura — entao o botao que abre o seletor entra como acao principal,
+    // na frente do exemplo pronto que o bot oferece.
+    if (atual === "ficha_pdf"){
+      grupos.acoes.unshift({
+        rotulo: "\u{1F4CE} Anexar a minha ficha", acao: "__anexar_meu__", destino: ""
+      });
+    }
+
     var temEscolha = grupos.opcoes.length > 0;
     grupos.acoes.forEach(function(b, n){
-      acoes.appendChild(acao(b, !temEscolha && n === 0 && vivo(b)));
+      acoes.appendChild(acao(b, !temEscolha && n === 0 && (vivo(b) || b.acao === "__anexar_meu__")));
     });
 
     var cabeca = bs.filter(function(b){ return b.tipo === "titulo"; })[0];
