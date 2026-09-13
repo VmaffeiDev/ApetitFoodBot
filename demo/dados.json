@@ -259,6 +259,20 @@
   {
    "restricoes": [
     "gluten",
+    "ovos"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "bloqueio",
+    "ovo_cozido": "bloqueio",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "atencao"
+   }
+  },
+  {
+   "restricoes": [
+    "gluten",
     "soja",
     "leite"
    ],
@@ -359,6 +373,7 @@
  "porcoes": {
   "itens": [
    {
+    "codigo": "carne_assada_ao_molho",
     "nome": "Carne assada ao molho",
     "medida": "2 porcoes",
     "categoria": "Prato principal",
@@ -366,6 +381,7 @@
     "ptn": 24
    },
    {
+    "codigo": "macarrao_alho_e_oleo",
     "nome": "Macarrao alho e oleo",
     "medida": "1 colher",
     "categoria": "Guarnicao",
@@ -373,6 +389,7 @@
     "ptn": 2
    },
    {
+    "codigo": "arroz_parboilizado",
     "nome": "Arroz parboilizado",
     "medida": "2 colheres",
     "categoria": "Arroz",
@@ -380,6 +397,7 @@
     "ptn": 4
    },
    {
+    "codigo": "feijao_preto",
     "nome": "Feijao preto",
     "medida": "1 concha",
     "categoria": "Feijao",
@@ -387,6 +405,7 @@
     "ptn": 2
    },
    {
+    "codigo": "sal_mix_de_alface",
     "nome": "Mix de alface",
     "medida": "a vontade",
     "categoria": "Salada",
@@ -401,6 +420,1124 @@
   "resumo": "Isso da 703 kcal e 33 g de proteina. E a sua meta do dia.",
   "avisos": []
  },
+ "combinacoes": [
+  {
+   "bloqueados": [],
+   "objetivo": "Comer melhor no dia a dia",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "macarrao_alho_e_oleo",
+      "nome": "Macarrao alho e oleo",
+      "medida": "1 colher",
+      "categoria": "Guarnicao",
+      "kcal": 126,
+      "ptn": 2
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "2 colheres",
+      "categoria": "Arroz",
+      "kcal": 276,
+      "ptn": 4
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 703,
+    "ptn": 33,
+    "alvo_kcal": 700,
+    "alvo_ptn": 30,
+    "resumo": "Isso da 703 kcal e 33 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [],
+   "objetivo": "Manter o equilibrio",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "macarrao_alho_e_oleo",
+      "nome": "Macarrao alho e oleo",
+      "medida": "1 colher",
+      "categoria": "Guarnicao",
+      "kcal": 126,
+      "ptn": 2
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "2 colheres",
+      "categoria": "Arroz",
+      "kcal": 276,
+      "ptn": 4
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 703,
+    "ptn": 33,
+    "alvo_kcal": 700,
+    "alvo_ptn": 30,
+    "resumo": "Isso da 703 kcal e 33 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [],
+   "objetivo": "Comer mais leve",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "macarrao_alho_e_oleo",
+      "nome": "Macarrao alho e oleo",
+      "medida": "1 colher",
+      "categoria": "Guarnicao",
+      "kcal": 126,
+      "ptn": 2
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "1 colher",
+      "categoria": "Arroz",
+      "kcal": 138,
+      "ptn": 2
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 565,
+    "ptn": 31,
+    "alvo_kcal": 550,
+    "alvo_ptn": 25,
+    "resumo": "Isso da 565 kcal e 31 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [],
+   "objetivo": "Reforcar a proteina",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "macarrao_alho_e_oleo",
+      "nome": "Macarrao alho e oleo",
+      "medida": "1 colher",
+      "categoria": "Guarnicao",
+      "kcal": 126,
+      "ptn": 2
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "3 colheres",
+      "categoria": "Arroz",
+      "kcal": 414,
+      "ptn": 6
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "2 conchas",
+      "categoria": "Feijao",
+      "kcal": 58,
+      "ptn": 4
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 870,
+    "ptn": 37,
+    "alvo_kcal": 850,
+    "alvo_ptn": 45,
+    "resumo": "Isso da 870 kcal e 37 g de proteina. Com o que tem hoje, ainda fica abaixo do seu alvo em 8 g de proteina.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 15,
+    "ganho": 15,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "macarrao_alho_e_oleo"
+   ],
+   "objetivo": "Comer melhor no dia a dia",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "3 colheres",
+      "categoria": "Arroz",
+      "kcal": 414,
+      "ptn": 6
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 715,
+    "ptn": 33,
+    "alvo_kcal": 700,
+    "alvo_ptn": 30,
+    "resumo": "Isso da 715 kcal e 33 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "macarrao_alho_e_oleo"
+   ],
+   "objetivo": "Manter o equilibrio",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "3 colheres",
+      "categoria": "Arroz",
+      "kcal": 414,
+      "ptn": 6
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 715,
+    "ptn": 33,
+    "alvo_kcal": 700,
+    "alvo_ptn": 30,
+    "resumo": "Isso da 715 kcal e 33 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "macarrao_alho_e_oleo"
+   ],
+   "objetivo": "Comer mais leve",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "2 colheres",
+      "categoria": "Arroz",
+      "kcal": 276,
+      "ptn": 4
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 577,
+    "ptn": 31,
+    "alvo_kcal": 550,
+    "alvo_ptn": 25,
+    "resumo": "Isso da 577 kcal e 31 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "macarrao_alho_e_oleo"
+   ],
+   "objetivo": "Reforcar a proteina",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "3 colheres",
+      "categoria": "Arroz",
+      "kcal": 414,
+      "ptn": 6
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "2 conchas",
+      "categoria": "Feijao",
+      "kcal": 58,
+      "ptn": 4
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 744,
+    "ptn": 35,
+    "alvo_kcal": 850,
+    "alvo_ptn": 45,
+    "resumo": "Isso da 744 kcal e 35 g de proteina. Com o que tem hoje, ainda fica abaixo do seu alvo em 10 g de proteina.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 15,
+    "ganho": 15,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "macarrao_alho_e_oleo",
+    "ovo_cozido"
+   ],
+   "objetivo": "Comer melhor no dia a dia",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "3 colheres",
+      "categoria": "Arroz",
+      "kcal": 414,
+      "ptn": 6
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 715,
+    "ptn": 33,
+    "alvo_kcal": 700,
+    "alvo_ptn": 30,
+    "resumo": "Isso da 715 kcal e 33 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "macarrao_alho_e_oleo",
+    "ovo_cozido"
+   ],
+   "objetivo": "Manter o equilibrio",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "3 colheres",
+      "categoria": "Arroz",
+      "kcal": 414,
+      "ptn": 6
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 715,
+    "ptn": 33,
+    "alvo_kcal": 700,
+    "alvo_ptn": 30,
+    "resumo": "Isso da 715 kcal e 33 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "macarrao_alho_e_oleo",
+    "ovo_cozido"
+   ],
+   "objetivo": "Comer mais leve",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "2 colheres",
+      "categoria": "Arroz",
+      "kcal": 276,
+      "ptn": 4
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 577,
+    "ptn": 31,
+    "alvo_kcal": 550,
+    "alvo_ptn": 25,
+    "resumo": "Isso da 577 kcal e 31 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "macarrao_alho_e_oleo",
+    "ovo_cozido"
+   ],
+   "objetivo": "Reforcar a proteina",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "3 colheres",
+      "categoria": "Arroz",
+      "kcal": 414,
+      "ptn": 6
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "2 conchas",
+      "categoria": "Feijao",
+      "kcal": 58,
+      "ptn": 4
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 744,
+    "ptn": 35,
+    "alvo_kcal": 850,
+    "alvo_ptn": 45,
+    "resumo": "Isso da 744 kcal e 35 g de proteina. Com o que tem hoje, ainda fica abaixo do seu alvo em 10 g de proteina.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 15,
+    "ganho": 15,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "ovo_cozido"
+   ],
+   "objetivo": "Comer melhor no dia a dia",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "macarrao_alho_e_oleo",
+      "nome": "Macarrao alho e oleo",
+      "medida": "1 colher",
+      "categoria": "Guarnicao",
+      "kcal": 126,
+      "ptn": 2
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "2 colheres",
+      "categoria": "Arroz",
+      "kcal": 276,
+      "ptn": 4
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 703,
+    "ptn": 33,
+    "alvo_kcal": 700,
+    "alvo_ptn": 30,
+    "resumo": "Isso da 703 kcal e 33 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "ovo_cozido"
+   ],
+   "objetivo": "Manter o equilibrio",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "macarrao_alho_e_oleo",
+      "nome": "Macarrao alho e oleo",
+      "medida": "1 colher",
+      "categoria": "Guarnicao",
+      "kcal": 126,
+      "ptn": 2
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "2 colheres",
+      "categoria": "Arroz",
+      "kcal": 276,
+      "ptn": 4
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 703,
+    "ptn": 33,
+    "alvo_kcal": 700,
+    "alvo_ptn": 30,
+    "resumo": "Isso da 703 kcal e 33 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "ovo_cozido"
+   ],
+   "objetivo": "Comer mais leve",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "macarrao_alho_e_oleo",
+      "nome": "Macarrao alho e oleo",
+      "medida": "1 colher",
+      "categoria": "Guarnicao",
+      "kcal": 126,
+      "ptn": 2
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "1 colher",
+      "categoria": "Arroz",
+      "kcal": 138,
+      "ptn": 2
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "1 concha",
+      "categoria": "Feijao",
+      "kcal": 29,
+      "ptn": 2
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 565,
+    "ptn": 31,
+    "alvo_kcal": 550,
+    "alvo_ptn": 25,
+    "resumo": "Isso da 565 kcal e 31 g de proteina. E a sua meta do dia.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 25,
+    "ganho": 25,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     },
+     {
+      "nome": "Atingiu a meta de proteina do dia",
+      "pontos": 10
+     }
+    ]
+   }
+  },
+  {
+   "bloqueados": [
+    "ovo_cozido"
+   ],
+   "objetivo": "Reforcar a proteina",
+   "sugestao": {
+    "itens": [
+     {
+      "codigo": "carne_assada_ao_molho",
+      "nome": "Carne assada ao molho",
+      "medida": "2 porcoes",
+      "categoria": "Prato principal",
+      "kcal": 268,
+      "ptn": 24
+     },
+     {
+      "codigo": "macarrao_alho_e_oleo",
+      "nome": "Macarrao alho e oleo",
+      "medida": "1 colher",
+      "categoria": "Guarnicao",
+      "kcal": 126,
+      "ptn": 2
+     },
+     {
+      "codigo": "arroz_parboilizado",
+      "nome": "Arroz parboilizado",
+      "medida": "3 colheres",
+      "categoria": "Arroz",
+      "kcal": 414,
+      "ptn": 6
+     },
+     {
+      "codigo": "feijao_preto",
+      "nome": "Feijao preto",
+      "medida": "2 conchas",
+      "categoria": "Feijao",
+      "kcal": 58,
+      "ptn": 4
+     },
+     {
+      "codigo": "sal_mix_de_alface",
+      "nome": "Mix de alface",
+      "medida": "a vontade",
+      "categoria": "Salada",
+      "kcal": 4,
+      "ptn": 1
+     }
+    ],
+    "kcal": 870,
+    "ptn": 37,
+    "alvo_kcal": 850,
+    "alvo_ptn": 45,
+    "resumo": "Isso da 870 kcal e 37 g de proteina. Com o que tem hoje, ainda fica abaixo do seu alvo em 8 g de proteina.",
+    "avisos": []
+   },
+   "registro": {
+    "pontos_antes": 0,
+    "pontos_depois": 15,
+    "ganho": 15,
+    "conquistas": [
+     {
+      "nome": "Registrou a refeicao",
+      "pontos": 10
+     },
+     {
+      "nome": "Incluiu salada ou fruta no prato",
+      "pontos": 5
+     }
+    ]
+   }
+  }
+ ],
  "meu_dia": {
   "dias": [
    {

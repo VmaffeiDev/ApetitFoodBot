@@ -1100,6 +1100,17 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     recado(location.href);
   }
 
+  // O cadastro fica guardado; o registro e a avaliacao, nao. A diferenca e real
+  // — no app de verdade quem grava isso e o servidor do bot, e aqui nao ha
+  // servidor — e precisa aparecer na hora da confirmacao. Descobrir sozinho,
+  // recarregando a pagina e vendo os pontos voltarem, e a pior forma de saber:
+  // a pessoa passa a duvidar de tudo que o app confirmou antes.
+  function notaDeSimulacao(html){
+    var n = el("p", "legenda", html);
+    n.style.marginTop = "10px";
+    return n;
+  }
+
   function recado(texto){
     var antigo = document.getElementById("recado");
     if (antigo) antigo.remove();
@@ -1229,7 +1240,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   }
 
   function cartaoConquistas(){
-    var p = (DADOS && DADOS.progresso) || {conquistas:[]};
+    var p = meuHistorico().progresso;
     var cartao = el("section", "conquistas");
     var cabeca = el("div", "conq-topo");
     cabeca.appendChild(chip("i-trofeu"));
@@ -1456,16 +1467,58 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   }
 
   // ---------- 3. quanto pegar hoje ----------
+  //
+  // A sugestao nao e calculada aqui. `apetit/portions.py` decide quanto alguem
+  // come, e reescrever isso em JavaScript seria a segunda implementacao mais
+  // perigosa do app: uma divergencia entre as duas apareceria como um prato
+  // bloqueado dentro da sugestao de quem tem alergia a ele.
+  //
+  // O que o navegador faz e **escolher** entre respostas prontas. A sugestao
+  // depende de quais pratos sobram e do alvo do objetivo — nao da lista de
+  // alergias em si —, e das 512 combinacoes de alergia deste cardapio saem so
+  // quatro conjuntos de bloqueados. O exportador calculou os quatro, vezes os
+  // quatro objetivos, com o motor de verdade.
+  function bloqueadosAgora(){
+    var restricoes = restricoesAtuais(), fora = [];
+    ((DADOS && DADOS.cardapio) || []).forEach(function(g){
+      g.itens.forEach(function(i){
+        if (vereditoPara(i, restricoes) === "bloqueio") fora.push(i.codigo);
+      });
+    });
+    return fora.sort();
+  }
+
+  function combinacaoAtual(){
+    var chave = bloqueadosAgora().join("|");
+    var objetivo = pessoa().objetivo;
+    var achado = null;
+    ((DADOS && DADOS.combinacoes) || []).forEach(function(c){
+      if (c.objetivo === objetivo && c.bloqueados.slice().sort().join("|") === chave) achado = c;
+    });
+    return achado;
+  }
+
   function telaQuanto(){
     cabecalhoInterno("Apetit", DADOS ? DADOS.dia_amigavel : "");
-    var p = (DADOS && DADOS.porcoes) || {};
+    var combinacao = combinacaoAtual();
+    var p = (combinacao && combinacao.sugestao) || {};
 
     tela.appendChild(el("h1", "h1", "Quanto pegar hoje"));
 
-
+    // Sem resposta pronta para este cadastro, o app nao mostra sugestao
+    // nenhuma. Cair na sugestao de outra pessoa seria pior que nao sugerir:
+    // ela viria com a cara de ter sido feita para quem esta lendo.
     if (!p.itens || !p.itens.length){
       tela.appendChild(vazio("Ainda não consigo sugerir um prato.",
-        "Falta informação nutricional no cardápio de hoje.", "i-tigela"));
+        combinacao
+          ? "Falta informação nutricional no cardápio de hoje."
+          : "Não tenho uma sugestão calculada para as suas restrições e o seu objetivo. "
+            + "Monte o prato do seu jeito e eu confiro os alergênicos.", "i-tigela"));
+      var verCardapio = el("button", "cta leve");
+      verCardapio.appendChild(icone("i-calendario"));
+      verCardapio.appendChild(el("b", "", "Ver cardápio"));
+      verCardapio.addEventListener("click", function(){ mostrar("cardapio"); });
+      acoes.appendChild(verCardapio);
       return;
     }
 
@@ -1487,10 +1540,17 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     tela.appendChild(resumo);
     tela.appendChild(el("p", "secao", "Suas porções"));
 
+    // O que esta sugerido, e para qual alvo, fica legivel no proprio no:
+    // `scripts/conferir_vereditos.py` le daqui para provar que nenhum prato
+    // bloqueado entrou na sugestao de ninguem.
     var pilha = el("div", "pilha");
     pilha.style.marginTop = "10px";
+    pilha.dataset.sugestao = "";
+    pilha.dataset.alvoKcal = p.alvo_kcal;
+    pilha.dataset.alvoPtn = p.alvo_ptn;
     p.itens.forEach(function(i){
       var linha = el("div", "linha-porcao");
+      linha.dataset.codigo = i.codigo || "";
       linha.appendChild(el("span", "nome", escapar(i.nome)));
       linha.appendChild(el("span", "medida", escapar(i.medida === "a vontade" ? "À vontade" : i.medida)));
       pilha.appendChild(linha);
@@ -1499,7 +1559,13 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
     var estimativa = el("div", "estimativa");
     estimativa.appendChild(el("b", "", "Estimativa: " + escapar(p.kcal) + " kcal · " + escapar(p.ptn) + " g de proteína"));
-    estimativa.appendChild(el("p", "", "A sugestão considera o cardápio e seu objetivo. Quantidades individuais devem seguir orientação nutricional. Foto ilustrativa."));
+    estimativa.appendChild(el("p", "", "Calculada para o objetivo <b>" +
+      escapar(pessoa().objetivo || "") + "</b> (alvo de " + escapar(p.alvo_kcal) +
+      " kcal e " + escapar(p.alvo_ptn) + " g de proteína)" +
+      (bloqueadosAgora().length
+        ? ", e sem os pratos que você não pode comer."
+        : ".") +
+      " Quantidade individual é definição do nutricionista responsável. Foto ilustrativa."));
     tela.appendChild(estimativa);
 
 
@@ -1513,9 +1579,11 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     if (estado.registrado){
       var feito = el("button", "cta feito");
       feito.appendChild(icone("i-liberado"));
-      feito.appendChild(el("b", "", "Refeição registrada"));
+      feito.appendChild(el("b", "", "Refeição registrada nesta sessão"));
       feito.disabled = true;
       acoes.appendChild(feito);
+      tela.appendChild(notaDeSimulacao(
+        "Registro desta demonstração: ele some ao recarregar a página, e não chega à Apetit."));
     } else {
       var registrar = el("button", "cta forte");
       registrar.appendChild(icone("i-liberado"));
@@ -1543,7 +1611,13 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   // `apetit/tracking.py`. Recalcular no navegador seria uma segunda
   // implementacao das regras, que um dia discordaria da primeira.
   function registrarPrato(){
-    var previsto = (DADOS && DADOS.registro_previsto) || {};
+    var combinacao = combinacaoAtual();
+    // Com cadastro proprio o historico comeca vazio, e as regras de semana
+    // ("variedade", "sequencia") dependem do que veio antes: a previsao da
+    // Mariana prometeria ponto que nao vem.
+    var previsto = (cadastroSalvo()
+      ? (combinacao && combinacao.registro)
+      : (DADOS && DADOS.registro_previsto)) || {};
     estado.registrado = true;
     estado.pontosAnimar = estado.pontos;
     estado.pontos = previsto.pontos_depois != null ? previsto.pontos_depois : estado.pontos;
@@ -1553,16 +1627,20 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     acoes.textContent = "";
     var feito = el("button", "cta feito");
     feito.appendChild(icone("i-liberado"));
-    feito.appendChild(el("b", "", "Refeição registrada"));
+    feito.appendChild(el("b", "", "Refeição registrada nesta sessão"));
     feito.disabled = true;
     acoes.appendChild(feito);
 
     var ganho = previsto.ganho || 0;
     var a = el("div", "aviso okk");
     a.appendChild(icone("i-trofeu"));
-    a.appendChild(el("span", "", ganho
+    var texto = el("span", "", ganho
       ? "<b>+" + ganho + " pontos.</b> " + novas.map(function(c){ return c.nome; }).join(" · ")
-      : "Refeição registrada."));
+      : "Refeição registrada.");
+    texto.appendChild(notaDeSimulacao(
+      "Nesta demonstração o registro vale enquanto a página estiver aberta e não " +
+      "chega à Apetit. No app de verdade ele fica guardado com o seu histórico."));
+    a.appendChild(texto);
     tela.insertBefore(a, tela.firstChild);
     tela.scrollTop = 0;
 
@@ -1614,7 +1692,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     });
     tela.appendChild(marcas);
     var enviar=el("button", "cta " + (estado.avaliado ? "feito" : "forte"));
-    enviar.appendChild(el("b", "", estado.avaliado ? "Avaliação enviada" : "Enviar avaliação"));
+    enviar.appendChild(el("b", "", estado.avaliado ? "Avaliação registrada nesta sessão" : "Enviar avaliação"));
     enviar.style.textAlign="center";
     enviar.disabled=estado.nota == null || estado.avaliado;
     enviar.addEventListener("click", function(){estado.avaliado=true;redesenhar();});
@@ -1623,7 +1701,11 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       var obrigado=el("div","aviso okk");
       obrigado.setAttribute("role","status");
       obrigado.appendChild(icone("i-liberado"));
-      obrigado.appendChild(el("span","","<b>Obrigado pela sua avaliação!</b><br>Sua opinião ajuda a melhorar o refeitório a cada dia."));
+      var textoAv = el("span","","<b>Obrigado pela sua avaliação!</b><br>Sua opinião ajuda a melhorar o refeitório a cada dia.");
+      textoAv.appendChild(notaDeSimulacao(
+        "Nesta demonstração ela não foi enviada a lugar nenhum. No app de verdade ela " +
+        "vai para a Apetit sem o seu nome, sem a sua empresa e sem o seu setor."));
+      obrigado.appendChild(textoAv);
       tela.appendChild(obrigado);
     }
   }
@@ -1631,8 +1713,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   // ---------- 5. progresso ----------
   function telaProgresso(){
     cabecalhoInterno("Apetit", "");
-    var p = (DADOS && DADOS.progresso) || { conquistas: [] };
-    var semana = (DADOS && DADOS.semana) || [];
+    var p = meuHistorico().progresso;
+    var semana = meuHistorico().semana;
 
     tela.appendChild(el("h1", "h1", "Meu progresso"));
     tela.appendChild(el("p", "sub", "Pequenas escolhas, grandes resultados."));
@@ -1688,7 +1770,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     var vezes = {};
     (p.conquistas || []).forEach(function(c){ vezes[c.nome] = c.vezes; });
     if (estado.registrado) (((DADOS || {}).registro_previsto || {}).conquistas || []).forEach(function(c){vezes[c.nome]=(vezes[c.nome] || 0) + 1;});
-    var registros = ((DADOS && DADOS.meu_dia && DADOS.meu_dia.dias) || []).length + (estado.registrado ? 1 : 0);
+    var registros = (meuHistorico().meu_dia.dias || []).length + (estado.registrado ? 1 : 0);
 
     var cabeca2 = el("div", "cabeca-secao");
     cabeca2.appendChild(el("h2", "", "Como você está indo"));
@@ -1752,7 +1834,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   }
 
   function serieProgresso(periodo){
-    if(periodo === "semana") return ((DADOS && DADOS.semana) || []).map(function(d){
+    if(periodo === "semana") return meuHistorico().semana.map(function(d){
       return d.hoje && estado.registrado ? Object.assign({},d,{registrado:true,kcal:DADOS.porcoes.kcal}) : d;
     });
     var dia=(DADOS && DADOS.dia) || "", hoje=new Date(dia + "T12:00:00Z");
@@ -1853,9 +1935,43 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       restricoes_codigos: salvo.restricoes || [],
       restricoes_livres: [],
       evitar: [],
-      favoritos: exemplo.favoritos || [],
+      favoritos: [],
+      // Preferencia de aviso e ajuste com padrao, nao historico: nasce igual
+      // para todo mundo e a pessoa mexe se quiser.
       avisos: exemplo.avisos || []
     };
+  }
+
+  // Quem se cadastra comeca do zero. O histórico — pontos, conquistas, dias
+  // registrados, favoritos — e da Mariana, e mostrá-lo para outra pessoa daria
+  // a ela refeicoes que nunca fez e pontos que nunca ganhou. E o app ficaria
+  // dizendo, na tela de privacidade, que guarda sobre ela o que e de outro.
+  function meuHistorico(){
+    if (cadastroSalvo()){
+      return {
+        progresso: { pontos: 0, dias_na_semana: 0, resumo_semana: "", conquistas: [] },
+        meu_dia: { dias: [] },
+        semana: [],
+        favoritos: []
+      };
+    }
+    return {
+      progresso: (DADOS && DADOS.progresso) || { pontos: 0, conquistas: [] },
+      meu_dia: (DADOS && DADOS.meu_dia) || { dias: [] },
+      semana: (DADOS && DADOS.semana) || [],
+      favoritos: (DADOS && DADOS.perfil && DADOS.perfil.favoritos) || []
+    };
+  }
+
+  // O que muda quando a pessoa deixa de ser o exemplo, ou volta a ser.
+  function zerarSessao(){
+    estado.nota = null;
+    estado.faltas = [];
+    estado.avaliado = false;
+    estado.registrado = false;
+    estado.conquistaNova = null;
+    estado.pontosAnimar = null;
+    estado.pontos = meuHistorico().progresso.pontos;
   }
 
   function restricoesAtuais(){
@@ -2095,12 +2211,17 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       setor: String(rascunho.setor || "").trim(),
       objetivo: rascunho.objetivo,
       restricoes: rascunho.restricoes.slice(),
-      consentimento: true
+      consentimento: true,
+      // Desde quando o aceite vale. E o que a tela de privacidade mostra, e
+      // editar o cadastro nao recomeca a contagem: quem aceitou, aceitou.
+      aceite: (cadastroSalvo() || {}).aceite || new Date().toISOString()
     };
     var editando = rascunho.editando;
     var onde = guardarCadastro(dados);
     rascunho = null;
     historico.length = 0;
+    // Cadastro novo comeca do zero: nada do exemplo continua valendo.
+    if (!editando) zerarSessao();
     mostrar(editando ? "perfil" : "inicio", false);
     if (editando){ recado("Cadastro atualizado."); return; }
     recado(onde === "aparelho"
@@ -2168,6 +2289,144 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       mostrar("inicio", false);
     });
     acoes.appendChild(olhar);
+  }
+
+  // ---------- meus dados, e meu dia ----------
+  //
+  // Das ~70 telas que saem do texto do bot, so tres traziam o nome do exemplo,
+  // e duas ja viraram nativas (inicio e perfil). Sobrava `meus_dados` — logo a
+  // tela que promete dizer **tudo o que o app guarda sobre voce**. Mostrar ali
+  // o nome, a empresa e as alergias de outra pessoa nao e detalhe de
+  // demonstracao: e a tela da promessa desmentindo a promessa.
+  //
+  // `meu_dia` nao traz o nome, mas traz as refeicoes da Mariana, que e a mesma
+  // coisa por outro caminho. As duas passam a ler o cadastro de quem esta
+  // usando o app.
+  //
+  // As palavras sao as do bot (`meus_dados` em `bot.py`), porque a promessa
+  // precisa ser a mesma nas duas portas de entrada.
+  function telaMeusDados(){
+    cabecalhoInterno("Apetit", "Privacidade");
+    var p = pessoa();
+    var h = meuHistorico();
+    var salvo = cadastroSalvo();
+
+    tela.appendChild(el("h1", "h1", "Tudo o que eu guardo sobre você"));
+    if (!salvo){
+      var nota = el("div", "aviso wrn");
+      nota.appendChild(icone("i-info"));
+      nota.appendChild(el("span", "", "<b>Estes são os dados de exemplo da Mariana.</b> " +
+        "Você ainda não tem cadastro neste aparelho."));
+      tela.appendChild(nota);
+    }
+
+    var dados = el("dl", "campos");
+    dados.style.marginTop = "16px";
+    [["Nome", p.nome], ["Refeitório", p.refeitorio], ["Empresa", p.empresa],
+     ["Setor", p.setor], ["Objetivo", p.objetivo],
+     ["Restrições", (p.restricoes || []).join(", ") || "Nenhuma"],
+     ["Aceite", salvo && salvo.aceite ? dataCurta(salvo.aceite) : (salvo ? "sim" : "—")]
+    ].forEach(function(par){
+      var linha = el("div", "campo");
+      linha.appendChild(el("dt", "", escapar(par[0])));
+      linha.appendChild(el("dd", "", escapar(par[1] || "—")));
+      dados.appendChild(linha);
+    });
+    tela.appendChild(dados);
+
+    var contas = el("dl", "campos");
+    contas.style.marginTop = "12px";
+    [["Dias com refeição registrada", (h.meu_dia.dias || []).length + (estado.registrado ? 1 : 0)],
+     ["Pratos guardados", (p.favoritos || []).length],
+     ["Pontos", estado.pontos],
+     ["Avaliações do refeitório", estado.avaliado ? 1 : 0]
+    ].forEach(function(par){
+      var linha = el("div", "campo");
+      linha.appendChild(el("dt", "", escapar(par[0])));
+      linha.appendChild(el("dd", "", String(par[1])));
+      contas.appendChild(linha);
+    });
+    tela.appendChild(contas);
+
+    var promessa = el("div", "cartao");
+    promessa.style.marginTop = "18px";
+    promessa.appendChild(el("p", "paragrafo",
+      "<b>Sua empresa não vê nada disso sobre você.</b>"));
+    promessa.appendChild(el("p", "paragrafo",
+      "A única coisa que sai daqui é a avaliação do refeitório — e ela vai sem o seu " +
+      "nome, sem a sua empresa e sem o seu setor, junto com a de todo mundo. A Apetit " +
+      "vê como o refeitório está indo, nunca quem disse o quê."));
+    tela.appendChild(promessa);
+
+    if (salvo){
+      var apagar = el("button", "cta fantasma");
+      apagar.appendChild(icone("i-proibido"));
+      apagar.appendChild(el("b", "", "Apagar tudo"));
+      apagar.addEventListener("click", confirmarApagar);
+      acoes.appendChild(apagar);
+    }
+  }
+
+  function dataCurta(iso){
+    var d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleDateString("pt-BR") + ", " +
+           d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function telaMeuDia(){
+    cabecalhoInterno("Apetit", DADOS ? DADOS.dia_amigavel : "");
+    var dias = meuHistorico().meu_dia.dias || [];
+
+    tela.appendChild(el("h1", "h1", "Meu dia"));
+    tela.appendChild(el("p", "sub", estado.registrado
+      ? "Almoço de hoje registrado."
+      : "Você ainda não registrou o almoço de hoje."));
+
+    if (!estado.registrado){
+      var ir = el("button", "cta forte");
+      ir.appendChild(icone("i-tigela"));
+      ir.appendChild(el("b", "", "Quanto pegar hoje"));
+      ir.appendChild(icone("i-seta", "seta"));
+      ir.addEventListener("click", function(){ mostrar("quanto"); });
+      acoes.appendChild(ir);
+    }
+
+    secaoSimples("Seu histórico");
+    if (!dias.length){
+      tela.appendChild(vazio("Nada registrado ainda.",
+        cadastroSalvo()
+          ? "O que você registrar aparece aqui, do mais recente para o mais antigo."
+          : "Este exemplo ainda não tem refeições no período.", "i-calendario"));
+      return;
+    }
+    dias.forEach(function(d){
+      var cartao = el("div", "cartao");
+      cartao.style.marginTop = "10px";
+      var cabeca = el("div", "cabeca-secao");
+      cabeca.appendChild(el("h2", "", escapar(d.data_amigavel || d.data)));
+      if (d.kcal != null){
+        cabeca.appendChild(el("span", "", escapar(d.kcal) + " kcal · " + escapar(d.ptn) + " g ptn"));
+      }
+      cartao.appendChild(cabeca);
+      (d.itens || []).forEach(function(i){
+        var linha = el("div", "linha-porcao");
+        linha.appendChild(el("span", "nome", escapar(i.nome)));
+        linha.appendChild(el("span", "medida", escapar(String(i.quantidade))));
+        cartao.appendChild(linha);
+      });
+      if (d.incompleto){
+        cartao.appendChild(el("p", "legenda",
+          "Algum prato deste dia não tinha informação nutricional, então o total está incompleto."));
+      }
+      tela.appendChild(cartao);
+    });
+  }
+
+  function secaoSimples(nome){
+    var c = el("div", "cabeca-secao");
+    c.appendChild(el("h2", "", escapar(nome)));
+    tela.appendChild(c);
   }
 
   // ---------- 6. perfil ----------
@@ -2436,11 +2695,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       temCadastro ? "i-lapis" : "i-pessoa",
       function(){ comecarCadastro(temCadastro); }
     ));
-    var privacidade = alvoDeRotulo("Meus dados");
-    if (privacidade){
-      conta.appendChild(itemDeConta("Meus dados e privacidade", "i-cadeado",
-        function(){ mostrar(privacidade); }));
-    }
+    conta.appendChild(itemDeConta("Meus dados e privacidade", "i-cadeado",
+      function(){ mostrar("meus_dados"); }));
     if (temCadastro){
       conta.appendChild(itemDeConta("Apagar meu cadastro deste aparelho", "i-proibido",
         function(){ confirmarApagar(); }));
@@ -2527,24 +2783,12 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
         apagarCadastro();
         if (typeof folha.close === "function") folha.close();
         historico.length = 0;
+        zerarSessao();
         mostrar("boas_vindas", false);
         recado("Cadastro apagado deste aparelho.");
       });
       c.appendChild(apagar);
     });
-  }
-
-  function alvoDeRotulo(texto){
-    var ids = Object.keys(TELAS), i, j;
-    for (i = 0; i < ids.length; i++){
-      var bs = TELAS[ids[i]].botoes || [];
-      for (j = 0; j < bs.length; j++){
-        if (bs[j].rotulo.indexOf(texto) >= 0 && bs[j].destino && TELAS[bs[j].destino]) {
-          return bs[j].destino;
-        }
-      }
-    }
-    return "";
   }
 
   // ---------- 7. gestao ----------
@@ -2589,7 +2833,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     inicio: telaInicio, cardapio: telaCardapio, quanto: telaQuanto,
     avaliar: telaAvaliar, progresso: telaProgresso, perfil: telaPerfil,
     gestao: telaGestao, estados: telaEstados,
-    boas_vindas: telaBoasVindas, cadastro: telaCadastro
+    boas_vindas: telaBoasVindas, cadastro: telaCadastro,
+    meus_dados: telaMeusDados, meu_dia: telaMeuDia
   };
 
   // Telas de antes de existir cadastro. A navegacao inferior nao aparece nelas:
@@ -2701,7 +2946,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   function abaDe(id){
     if (id === "inicio") return "inicio";
     if (/^(montar|pick:|quanto|cardapio)/.test(id)) return "cardapio";
-    if (/^(ficha|perfil|avisos|aviso:|favoritos|gestao)/.test(id)) return "perfil";
+    if (/^(ficha|perfil|avisos|aviso:|favoritos|gestao|meus_dados|meu_dia)/.test(id)) return "perfil";
     var achou = "";
     ABAS.forEach(function(a){
       if (a.id !== "inicio" && id.indexOf(a.id) === 0) achou = a.id;
@@ -2992,7 +3237,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     promessa.then(function(par){
       TELAS = par[0];
       DADOS = par[1];
-      estado.pontos = (DADOS && DADOS.progresso && DADOS.progresso.pontos) || 0;
+      estado.pontos = meuHistorico().progresso.pontos;
       // Primeira vez: cadastro. Depois, direto para o app — a boas-vindas some
       // e nao volta a atrapalhar quem ja se cadastrou.
       mostrar(cadastroSalvo() ? "inicio" : "boas_vindas", false);

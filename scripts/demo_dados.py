@@ -19,14 +19,16 @@ import json
 import os
 import sys
 import tempfile
+from dataclasses import replace
 from datetime import date, timedelta
+from itertools import combinations
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "demo")
 
 import bot  # noqa: E402
-from apetit.allergens import ALLERGENS, Declaration, Restriction, check_item  # noqa: E402
+from apetit.allergens import ALLERGENS, Declaration, Restriction, Verdict, check_item  # noqa: E402
 from apetit.catalog import item_allergens  # noqa: E402
 from apetit.feedback import MISSING_TAGS, SCALE  # noqa: E402
 from apetit.humanize import DIAS  # noqa: E402
@@ -35,6 +37,7 @@ from apetit.humanize import (  # noqa: E402
     friendly_date, order_categories, week_summary,
 )
 from apetit.nudges import LEMBRETE_ALMOCO, RESUMO_SEMANAL  # noqa: E402
+from apetit.profile import Employee, load_employee, save_employee  # noqa: E402
 from apetit.portions import FREE_CATEGORIES, measure_label  # noqa: E402
 from apetit.prescription import extract_meal_plan, lunch_from_plan, read_pdf  # noqa: E402
 from apetit.tracking import (  # noqa: E402
@@ -115,12 +118,17 @@ def cardapio(pessoa) -> list[dict]:
 # Sao as que o cadastro do app consegue produzir: nenhuma, uma, duas e uma
 # larga. Alergia de texto livre nao entra porque a tela de cadastro oferece
 # lista, e o que ela nao oferece o app nao finge saber checar.
+# As combinacoes que a conferencia no navegador percorre. Sao escolhidas para
+# cobrir os **quatro** conjuntos de pratos bloqueados que este cardapio produz:
+# nenhum, so o macarrao (gluten), so o ovo (ovos) e os dois juntos. Sem o par
+# `gluten + ovos` o caso de dois bloqueios de uma vez nunca seria exercitado.
 COMBINACOES = (
     [],
     ["ovos"],
     ["leite"],
     ["gluten"],
     ["ovos", "leite"],
+    ["gluten", "ovos"],
     ["gluten", "soja", "leite"],
     ["amendoim", "castanhas", "peixes", "crustaceos"],
 )
@@ -188,6 +196,7 @@ def porcoes(pessoa) -> dict:
     return {
         "itens": [
             {
+                "codigo": p.code,
                 "nome": clean_dish_name(p.name),
                 "medida": "a vontade" if p.category in FREE_CATEGORIES
                           else measure_label(p.category, p.quantity),
@@ -204,6 +213,80 @@ def porcoes(pessoa) -> dict:
         "resumo": sugestao.summary(),
         "avisos": list(sugestao.notes),
     }
+
+
+def bloqueados_para(pessoa, restricoes: list[str]) -> list[str]:
+    """Os pratos que essa lista de alergias bloqueia no cardapio do dia."""
+    quem = replace(pessoa, restrictions=[Restriction(c) for c in restricoes])
+    return sorted(
+        i["item_code"] for i in bot.load_menu(quem, DIA)
+        if i["check"].verdict is Verdict.BLOQUEIO
+    )
+
+
+def combinacoes() -> list[dict]:
+    """A sugestao de porcoes para **qualquer** cadastro, vinda do Python.
+
+    O cadastro e do proprio funcionario e mora no aparelho dele, entao a
+    sugestao precisa responder a alergia e objetivo que so existem no
+    navegador. Recalcular la seria uma segunda implementacao de
+    `apetit/portions.py` — e essa decide quanto alguem come.
+
+    A saida disso e o que torna desnecessario: a sugestao nao depende da lista
+    de alergias, e sim de **quais pratos sobram**, e das 512 combinacoes de
+    alergia deste cardapio saem so quatro conjuntos de bloqueados. Quatro
+    conjuntos x quatro objetivos = dezesseis respostas, todas calculadas aqui
+    pelo motor de verdade. O navegador escolhe uma; nao calcula nenhuma.
+
+    O `registro` sai com historico vazio, que e a situacao de quem acabou de se
+    cadastrar. As regras de semana (`variedade`, `sequencia`) dependem do que
+    veio antes, e a Mariana tem dois dias registrados: usar a previsao dela
+    para uma pessoa nova prometeria ponto que nao vem.
+    """
+    novato = sem_historico()
+    distintos: dict[tuple[str, ...], list[str]] = {}
+    for tamanho in range(len(ALLERGENS) + 1):
+        for combo in combinations(list(ALLERGENS), tamanho):
+            chave = tuple(bloqueados_para(novato, list(combo)))
+            distintos.setdefault(chave, list(combo))
+
+    saida = []
+    for bloqueados, exemplo in sorted(distintos.items()):
+        for objetivo in bot.TARGETS:
+            quem = replace(
+                novato,
+                restrictions=[Restriction(c) for c in exemplo],
+                goal=objetivo,
+            )
+            saida.append({
+                "bloqueados": list(bloqueados),
+                "objetivo": objetivo,
+                "sugestao": porcoes(quem),
+                "registro": registro_previsto(quem),
+            })
+    return saida
+
+
+# Um `telegram_id` que nao e o da Mariana. As tabelas de consumo e ponto tem
+# chave estrangeira para `employee`, entao a pessoa sem historico precisa
+# existir no banco — ela so nunca registrou nada.
+NOVATO = 999_000_001
+
+
+def sem_historico():
+    """Alguem que acabou de se cadastrar: existe, e nao fez nada ainda."""
+    conn = bot.db()
+    try:
+        quem = Employee(
+            telegram_id=NOVATO, name="Novato", apetit_unit="SM",
+            client_company="Industria Exemplo", sector="Producao",
+            goal=next(iter(bot.TARGETS)), consent_accepted=True,
+        )
+        save_employee(conn, quem)
+        conn.commit()
+        return load_employee(conn, NOVATO)
+    finally:
+        conn.close()
 
 
 def meu_dia(pessoa) -> dict:
@@ -425,6 +508,7 @@ def main() -> int:
                 {"nome": nome, "alvo": alvo} for nome, alvo in bot.TARGETS.items()
             ],
             "porcoes": porcoes(pessoa),
+            "combinacoes": combinacoes(),
             "meu_dia": meu_dia(pessoa),
             "progresso": progresso(pessoa),
             "semana": semana(pessoa),

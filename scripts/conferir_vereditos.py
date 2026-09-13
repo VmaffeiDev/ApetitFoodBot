@@ -61,13 +61,26 @@ def servir(pasta: Path):
     return servidor, servidor.server_address[1]
 
 
-async def conferir(casos: list[dict], porta: int) -> list[str]:
+async def conferir(dados: dict, porta: int) -> list[str]:
     from playwright.async_api import async_playwright
 
+    casos = dados["conformidade"]
+    objetivos = [o["nome"] for o in dados["objetivos"]]
+    alvos = {o["nome"]: o["alvo"] for o in dados["objetivos"]}
     problemas: list[str] = []
+
     async with async_playwright() as p:
         navegador = await p.chromium.launch(executable_path=CHROMIUM)
         contexto = await navegador.new_context(viewport={"width": 393, "height": 852})
+        # Fonte e leitor de PDF vem de CDN e nao entram em nada que se confere
+        # aqui. Cortar a ida ate eles tira dez segundos de cada uma das dezenas
+        # de cargas, e faz a conferencia rodar em minutos em vez de meia hora.
+        await contexto.route(
+            "**/*",
+            lambda rota: rota.abort()
+            if "127.0.0.1" not in rota.request.url
+            else rota.continue_(),
+        )
         pagina = await contexto.new_page()
         pagina.on("pageerror", lambda e: problemas.append(f"erro de pagina: {e}"))
 
@@ -77,39 +90,84 @@ async def conferir(casos: list[dict], porta: int) -> list[str]:
         await pagina.goto(endereco, wait_until="domcontentloaded")
 
         for caso in casos:
-            cadastro = dict(BASE, restricoes=list(caso["restricoes"]))
-            await pagina.evaluate(
-                "d => localStorage.setItem('apetit-cadastro', JSON.stringify(d))",
-                cadastro,
-            )
-            await pagina.goto(endereco, wait_until="domcontentloaded")
-            await pagina.wait_for_selector('.aba:has-text("Cardápio")')
-            await pagina.click('.aba:has-text("Cardápio")')
-            await pagina.wait_for_selector(".prato[data-codigo]")
-            na_tela = await pagina.evaluate(
-                """() => {
-                  var saida = {};
-                  document.querySelectorAll('.prato[data-codigo]').forEach(function(n){
-                    saida[n.dataset.codigo] = n.dataset.veredito;
-                  });
-                  return saida;
-                }"""
-            )
+            for objetivo in objetivos:
+                quem = (", ".join(caso["restricoes"]) or "sem restricao") + f" / {objetivo}"
+                cadastro = dict(BASE, restricoes=list(caso["restricoes"]), objetivo=objetivo)
+                await pagina.evaluate(
+                    "d => localStorage.setItem('apetit-cadastro', JSON.stringify(d))",
+                    cadastro,
+                )
+                await pagina.goto(endereco, wait_until="domcontentloaded")
 
-            quem = ", ".join(caso["restricoes"]) or "sem restricao"
-            esperado = caso["vereditos"]
-            faltando = sorted(set(esperado) - set(na_tela))
-            if faltando:
-                problemas.append(f"[{quem}] pratos que nao apareceram na tela: {faltando}")
-            for codigo in sorted(set(esperado) & set(na_tela)):
-                if na_tela[codigo] != esperado[codigo]:
+                # 1. o veredito de cada prato, como ele chega na tela
+                await pagina.click('.aba:has-text("Cardápio")')
+                await pagina.wait_for_selector(".prato[data-codigo]")
+                na_tela = await pagina.evaluate(
+                    """() => {
+                      var saida = {};
+                      document.querySelectorAll('.prato[data-codigo]').forEach(function(n){
+                        saida[n.dataset.codigo] = n.dataset.veredito;
+                      });
+                      return saida;
+                    }"""
+                )
+                esperado = caso["vereditos"]
+                faltando = sorted(set(esperado) - set(na_tela))
+                if faltando:
+                    problemas.append(f"[{quem}] pratos que nao apareceram na tela: {faltando}")
+                for codigo in sorted(set(esperado) & set(na_tela)):
+                    if na_tela[codigo] != esperado[codigo]:
+                        problemas.append(
+                            f"[{quem}] {codigo}: a tela diz {na_tela[codigo]!r}, "
+                            f"o Python diz {esperado[codigo]!r}"
+                        )
+
+                # 2. a sugestao de porcoes, que e a parte perigosa
+                bloqueados = {c for c, v in esperado.items() if v == "bloqueio"}
+                sugerido = await abrir_sugestao(pagina)
+                if sugerido is None:
+                    problemas.append(f"[{quem}] a tela de porcoes nao montou")
+                    continue
+                dentro = sorted(bloqueados & set(sugerido["itens"]))
+                if dentro:
                     problemas.append(
-                        f"[{quem}] {codigo}: a tela diz {na_tela[codigo]!r}, "
-                        f"o Python diz {esperado[codigo]!r}"
+                        f"[{quem}] A SUGESTAO INCLUI PRATO BLOQUEADO: {dentro}"
+                    )
+                # 3. e ela tem de ser a do objetivo escolhido, nao a de outro
+                alvo = alvos[objetivo]
+                if sugerido["alvo_kcal"] != alvo["kcal"] or sugerido["alvo_ptn"] != alvo["ptn"]:
+                    problemas.append(
+                        f"[{quem}] a sugestao mira {sugerido['alvo_kcal']} kcal / "
+                        f"{sugerido['alvo_ptn']} g, mas o objetivo pede "
+                        f"{alvo['kcal']} kcal / {alvo['ptn']} g"
                     )
 
         await navegador.close()
     return problemas
+
+
+async def abrir_sugestao(pagina):
+    """Os codigos dos pratos que "Quanto pegar hoje" esta sugerindo.
+
+    Le a tela, e nao o JSON: o que importa e o que a pessoa vai pegar no
+    balcao depois de ler aquilo.
+    """
+    await pagina.click('.aba:has-text("Início")')
+    await pagina.click('.cta:has-text("Quanto pegar hoje")')
+    try:
+        await pagina.wait_for_selector("[data-sugestao]", timeout=8000)
+    except Exception:
+        return None
+    return await pagina.evaluate(
+        """() => {
+          var n = document.querySelector('[data-sugestao]');
+          return {
+            itens: [...n.querySelectorAll('[data-codigo]')].map(x => x.dataset.codigo),
+            alvo_kcal: Number(n.dataset.alvoKcal),
+            alvo_ptn: Number(n.dataset.alvoPtn)
+          };
+        }"""
+    )
 
 
 def main() -> int:
@@ -125,7 +183,7 @@ def main() -> int:
 
     servidor, porta = servir(DEMO)
     try:
-        problemas = asyncio.run(conferir(casos, porta))
+        problemas = asyncio.run(conferir(dados, porta))
     finally:
         servidor.shutdown()
 
@@ -135,7 +193,10 @@ def main() -> int:
         return 1
 
     pratos = len(casos[0]["vereditos"])
-    print(f"ok: {len(casos)} combinacoes x {pratos} pratos conferem com o Python.")
+    objetivos = len(dados.get("objetivos", []))
+    print(f"ok: {len(casos)} combinacoes de alergia x {objetivos} objetivos "
+          f"x {pratos} pratos. Nenhum veredito diverge do Python, e nenhuma "
+          f"sugestao inclui prato bloqueado.")
     return 0
 
 

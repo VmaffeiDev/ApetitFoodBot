@@ -779,6 +779,56 @@ Quem não declarou alergia **não** vê o cardápio inteiro de verde. `liberado`
 afirma que alguém conferiu o prato para ela, e ninguém conferiu; o estado fica
 `sem_restricao`, sem cor de segurança, e a tela diz por quê.
 
+### A sugestao de porcoes segue quem se cadastrou
+
+Um relato de teste achou o pior defeito que este app podia ter: alguem com
+alergia a gluten via o macarrao marcado como **Nao pode** no cardapio, e a tela
+**Quanto pegar hoje** sugeria esse mesmo macarrao. As duas telas liam fontes
+diferentes — o cardapio ja calculava no navegador, a sugestao continuava
+congelada no perfil de exemplo.
+
+A saida nao foi reescrever `apetit/portions.py` em JavaScript. Aquele modulo
+decide **quanto alguem come**, e uma segunda implementacao dele discordaria da
+primeira um dia — a divergencia apareceria como um prato bloqueado dentro da
+sugestao de quem tem alergia a ele.
+
+O que resolveu foi olhar de que a sugestao depende: nao da lista de alergias, e
+sim de **quais pratos sobram**, e do alvo do objetivo. Das 512 combinacoes de
+alergia deste cardapio saem so **quatro** conjuntos de pratos bloqueados. Quatro
+conjuntos x quatro objetivos = dezesseis respostas, todas calculadas pelo motor
+de verdade em `scripts/demo_dados.py` e exportadas em `dados.combinacoes`. O
+navegador escolhe uma; nao calcula nenhuma. Sem resposta para o cadastro em
+questao, o app **nao mostra sugestao** — cair na de outra pessoa seria pior, por
+vir com a cara de ter sido feita para quem esta lendo.
+
+`scripts/conferir_vereditos.py` passou a cobrir isso: para cada combinacao de
+alergia **vezes cada objetivo**, ele abre a tela de porcoes e falha se um prato
+bloqueado aparecer ali, ou se o alvo nao for o do objetivo escolhido. A prova de
+que a conferencia funciona e ter reintroduzido o defeito de proposito e visto o
+script acusar `A SUGESTAO INCLUI PRATO BLOQUEADO: ['macarrao_alho_e_oleo']`.
+
+### O historico e de quem se cadastrou, e o exemplo e da Mariana
+
+Cadastro novo comeca **vazio**: zero ponto, nenhuma conquista, nenhum dia
+registrado, nenhum favorito. Herdar os 25 pontos e os dois almocos da Mariana
+daria a pessoa refeicoes que ela nunca fez.
+
+Das ~70 telas que saem do texto do bot, tres traziam o nome do exemplo, e duas
+ja eram nativas. Sobrava `meus_dados` — justamente a tela que promete listar
+**tudo o que o app guarda sobre voce**, e que mostrava o nome, a empresa e as
+alergias de outra pessoa. A tela da promessa desmentindo a promessa. Ela e
+`meu_dia` (que nao traz o nome, mas traz as refeicoes da Mariana) viraram
+nativas, lendo o cadastro de quem esta usando o app, com as palavras do
+`meus_dados` do `bot.py`.
+
+### Registro e avaliacao sao simulacao, e dizem isso
+
+O cadastro fica guardado; o registro da refeicao e a avaliacao, nao — no app de
+verdade quem grava isso e o servidor do bot, e aqui nao ha servidor. A diferenca
+aparece **na propria confirmacao**, e nao ao recarregar a pagina e ver os pontos
+voltarem. Descobrir assim e a pior forma de saber: a pessoa passa a duvidar de
+tudo que o app confirmou antes.
+
 ### Onde o cadastro fica guardado
 
 Em `localStorage`, como a foto de perfil: esta demonstração não tem servidor, e
