@@ -39,7 +39,12 @@ from tests.test_bot import FakeContext, FakeDocument, FakeUpdate  # noqa: E402
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 DIA = "2025-09-01"          # segunda-feira coberta pelo cardapio de exemplo
 USUARIO = 777
-PROFUNDIDADE = 6
+# Ate onde a varredura desce. A 6 ela cortava o "monta o prato" no meio: os
+# passos 5 e 6 ficavam com "Proximo" sem destino, e o fim do fluxo nunca era
+# capturado. O grafo do bot fecha em 10 — de 10 para cima saem sempre as mesmas
+# 96 telas —, e a varredura inteira leva dois segundos e meio, entao a folga
+# ate 12 nao custa nada e absorve uma tela nova sem ninguem perceber.
+PROFUNDIDADE = 12
 
 # Telas que dependem de digitar algo, e por isso entram com o texto ja dado.
 TEXTOS = {
@@ -205,6 +210,29 @@ async def rodar_caminho(caminho: list[str]) -> tuple[str, list]:
     return update.last, update.buttons
 
 
+def escolhidos(caminho: list[str]) -> frozenset[str]:
+    """Os alimentos ja marcados no "monta o prato", por este caminho.
+
+    A deduplicacao por conteudo sozinha nao serve para um fluxo com estado. A
+    tela do passo 2 e identica tendo ou nao marcado a carne no passo 1 — mas o
+    "Terminei de montar" dela leva a pratos diferentes. Deduplicando so pelo
+    texto, quem marcava a carne e seguia adiante terminava com **o prato
+    vazio**, e o app parecia ter perdido a escolha.
+
+    Entao a assinatura leva junto o que ja foi escolhido: telas iguais com
+    escolhas iguais sao a mesma tela; telas iguais com escolhas diferentes,
+    nao. E a distincao minima que preserva o futuro sem explodir a varredura em
+    todas as ordens possiveis de chegar ate ali.
+    """
+    if not caminho or not (caminho[-1] == "montar"
+                           or caminho[-1].startswith(("pick:", "flow_"))):
+        # Fora do fluxo a distincao nao paga: ela multiplicaria as outras
+        # setenta telas por cada combinacao de escolha, e o arquivo que as 15
+        # pessoas baixam no refeitorio passaria de um megabyte.
+        return frozenset()
+    return frozenset(p for p in caminho if p.startswith("pick:"))
+
+
 async def varrer() -> dict:
     """Varre o bot como grafo, nao como arvore.
 
@@ -214,7 +242,10 @@ async def varrer() -> dict:
     tela distinta e visitada uma vez e ganha um id estavel.
     """
     telas: dict[str, dict] = {}
-    por_conteudo: dict[str, str] = {}
+    por_conteudo: dict[tuple, str] = {}
+    # Em que tela cada caminho vai dar — inclusive os caminhos que a
+    # deduplicacao descartou, porque um botao pode levar por ali.
+    id_por_caminho: dict[tuple[str, ...], str] = {}
     caminhos_vistos: set[tuple[str, ...]] = set()
     fila: list[list[str]] = [[]]
 
@@ -230,13 +261,21 @@ async def varrer() -> dict:
         except Exception as erro:  # tela que depende de estado que o crawler nao monta
             print(f"  pulei {caminho}: {type(erro).__name__}: {erro}", file=sys.stderr)
             continue
-        if not texto or texto in por_conteudo:
+        if not texto:
+            continue
+        assinatura = (texto, escolhidos(caminho))
+        if assinatura in por_conteudo:
+            # Mesma tela alcancada por outro caminho. Ela nao vira uma entrada
+            # nova, mas o caminho precisa ficar registrado: e por ele que os
+            # botoes de quem chega ate aqui vao se orientar.
+            id_por_caminho[chave] = por_conteudo[assinatura]
             continue
 
         ident = "inicio" if not caminho else caminho[-1]
         while ident in telas:
             ident += "_"
-        por_conteudo[texto] = ident
+        por_conteudo[assinatura] = ident
+        id_por_caminho[chave] = ident
         telas[ident] = {
             "texto": texto,
             "botoes": [{"rotulo": r, "acao": d} for r, d in botoes],
@@ -256,10 +295,31 @@ async def varrer() -> dict:
             })
 
     # Liga cada botao a tela que ele abre, para o simulador navegar sozinho.
-    destino_de = {tela["caminho"][-1]: ident for ident, tela in telas.items() if tela["caminho"]}
+    #
+    # Pelo **caminho**, e nao pela ultima acao. Uma mesma acao produz telas
+    # diferentes conforme onde voce esta: no "monta o prato", `flow_next` e o
+    # passo 2 vindo do passo 1 e o passo 6 vindo do passo 5. Resolver pela acao
+    # fazia todos os "Proximo" apontarem para a ultima tela registrada com
+    # aquele nome — e selecionar um alimento no passo 1 pulava direto para a
+    # salada do passo 6.
+    ids_por_acao: dict[str, list[str]] = {}
+    for ident, tela in telas.items():
+        if tela["caminho"]:
+            ids_por_acao.setdefault(tela["caminho"][-1], []).append(ident)
+
     for tela in telas.values():
+        base = tuple(tela["caminho"])
         for botao in tela["botoes"]:
-            botao["destino"] = destino_de.get(botao["acao"], "")
+            exato = id_por_caminho.get(base + (botao["acao"],))
+            if exato:
+                botao["destino"] = exato
+                continue
+            # O caminho nao foi visitado (cortado pela profundidade, ou na lista
+            # de nao clicar). So vale adivinhar pela acao quando ela produz uma
+            # tela so: com varias, um palpite errado leva a pessoa para um
+            # lugar que ela nao pediu, que e justamente o defeito acima.
+            candidatos = ids_por_acao.get(botao["acao"], [])
+            botao["destino"] = candidatos[0] if len(candidatos) == 1 else ""
     return telas
 
 

@@ -854,6 +854,45 @@ Os avisos de alergênicos mantêm cores próprias: coral para bloqueio, âmbar p
 confirmação e verde para liberação. Cor, ícone e texto aparecem juntos. A
 reorganização visual não muda os vereditos nem as regras de pontuação.
 
+### O "monta o prato", e por que uma tela nao basta como id
+
+Um relato de teste: selecionar um alimento no passo 1 pulava direto para o
+passo 6. O defeito estava na captura, nao no app. As telas eram ligadas aos
+botoes **pela ultima acao do caminho**:
+
+```python
+destino_de = {tela["caminho"][-1]: ident for ...}
+```
+
+Cinco telas distintas — os passos 2 a 6 — tem `flow_next` como ultima acao, e o
+dicionario ficava com a ultima. Todo "Proximo" apontava para a salada do passo
+6. Agora a ligacao e pelo **caminho inteiro** (`caminho + [acao]`), e quando o
+caminho nao foi visitado so vale adivinhar pela acao se ela produzir uma tela
+so: com varias, palpite errado leva a pessoa para onde ela nao pediu, que era
+exatamente o defeito.
+
+Junto vieram dois vizinhos:
+
+- **A varredura parava no meio do fluxo.** Com `PROFUNDIDADE = 6` os passos 5 e
+  6 ficavam com "Proximo" sem destino. O grafo do bot fecha em 10 — de 10 para
+  cima saem sempre as mesmas telas — e a varredura leva segundos, entao ela
+  agora vai ate 12.
+
+- **A tela do prato montado nao tinha saida.** `classificar` tira o "Voltar"
+  (a seta do cabecalho ja faz isso) e tira o que repete o menu inicial. No fim
+  do fluxo os dois filtros comiam os unicos botoes e a pessoa ficava presa.
+  Agora, se a limpeza esvaziar a tela, os descartados que levam a algum lugar
+  voltam: limpar a tela nunca pode custar o caminho para sair dela.
+
+E um defeito que o teste do fluxo revelou: quem marcava a carne no passo 1
+terminava com **o prato vazio**. A deduplicacao era so pelo texto, e a tela do
+passo 2 e identica tendo ou nao marcado a carne — mas o "Terminei de montar"
+dela leva a pratos diferentes. Deduplicar por texto num fluxo com estado perde
+o futuro. A assinatura agora leva junto os alimentos ja escolhidos, e **so
+dentro do fluxo**: fora dele a distincao multiplicaria as outras setenta telas
+por cada combinacao de escolha, e o arquivo passaria de um megabyte. Dentro, o
+custo medido e 9 KB -> 19 KB comprimidos, que e o que a pessoa baixa.
+
 ### Prévia do visual, sem servidor
 
 Para ver todas as telas, abra [Apetit-telas.html](preview/Apetit-telas.html).

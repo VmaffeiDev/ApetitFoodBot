@@ -995,15 +995,24 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     for (i = 0; i < botoes.length; i++) if (botoes[i].rotulo === rotulo) return true;
     return false;
   }
+  // "Voltar" sai porque a seta do cabecalho ja faz isso, e o que repete o menu
+  // inicial sai para a tela nao virar uma segunda copia da navegacao.
+  //
+  // Os dois juntos podiam esvaziar uma tela inteira: no fim do "monta o prato",
+  // "Montar meu prato" caia por estar no menu e "Voltar" caia pela seta, e
+  // sobrava uma tela sem nenhuma saida — a pessoa chegava ao fim do fluxo e
+  // ficava presa. Limpar a tela nunca pode custar o caminho para sair dela.
   function classificar(botoes){
-    var out = { opcoes: [], acoes: [] };
+    var out = { opcoes: [], acoes: [] }, descartados = [];
     (botoes || []).forEach(function(b){
-      if (/voltar/i.test(b.rotulo)) return;
       if (/^(pick:|aval_|aviso:|fav_)/.test(b.acao || "")){ out.opcoes.push(b); return; }
       if (/^(⬜|☑️)/.test(b.rotulo)){ out.opcoes.push(b); return; }
-      if (noMenu(b.rotulo)) return;
+      if (/voltar/i.test(b.rotulo) || noMenu(b.rotulo)){ descartados.push(b); return; }
       out.acoes.push(b);
     });
+    if (!out.acoes.length && !out.opcoes.length){
+      out.acoes = descartados.filter(vivo);
+    }
     return out;
   }
   function vivo(b){ return !!(b.destino && (TELAS[b.destino] || NATIVAS[destinoReal(b.destino)])); }
