@@ -726,9 +726,10 @@ folgada porque o Android recorta o icone na forma do lancador.
 ### As cores, e por que o vermelho nao vai para todo lado
 
 A interface usa o **vermelho `#EC003F`** e o **amarelo `#F5D94E`** já presentes
-no app. O destaque da refeição usa vermelho; o amarelo identifica a ação
-principal. Os demais cartões usam superfícies de grafite, com textos de apoio
-mais claros e navegação inferior persistente.
+no app. O cabeçalho da home e os ícones usam vermelho; o amarelo destaca a ação
+principal e o anel de pontos. O anel é decorativo: não representa porcentagem
+ou meta de conclusão. Os cartões usam grafite, contornos discretos e navegação
+inferior persistente, seguindo a referência visual aprovada.
 
 Os avisos de alergênicos mantêm cores próprias: coral para bloqueio, âmbar para
 confirmação e verde para liberação. Cor, ícone e texto aparecem juntos. A
@@ -736,11 +737,15 @@ reorganização visual não muda os vereditos nem as regras de pontuação.
 
 ### Prévia do visual, sem servidor
 
-Baixe e abra [Apetit-previa-visual-v2.html](preview/Apetit-previa-visual-v2.html) no
+Para ver todas as telas, abra [Apetit-oito-telas.html](preview/Apetit-oito-telas.html).
+A galeria é estática e permite conferir as oito telas mesmo em leitores de
+anexos sem JavaScript.
+
+Baixe e abra [Apetit-previa-referencia.html](preview/Apetit-previa-referencia.html) no
 navegador. É uma demonstração interativa com os mesmos dados de exemplo do
 `demo/`; refeições e avaliações não são persistidas. Essa versão não instala
 como PWA. Fontes e leitor de PDF dependem de conexão; a navegação usa os dados
-embutidos no arquivo.
+embutidos no arquivo, assim como as fotos ilustrativas.
 
 A tela inicial já vem montada no HTML e aparece mesmo em leitores de anexos
 que não executam JavaScript, como a prévia do iPhone. Nesse modo, os botões
@@ -751,10 +756,19 @@ interface ou os dados de exemplo, atualize-o a partir da raiz do repositório:
 
 ```bash
 npm ci --prefix scripts
-python scripts/demo_pagina.py --documento preview/Apetit-previa-visual-v2.html
+python scripts/demo_pagina.py --documento --telas preview/Apetit-oito-telas.html preview/Apetit-previa-referencia.html
 ```
 
 Sem `--documento`, o script mantém o formato de fragmento para incorporação.
+
+O cardápio permite filtrar categorias. A avaliação só é confirmada depois de
+selecionar uma nota e tocar em **Enviar avaliação**, mantendo os códigos de
+motivo do bot. Os períodos do gráfico somam apenas registros disponíveis na
+demonstração; números da referência visual não são dados do app.
+
+As fotos foram geradas para ilustrar os pratos de exemplo; não são fotos da
+operação nem comprovam ingredientes ou tamanho de porção. A origem e o mapa
+do arquivo estão em [demo/assets/README.md](demo/assets/README.md).
 
 ## O relatorio do piloto (`/piloto`)
 

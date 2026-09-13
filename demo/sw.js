@@ -9,7 +9,7 @@
  * dados das telas, para uma republicacao chegar sem a pessoa reinstalar.
  */
 
-const VERSAO = "apetit-demo-v3";
+const VERSAO = "apetit-demo-v4";
 const SHELL = [
   ".",
   "index.html",
@@ -18,6 +18,7 @@ const SHELL = [
   "icon-512.png",
   "icon-maskable-512.png",
   "apple-touch-icon.png",
+  "assets/pratos.webp",
 ];
 
 self.addEventListener("install", (evento) => {

@@ -43,10 +43,10 @@
   --amarelo-alto:#FFE97A;
   --amarelo-ink:#121212;
 
-  --fundo:#101113;
-  --card:#191B1E;
-  --card-2:#202226;
-  --card-3:#292C31;
+  --fundo:#0D0F11;
+  --card:#171A1D;
+  --card-2:#1D2024;
+  --card-3:#292D32;
 
   --texto:#FFFFFF;
   --texto-2:#B1B3BC;
@@ -63,25 +63,26 @@
   --linha:rgba(255,255,255,.07);
   --linha-2:rgba(255,255,255,.12);
 
-  --r-card:20px;
-  --r-btn:16px;
+  --r-card:16px;
+  --r-btn:14px;
   --r-pill:999px;
-  --h-cta:58px;
-  --pad:24px;
-  --gap:16px;
-  --gap-secao:32px;
+  --h-cta:54px;
+  --pad:18px;
+  --gap:12px;
+  --gap-secao:24px;
 
   --rapido:150ms;
   --medio:190ms;
   --lento:220ms;
   --curva:cubic-bezier(.22,.61,.36,1);
 
+  --fotos:url("assets/pratos.webp");
   --sombra:0 1px 2px rgba(0,0,0,.32), 0 10px 26px -22px rgba(0,0,0,.9);
 
-  --t-h1:30px;
-  --t-h2:19px;
+  --t-h1:26px;
+  --t-h2:17px;
   --t-card:17px;
-  --t-body:15px;
+  --t-body:14px;
   --t-label:12px;
 }
 
@@ -107,31 +108,26 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 
 /* ---------- cabecalho ---------- */
 .topo{flex:none;position:relative;z-index:2;background:var(--fundo)}
-.topo.marca{padding:18px var(--pad) 12px;padding-top:calc(18px + env(safe-area-inset-top))}
 .topo .barra{display:flex;align-items:center;gap:12px}
-.topo .titulo{flex:1;min-width:0}
-.marca-identidade{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
-.marca-simbolo{display:grid;place-items:center;background:var(--vermelho);width:38px;height:42px;flex:none;border-radius:13px 13px 13px 4px;color:#fff}
-.marca-simbolo .icone{width:23px;height:23px}
-.marca-identidade .marca-nome{font-size:29px;font-weight:800;letter-spacing:-.055em;line-height:1.1}
-.marca-identidade .marca-legenda{display:block;margin-top:3px;font-size:9px;letter-spacing:.17em;font-weight:600;color:var(--texto-2);text-transform:uppercase}
-.topo .direita{display:flex;gap:8px;align-items:center}
+.topo .titulo{flex:1;min-width:0;text-align:center}
+.topo .titulo h1{font-size:21px;font-weight:800;line-height:1.25;letter-spacing:-.025em}
+.topo .titulo p{margin-top:3px;font-size:10px;color:var(--texto-2)}
+.topo.marca{background:linear-gradient(135deg,#F80045,var(--vermelho) 60%,#C70039);
+  padding:18px 15px 20px;padding-top:calc(18px + env(safe-area-inset-top));border-radius:0 0 25px 25px}
+.topo.marca .titulo h1{font-size:28px}
+.topo .apoio{margin-top:10px;text-align:center;font-size:9px;font-weight:700;letter-spacing:.19em;color:#fff}
 .crculo{width:44px;height:44px;border-radius:50%;flex:none;display:grid;place-items:center;
-  background:var(--card);border:1px solid var(--linha-2);cursor:pointer;
-  transition:background var(--rapido) var(--curva),transform var(--rapido) var(--curva)}
-.crculo:hover{background:var(--card-3)}
-.crculo:active{transform:scale(.95)}
-.crculo:focus-visible{outline:2px solid var(--amarelo);outline-offset:3px}
-.demo-badge{min-height:44px;padding:0 10px;border:0;background:transparent;color:var(--texto-2);
-  font-size:10px;letter-spacing:.08em;font-weight:700;cursor:pointer;border-radius:10px}
-.demo-badge:focus-visible{outline:2px solid var(--amarelo)}
-.demo-badge span{border:1px solid var(--linha-2);border-radius:6px;padding:4px 6px}
-.topo.simples{border-bottom:1px solid var(--linha);padding:12px 18px;padding-top:calc(12px + env(safe-area-inset-top))}
-.topo.simples .titulo h1{font-size:16px;font-weight:700;overflow-wrap:anywhere}
-.topo.simples .titulo p{margin:3px 0 0;font-size:12px;color:var(--texto-2)}
+  background:transparent;border:0;cursor:pointer;position:relative;color:var(--texto-2);transition:background var(--rapido)}
+.crculo::before{content:"";position:absolute;inset:7px;border:1px solid var(--linha-2);border-radius:50%;background:rgba(255,255,255,.025)}
+.crculo .icone{width:18px;height:18px}
+.topo.marca .crculo{color:white}
+.topo.marca .crculo::before{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15)}
+.crculo:hover{background:var(--neutro-fundo)}
+.crculo:focus-visible{outline:2px solid var(--amarelo);outline-offset:2px}
+.topo.simples{padding:8px 12px 6px;padding-top:calc(8px + env(safe-area-inset-top))}
 
 /* ---------- corpo ---------- */
-.tela{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--card-3) transparent;-webkit-overflow-scrolling:touch;padding:20px var(--pad) 28px}
+.tela{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--card-3) transparent;-webkit-overflow-scrolling:touch;padding:16px var(--pad) 24px}
 .tela > * + *{margin-top:var(--gap)}
 .tela:focus{outline:none}
 .tela.entrando{animation:entrar var(--medio) var(--curva)}
@@ -157,67 +153,93 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .cartao > * + *{margin-top:12px}
 
 /* ---------- inicio ---------- */
-.boas-vindas{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:22px}
-.boas-vindas h1{font-size:28px;letter-spacing:-.045em;line-height:1.2}
-.boas-vindas p{margin-top:6px;font-size:13px;color:var(--texto-2)}
-.avatar-mini{width:44px;height:44px;border-radius:50%;border:1px solid var(--linha-2);background:var(--card-2);color:var(--texto);
-  flex:none;font-size:15px;font-weight:700;cursor:pointer}
-.avatar-mini:focus-visible{outline:2px solid var(--amarelo);outline-offset:3px}
-.hero-refeicao{isolation:isolate;position:relative;overflow:hidden;border-radius:24px;
-  padding:23px;background:linear-gradient(120deg,#BC0032 0%,var(--vermelho) 75%);box-shadow:0 12px 32px -22px rgba(236,0,63,.65)}
-.hero-refeicao::after{content:"";position:absolute;z-index:-1;right:-84px;top:-94px;width:290px;height:290px;
-  border:1px solid rgba(255,255,255,.18);border-radius:50%;box-shadow:0 0 0 30px rgba(255,255,255,.035),0 0 0 60px rgba(255,255,255,.025)}
-.hero-refeicao .eyebrow{color:#FFE4EC;font-size:10px;letter-spacing:.14em;display:flex;align-items:center;gap:7px}
-.hero-refeicao .eyebrow .icone{width:14px;height:14px}
-.hero-refeicao h2{font-size:32px;line-height:1.08;font-weight:800;letter-spacing:-.045em;margin-top:14px;max-width:8ch}
-.hero-refeicao p{font-size:12px;line-height:1.5;color:#FFE4EC;margin-top:10px;max-width:23ch}
-.hero-refeicao .cta{margin-top:21px;min-height:52px;padding:0 16px;position:relative}
-.hero-refeicao .cta b{font-size:14px}
-.hero-prato{position:absolute;z-index:-1;width:150px;height:150px;right:-2px;top:34px;color:#fff;opacity:.85;transform:rotate(-14deg)}
-.atalhos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.atalho{display:flex;flex-direction:column;align-items:flex-start;gap:14px;position:relative;min-height:122px;padding:17px;
-  background:var(--card);border:1px solid var(--linha-2);border-radius:var(--r-card);text-align:left;cursor:pointer;
-  transition:background var(--rapido),transform var(--rapido)}
-.atalho:hover{background:var(--card-2)}
-.atalho:active{transform:scale(.98)}
-.atalho:focus-visible{outline:2px solid var(--amarelo);outline-offset:3px}
-.atalho > .icone{color:var(--texto);width:24px;height:24px}
-.atalho .seta{position:absolute;top:20px;right:16px;width:14px;height:14px;color:var(--texto-3)}
-.atalho b{display:block;font-size:14px;line-height:1.3;letter-spacing:-.02em}
-.atalho small{display:block;margin-top:4px;font-size:11px;color:var(--texto-2);line-height:1.4}
-.conquistas{border:1px solid var(--linha-2);border-radius:var(--r-card);padding:18px;background:var(--card)}
-.conq-topo{display:flex;align-items:center;gap:10px}
-.conq-topo h2{flex:1;font-size:15px;letter-spacing:-.02em}
-.conq-topo > .icone{width:18px;height:18px;color:var(--texto-2)}
-.conq-link{min-height:44px;margin:-12px -8px -12px 0;padding:8px;background:none;border:0;color:var(--texto-2);font-size:11px;cursor:pointer;border-radius:8px}
-.conq-link:focus-visible{outline:2px solid var(--amarelo)}
-.conq-corpo{display:flex;align-items:center;gap:20px;margin-top:16px}
-.conq-lista{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px}
-.conq-item{display:flex;align-items:flex-start;gap:7px;font-size:12px;line-height:1.45;color:var(--texto-2)}
-.conq-item .tick{width:15px;height:17px;flex:none;color:var(--verde);display:grid;place-items:center}
-.conq-item .tick .icone{width:13px;height:13px;stroke-width:2.5}
+.inicio-frase{font-size:12px;color:var(--texto-2);margin-bottom:18px}
+.conquistas{border:1px solid var(--linha-2);border-radius:18px;padding:16px;
+  background:radial-gradient(ellipse at 100% 0%,rgba(236,0,63,.22),transparent 65%),linear-gradient(140deg,#1B1E22,#111315);box-shadow:var(--sombra)}
+.conq-topo{display:flex;align-items:center;gap:12px}
+.conq-topo h2{font-size:16px;letter-spacing:-.02em}
+.conq-topo .chip{width:40px;height:40px;border-radius:12px}
+.conq-corpo{display:flex;align-items:center;gap:16px;margin-top:14px}
+.conq-lista{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.conq-item{display:flex;align-items:flex-start;gap:9px;font-size:12px;line-height:1.35;color:var(--texto)}
+.conq-item .tick{width:22px;height:22px;flex:none;display:grid;place-items:center;border-radius:50%;background:var(--vermelho);color:white}
+.conq-item .tick .icone{width:12px;height:12px;stroke-width:2.5}
 .conq-item.nova .tick{animation:pulsar 420ms var(--curva)}
-@keyframes pulsar{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
-.pontos{flex:none;min-width:76px;padding-right:16px;border-right:1px solid var(--linha-2)}
-.pontos .n{display:block;font-size:40px;font-weight:700;line-height:1;letter-spacing:-.06em;font-variant-numeric:tabular-nums}
-.pontos .l{display:block;font-size:10px;color:var(--texto-2);margin-top:6px}
-.conq-nota{display:flex;align-items:center;gap:7px;margin-top:16px;padding-top:13px;border-top:1px solid var(--linha);font-size:10.5px;color:var(--texto-2)}
-.conq-nota .icone{width:13px;height:13px}
-.lista-atalhos{background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);overflow:hidden}
-.lista-atalhos .item{border:0;border-radius:0;box-shadow:none;background:transparent;min-height:74px;padding:15px 16px}
-.lista-atalhos .item + .item{border-top:1px solid var(--linha)}
-.lista-atalhos .item:hover{background:var(--card-2)}
-.lista-atalhos .item:focus-visible{outline-offset:-3px}
+@keyframes pulsar{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+.pontos{flex:none;width:104px;text-align:center}
+.anel{width:96px;height:96px;margin:auto;position:relative;display:grid;place-items:center}
+.anel > svg{position:absolute;inset:0;width:100%;height:100%}
+.anel .n{font-size:31px;font-weight:800;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.pontos .l{display:block;font-size:9px;font-weight:700;line-height:1.45;letter-spacing:.12em;margin-top:4px;color:var(--texto-2);text-transform:uppercase}
+.home-acoes{display:flex;flex-direction:column;gap:12px}
+.home-rapidas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.home-rapidas .item{min-height:76px;padding:12px 10px;gap:9px}
+.home-rapidas .item b{font-size:12px}
+.home-rapidas .chip{width:36px;height:40px;border-radius:11px}
+.home-rapidas .seta{width:13px;height:13px}
+.home-acoes .leve > .icone{color:var(--amarelo)}
 .item .item-texto{flex:1;min-width:0}
-.item .item-texto b{display:block;font-size:13px}
+.item .item-texto b{display:block}
 .item small{display:block;color:var(--texto-2);font-size:11px;line-height:1.4;margin-top:4px;font-weight:400}
-.avaliar-chamada{display:flex;align-items:center;gap:13px;width:100%;text-align:left;padding:18px;border:1px solid var(--linha-2);
-  border-radius:var(--r-card);background:linear-gradient(115deg,var(--card-2),var(--card));cursor:pointer}
-.avaliar-chamada .item-texto{flex:1;min-width:0}
-.avaliar-chamada b{display:block;font-size:14px}
-.avaliar-chamada small{display:block;font-size:11px;line-height:1.5;margin-top:5px;color:var(--texto-2)}
-.avaliar-chamada .seta{width:16px;height:16px;color:var(--texto-3)}
-.avaliar-chamada:focus-visible{outline:2px solid var(--amarelo);outline-offset:3px}
+.lista-atalhos{background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);overflow:hidden}
+.lista-atalhos .item{border:0;border-radius:0;box-shadow:none;min-height:46px;padding:9px 12px;background:transparent}
+.lista-atalhos .item + .item{border-top:1px solid var(--linha)}
+.lista-atalhos .chip{width:26px;height:26px;border-radius:8px}
+.lista-atalhos .chip .icone{width:16px;height:16px}
+.lista-atalhos .item:focus-visible{outline-offset:-3px}
+.foto-prato{display:block;flex:none;width:58px;height:58px;border-radius:10px;background-image:var(--fotos);
+  background-size:400% 216%;background-position:0 0;background-color:var(--card-3)}
+.foto-ovo{background-position:33.333% 0}
+.foto-macarrao{background-position:66.667% 0}
+.foto-arroz{background-position:100% 0}
+.foto-feijao,.foto-salada,.foto-refeicao{background-size:400% 186%}
+.foto-feijao{background-position:0 100%}
+.foto-salada{background-position:33.333% 100%}
+.foto-refeicao{background-position:66.667% 100%}
+.fotos-nota{font-size:10px;color:var(--texto-2)}
+.filtros{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:1px 0 4px}
+.filtro{flex:1;min-height:38px;border:1px solid var(--linha-2);border-radius:var(--r-pill);padding:7px 10px;
+  background:var(--card);color:var(--texto-2);font-size:11px;cursor:pointer;white-space:nowrap}
+.filtro[aria-pressed="true"]{background:var(--vermelho);border-color:var(--vermelho);color:white;font-weight:600}
+.filtro:focus-visible{outline:2px solid var(--amarelo);outline-offset:-2px}
+.prato-resumo{background:linear-gradient(135deg,rgba(245,217,78,.18),var(--card) 90%);border-color:rgba(245,217,78,.32);border-left:4px solid var(--amarelo)}
+.prato-resumo .prato-ficha{display:flex;gap:16px;align-items:center;margin-top:12px}
+.prato-resumo .foto-prato{width:120px;height:120px;border-radius:50%;border:3px solid rgba(255,255,255,.16)}
+.prato-resumo .macros{flex:1;min-width:0}
+.prato-resumo .macros > b{display:block;font-size:23px;line-height:1.2;letter-spacing:-.035em}
+.prato-resumo .macros > span{display:block;font-size:14px;margin-top:5px;font-weight:600}
+.prato-resumo .objetivo-resumo{display:flex;align-items:center;gap:9px;margin-top:16px;font-size:11px;line-height:1.4;color:var(--texto-2)}
+.objetivo-resumo .icone{color:var(--amarelo);width:23px;height:23px}
+.objetivo-resumo b{display:block;color:var(--texto);font-size:11px;font-weight:500}
+.estimativa{border:1px solid var(--linha);border-radius:12px;padding:12px;background:var(--card)}
+.estimativa b{font-size:12px;font-weight:600}
+.estimativa p{font-size:11px;color:var(--texto-2);line-height:1.5;margin-top:5px}
+.resumo-progresso{display:flex;align-items:center;gap:13px;background:linear-gradient(130deg,rgba(245,217,78,.14),var(--card) 70%)}
+.resumo-progresso .pontos{width:75px}
+.resumo-progresso .anel{width:72px;height:72px}
+.resumo-progresso .anel .n{font-size:24px}
+.resumo-progresso .pontos .l{display:none}
+.resumo-progresso .placar-label{font-size:11px;line-height:1.4;max-width:9ch}
+.resumo-progresso .resumo-mensagem{flex:1;border-left:1px solid var(--linha-2);padding-left:15px;font-size:11px;line-height:1.5;color:var(--texto-2)}
+.periodos{display:flex;padding:3px;background:var(--card);border:1px solid var(--linha);border-radius:11px}
+.periodos .filtro{border-radius:8px;border:0;min-height:32px;background:transparent;padding:5px}
+.periodos .filtro[aria-pressed="true"]{background:var(--vermelho)}
+.discreto{border:1px solid var(--linha);border-radius:12px;background:var(--card);padding:11px 13px;font-size:12px;color:var(--texto-2)}
+.discreto summary{cursor:pointer;color:var(--texto);min-height:24px;font-weight:500}
+.discreto[open] summary{margin-bottom:10px}
+.discreto > .interruptor{margin-top:8px}
+.gestao-nota{text-align:center;font-size:11px;color:var(--texto-2);line-height:1.6;margin-top:28px}
+.estado-exemplo{display:flex;gap:14px;align-items:center;border:1px solid var(--linha);border-radius:14px;padding:18px;background:var(--card);font-size:13px}
+.estado-exemplo .estado-icone{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--neutro-fundo)}
+.estado-exemplo b{display:block;font-size:13px}
+.estado-exemplo p{font-size:11px;color:var(--texto-2);margin-top:5px;line-height:1.5}
+.estado-exemplo.erro{background:linear-gradient(120deg,var(--restricao-fundo),var(--card));border-color:rgba(255,107,107,.2)}
+.estado-exemplo.erro .estado-icone{color:var(--restricao);background:var(--restricao-fundo)}
+.estado-exemplo.sucesso{background:linear-gradient(120deg,var(--verde-fundo),var(--card));border-color:rgba(69,212,144,.2)}
+.estado-exemplo.sucesso .estado-icone{color:var(--verde);background:var(--verde-fundo)}
+.estado-exemplo.loading{justify-content:center;flex-direction:column;text-align:center}
+.estado-exemplo.loading .icone{animation:girar 1s linear infinite;color:var(--texto-2)}
+@keyframes girar{to{transform:rotate(360deg)}}
 
 /* ---------- botoes ---------- */
 .cta{
@@ -227,7 +249,7 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
              background var(--medio) var(--curva), border-color var(--medio) var(--curva);
 }
 .cta:active{transform:scale(.98)}
-.cta b{flex:1;min-width:0;overflow-wrap:anywhere;font-size:16px;font-weight:700;letter-spacing:-.01em}
+.cta b{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px;font-weight:700;letter-spacing:-.01em}
 .cta .seta{opacity:.5;width:18px;height:18px}
 .cta:focus-visible{outline:2px solid var(--amarelo);outline-offset:3px}
 .cta.forte{background:var(--amarelo);color:var(--amarelo-ink);border:0;
@@ -262,7 +284,7 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .item .seta{color:var(--texto-3);width:16px;height:16px;flex:none}
 .item[disabled]{opacity:.45;cursor:default}
 .chip{width:38px;height:38px;border-radius:12px;flex:none;display:grid;place-items:center;
-  background:rgba(236,0,63,.12);color:#FF7A9D}
+  background:linear-gradient(145deg,#FF1450,#D20039);color:white;box-shadow:0 5px 14px -8px rgba(236,0,63,.6)}
 .chip .icone{width:19px;height:19px}
 .chip.calmo{background:var(--card-3);color:var(--texto-2);box-shadow:none}
 .grade.tres .item{flex-direction:column;align-items:flex-start;gap:10px;padding:14px 12px;min-height:0}
@@ -280,21 +302,21 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .prato:hover{background:var(--card-2);border-color:var(--linha-2)}
 .prato:active{transform:scale(.98)}
 .prato:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:2px}
-.prato{padding:15px 13px;min-height:82px;box-shadow:var(--sombra)}
+.prato{padding:8px;min-height:76px;gap:10px;border-radius:13px;box-shadow:var(--sombra)}
 .prato .corpo{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
-.prato .nome{font-size:14px;font-weight:700;line-height:1.25;letter-spacing:-.01em}
+.prato .nome{font-size:12px;font-weight:700;line-height:1.25;letter-spacing:-.01em}
 /* Papel e selos na mesma linha: em pilha, seis pratos viravam seis blocos de
    130px e a pessoa rolava a tela inteira para ver o almoco de um dia so. */
 .prato .selos{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
-.prato .papel{font-size:12px;color:var(--texto-2);line-height:1.3}
+.prato .papel{font-size:10px;color:var(--texto-2);line-height:1.3}
 .prato .seta{color:var(--texto-3);width:16px;height:16px;flex:none}
-.prato.blk{border-left:3px solid var(--restricao)}
-.prato.okk{border-left:3px solid var(--verde)}
-.prato.wrn{border-left:3px solid var(--laranja)}
+.prato.blk{border-color:rgba(255,107,107,.35)}
+.prato.okk{border-color:rgba(69,212,144,.23)}
+.prato.wrn{border-color:var(--linha-2)}
 
 .selo-tag{
   display:inline-flex;align-items:center;gap:5px;border-radius:var(--r-pill);
-  padding:3px 9px;font-size:11px;font-weight:600;line-height:1.4;white-space:normal;overflow-wrap:anywhere;
+  padding:2px 7px;font-size:10px;font-weight:600;line-height:1.4;white-space:normal;overflow-wrap:anywhere;
   background:var(--neutro-fundo);color:var(--texto-2);
 }
 .selo-tag .icone{width:12px;height:12px;stroke-width:2.4}
@@ -314,37 +336,41 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .resumo .rodape b{color:var(--texto);font-weight:600}
 
 .linha-porcao{
-  display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:56px;
-  background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);padding:12px 14px;
+  display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:43px;
+  background:var(--card);border:1px solid var(--linha);border-radius:11px;padding:9px 12px;
 }
-.linha-porcao .nome{font-size:14.5px;font-weight:600;letter-spacing:-.005em}
+.linha-porcao .nome{font-size:12px;font-weight:600;letter-spacing:-.005em}
 .linha-porcao .medida{
   font-size:12px;font-weight:700;color:var(--texto);max-width:48%;text-align:right;
-  background:var(--card-3);border:1px solid var(--linha-2);border-radius:var(--r-pill);padding:5px 12px;
+  background:var(--card-3);border:1px solid var(--linha-2);border-radius:var(--r-pill);padding:3px 9px;
 }
-.pilha{display:flex;flex-direction:column;gap:10px}
+.pilha{display:flex;flex-direction:column;gap:7px}
 
+.resumo.prato-resumo{background:linear-gradient(135deg,rgba(245,217,78,.18),var(--card) 90%);border-color:rgba(245,217,78,.32);border-left:4px solid var(--amarelo)}
+.resumo.resumo-progresso{background:linear-gradient(130deg,rgba(245,217,78,.14),var(--card) 70%)}
 /* ---------- avaliacao ---------- */
 .notas{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .avaliacao-nota{
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
-  min-height:104px;background:var(--card);border:1.5px solid var(--linha);
+  min-height:112px;background:var(--card);border:1.5px solid var(--linha);
   border-radius:var(--r-card);cursor:pointer;padding:14px 8px;
   transition:border-color var(--medio) var(--curva), background var(--medio) var(--curva),
              transform var(--rapido) var(--curva);
 }
-.avaliacao-nota .icone{width:30px;height:30px;color:var(--texto-2);transition:color var(--medio) var(--curva)}
+.avaliacao-nota .icone{width:42px;height:42px;color:var(--texto-2);transition:color var(--medio) var(--curva)}
 .avaliacao-nota span{font-size:13.5px;font-weight:600;color:var(--texto-2);transition:color var(--medio) var(--curva)}
 .avaliacao-nota:hover{border-color:var(--linha-2);background:var(--card-2)}
 .avaliacao-nota:active{transform:scale(.98)}
 .avaliacao-nota:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:2px}
 .avaliacao-nota[aria-pressed="true"]{background:var(--card-2);animation:escolher 260ms var(--curva)}
 .avaliacao-nota[aria-pressed="true"] span{color:var(--texto)}
-.avaliacao-nota.boa[aria-pressed="true"]{border-color:var(--verde)}
+.avaliacao-nota.boa[aria-pressed="true"]{border-color:var(--verde);background:var(--verde-fundo)}
 .avaliacao-nota.boa[aria-pressed="true"] .icone{color:var(--verde)}
-.avaliacao-nota.regular[aria-pressed="true"]{border-color:var(--laranja)}
-.avaliacao-nota.regular[aria-pressed="true"] .icone{color:var(--laranja)}
-.avaliacao-nota.ruim[aria-pressed="true"]{border-color:var(--restricao)}
+.avaliacao-nota.regular[aria-pressed="true"]{border-color:var(--amarelo);background:rgba(245,217,78,.08)}
+.avaliacao-nota.regular .icone{color:var(--amarelo)}
+.avaliacao-nota.boa .icone{color:var(--verde)}
+.avaliacao-nota.ruim .icone{color:var(--restricao)}
+.avaliacao-nota.ruim[aria-pressed="true"]{border-color:var(--restricao);background:var(--restricao-fundo)}
 .avaliacao-nota.ruim[aria-pressed="true"] .icone{color:var(--restricao)}
 @keyframes escolher{0%{transform:scale(1)}45%{transform:scale(1.035)}100%{transform:scale(1)}}
 
@@ -352,14 +378,14 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .marca-tag{
   display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:8px 14px;
   background:var(--card);border:1px solid var(--linha);border-radius:var(--r-pill);
-  font-size:13.5px;font-weight:600;color:var(--texto-2);cursor:pointer;
+  font-size:11px;font-weight:500;color:var(--texto-2);cursor:pointer;
   transition:border-color var(--medio) var(--curva), color var(--medio) var(--curva),
              background var(--medio) var(--curva);
 }
 .marca-tag .icone{width:15px;height:15px;opacity:0;transition:opacity var(--rapido) var(--curva)}
 .marca-tag:hover{border-color:var(--linha-2);color:var(--texto)}
-.marca-tag[aria-pressed="true"]{border-color:var(--vermelho);color:var(--texto);background:rgba(236,0,63,.1)}
-.marca-tag[aria-pressed="true"] .icone{opacity:1;color:var(--vermelho-alto)}
+.marca-tag[aria-pressed="true"]{border-color:var(--amarelo);color:var(--amarelo);background:rgba(245,217,78,.09)}
+.marca-tag[aria-pressed="true"] .icone{opacity:1;color:var(--amarelo)}
 .marca-tag:focus-visible{outline:2px solid var(--vermelho-alto);outline-offset:2px}
 
 /* ---------- progresso ---------- */
@@ -369,13 +395,14 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
   background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);padding:20px 16px}
 .dia{display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0}
 .dia .valor-dia{font-size:11px;font-weight:600;line-height:18px;color:var(--texto-2);font-variant-numeric:tabular-nums}
-.dia .trilho{width:100%;height:96px;border-radius:10px;background:var(--neutro-fundo);
+.dia .trilho{width:70%;height:94px;border-radius:10px;background:transparent;
   display:flex;align-items:flex-end;overflow:hidden}
 .dia .barra{width:100%;border-radius:10px;background:linear-gradient(180deg,var(--vermelho-alto),var(--vermelho));
   transition:height var(--lento) var(--curva)}
 .dia .sigla{font-size:11px;font-weight:700;color:var(--texto-3);letter-spacing:.04em}
+.dia.hoje .barra{background:linear-gradient(180deg,var(--amarelo-alto),var(--amarelo))}
 .dia.hoje .sigla{color:var(--texto)}
-.dia.hoje .trilho{outline:1.5px solid var(--linha-2);outline-offset:-1.5px}
+.dia.hoje .trilho{outline:0}
 .dia.sem-registro .barra{background:transparent}
 
 .metricas{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -383,26 +410,23 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .metrica .topo-m{display:flex;align-items:center;gap:9px;color:var(--texto-2)}
 .metrica .topo-m .icone{width:16px;height:16px}
 .metrica .topo-m span{font-size:11.5px;font-weight:600;line-height:1.3}
-.metrica b{display:block;font-size:26px;font-weight:800;margin-top:10px;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.metrica b{display:block;font-size:22px;font-weight:800;margin-top:10px;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 .metrica em{display:block;font-size:11.5px;color:var(--texto-3);font-style:normal;margin-top:5px}
 
 /* ---------- perfil ---------- */
-.perfil-topo{display:flex;align-items:center;gap:14px;padding:22px 18px;border:1px solid var(--linha-2);
-  border-radius:var(--r-card);background:radial-gradient(ellipse at 100% 0%,rgba(236,0,63,.1),transparent 70%),var(--card)}
-.avatar{
-  width:60px;height:60px;border-radius:20px;flex:none;display:grid;place-items:center;
-  background:linear-gradient(150deg,var(--vermelho-alto),var(--vermelho-baixo));color:#fff;
-  font-size:22px;font-weight:800;letter-spacing:-.02em;box-shadow:0 8px 20px -14px rgba(236,0,63,.9);
-}
+.perfil-topo{display:flex;align-items:center;gap:14px;padding:10px 0}
+.avatar{width:64px;height:64px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:linear-gradient(145deg,#77808D,#424954);border:2px solid #858D99;color:#fff;font-size:24px;font-weight:700}
+
 .perfil-topo .quem{min-width:0}
 .perfil-topo .quem b{display:block;font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
 .perfil-topo .quem span{display:block;font-size:13px;color:var(--texto-2);margin-top:3px}
 
 .campos{background:var(--card);border:1px solid var(--linha);border-radius:var(--r-card);overflow:hidden}
-.campo{display:flex;justify-content:space-between;gap:16px;align-items:baseline;padding:13px 16px;min-height:48px}
+.campo{display:flex;justify-content:space-between;gap:16px;align-items:baseline;padding:9px 13px;min-height:40px}
 .campo + .campo{border-top:1px solid var(--linha)}
-.campo dt{font-size:13px;color:var(--texto-2);flex:none}
-.campo dd{margin:0;font-size:14px;font-weight:600;text-align:right;min-width:0;overflow-wrap:anywhere}
+.campo dt{font-size:12px;color:var(--texto-2);flex:none}
+.campo dd{margin:0;font-size:12px;font-weight:600;text-align:right;min-width:0;overflow-wrap:anywhere}
 
 .tags{display:flex;flex-wrap:wrap;gap:8px}
 .tag{display:inline-flex;align-items:center;gap:7px;border-radius:var(--r-pill);padding:7px 13px;
@@ -476,24 +500,25 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .cabeca-tela{font-size:26px;font-weight:800;line-height:1.22;letter-spacing:-.03em}
 
 /* ---------- acoes no rodape ---------- */
-.acoes{flex:none;display:flex;flex-direction:column;gap:10px;padding:14px var(--pad);max-height:38dvh;overflow-y:auto;
+.acoes{flex:none;display:flex;flex-direction:column;gap:7px;padding:10px var(--pad);max-height:38dvh;overflow-y:auto;
   background:var(--card);border-top:1px solid var(--linha)}
 .acoes > *{flex-shrink:0}
+.acoes .cta{min-height:44px;padding:8px 14px;border-radius:11px}
+.acoes .cta b{font-size:12px}
+.acoes .cta > .icone{width:18px;height:18px}
+.acoes .leve > .icone,.acoes .fantasma > .icone{color:var(--amarelo)}
 .acoes:empty{display:none}
 .acoes .anexo{background:transparent;border:1.5px dashed var(--vermelho-alto);color:var(--vermelho-alto)}
 .acoes .anexo:hover{background:var(--restricao-fundo)}
 
 /* ---------- navegacao inferior ---------- */
-.abas{flex:none;display:flex;background:#141518;border-top:1px solid var(--linha-2);
-  padding:9px 12px 7px;padding-bottom:calc(7px + env(safe-area-inset-bottom));box-shadow:0 -12px 28px -18px #000}
-.aba{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:0;min-height:54px;
-  background:none;border:0;border-radius:14px;padding:8px 3px;cursor:pointer;font-size:10px;font-weight:500;
-  color:var(--texto-3);position:relative;transition:color var(--medio) var(--curva),background var(--medio) var(--curva)}
-.aba .icone{width:21px;height:21px;transition:transform var(--medio) var(--curva)}
-.aba:hover{color:var(--texto);background:var(--card-2)}
-.aba[aria-current="page"]{color:#FF7A9D;background:rgba(236,0,63,.09);font-weight:700}
-.aba[aria-current="page"] .icone{stroke-width:2.2}
-.aba:focus-visible{outline:2px solid var(--amarelo);outline-offset:-2px}
+.abas{flex:none;display:flex;background:var(--fundo);border-top:1px solid var(--linha-2);padding:7px 8px 6px;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+.aba{flex:1;min-width:0;min-height:55px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  padding:7px 3px;background:transparent;border:0;cursor:pointer;font-size:10px;color:var(--texto-3)}
+.aba .icone{width:21px;height:21px}
+.aba[aria-current="page"]{color:var(--vermelho-alto);font-weight:700}
+.aba[aria-current="page"]::after{content:"";height:3px;width:35px;position:absolute;bottom:-6px;left:calc(50% - 17.5px);background:var(--vermelho);border-radius:3px}
+.aba:focus-visible{outline:2px solid var(--amarelo);outline-offset:-3px;border-radius:8px}
 
 /* ---------- convite para instalar ---------- */
 .instalar{flex:none;display:none;align-items:center;flex-wrap:wrap;gap:8px;background:var(--card-2);
@@ -535,18 +560,21 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 .assinatura p{margin:5px 0 0;font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--texto-3)}
 
 @media (max-width:359px){
-  :root{--pad:16px;--t-h1:27px}
-  .grade.tres{grid-template-columns:1fr 1fr}
-  .resumo .numeros{gap:18px}
-  .hero-refeicao{padding:20px}
-  .hero-refeicao h2{font-size:29px}
-  .hero-prato{width:125px;height:125px;top:47px;right:-11px;opacity:.65}
-  .marca-identidade .marca-legenda{font-size:8px;letter-spacing:.1em}
-  .demo-badge{padding:0 3px}
-  .topo .direita{gap:3px}
-  .atalho{padding:14px;min-height:116px}
-  .conq-corpo{gap:12px}
+  :root{--pad:14px;--t-h1:23px}
+  .conquistas{padding:13px}
+  .conq-corpo{gap:9px}
+  .conq-item{font-size:11px;gap:6px}
+  .pontos{width:85px}
+  .anel{width:81px;height:81px}
+  .conq-topo h2{font-size:15px}
+  .filtros{gap:5px}
+  .filtro{font-size:10px;padding:6px 7px}
+  .foto-prato{width:48px;height:48px}
+  .prato-resumo .foto-prato{width:95px;height:95px}
+  .prato-resumo .macros > b{font-size:20px}
+  .resumo-progresso{gap:10px}
 }
+
 @media (min-width:600px){
   body{background:radial-gradient(ellipse at 50% 0%,#242025,#090A0C 65%)}
   .app{height:min(940px,calc(100dvh - 48px));margin:24px auto;border:1px solid var(--linha-2);
@@ -649,7 +677,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   // dizer que gravou no servidor seria mentir sobre o que aconteceu.
   var estado = {
     nota: null, faltas: [], avaliado: false,
-    registrado: false, pontos: 0, conquistaNova: null, gestao: false
+    registrado: false, pontos: 0, conquistaNova: null, gestao: false,
+    filtroCardapio: "todos", periodoProgresso: "semana"
   };
   try { estado.gestao = localStorage.getItem("apetit-gestao") === "sim"; } catch (e) {}
 
@@ -660,28 +689,22 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     { id: "perfil",    icone: "i-pessoa",     nome: "Perfil" }
   ];
 
-  var SECOES = [
-    { titulo: "Seu acompanhamento", apoio: "No seu ritmo", itens: [
-      { id: "ficha", icone: "i-ficha", nome: "Minha ficha nutricional", busca: "Minha ficha", detalhe: "As orientações do seu nutricionista" },
-      { id: "meu_dia", icone: "i-prancheta", nome: "Meu dia", busca: "Meu dia", detalhe: "Suas refeições em um só lugar" },
-      { id: "progresso", icone: "i-tendencia", nome: "Meu progresso", detalhe: "Acompanhe cada conquista" }
-    ]},
-    { titulo: "Sempre à mão", apoio: "Conta e suporte", itens: [
-      { id: "favoritos", icone: "i-marcador", nome: "Favoritos", busca: "Favoritos", detalhe: "Os pratos que você guardou" },
-      { id: "avisos", icone: "i-sino", nome: "Avisos", busca: "Avisos", detalhe: "Lembretes do seu jeito" },
-      { id: "perfil", icone: "i-pessoa", nome: "Meu cadastro", detalhe: "Objetivo, restrições e preferências" },
-      { id: "ajuda", icone: "i-ajuda", nome: "Precisa de ajuda?", busca: "Ajuda", detalhe: "Encontre as respostas por aqui" }
-    ]}
+  var ACOMPANHAMENTO = [
+    { id: "ficha", nome: "Minha ficha nutricional", busca: "Minha ficha", icone: "i-ficha" },
+    { id: "meu_dia", nome: "Meu dia", busca: "Meu dia", icone: "i-prancheta" },
+    { id: "favoritos", nome: "Alimentos preferidos", busca: "Favoritos", icone: "i-coracao" },
+    { id: "avisos", nome: "Notificações", busca: "Avisos", icone: "i-sino" },
+    { id: "ajuda", nome: "Ajuda", busca: "Ajuda", icone: "i-ajuda" }
   ];
 
   // "Avaliacao do refeitorio" virou "Resultados das avaliacoes": o funcionario
   // ja tem uma acao chamada "Avaliar o refeitorio", e dois nomes quase iguais
   // para coisas opostas — uma escreve, a outra le — confundem quem administra.
   var ADMIN = [
-    { id: "piloto",      icone: "i-trofeu",  nome: "Relatório do piloto" },
-    { id: "relatorio",   icone: "i-grupo",   nome: "Adesão por setor" },
-    { id: "atendimento", icone: "i-estrela", nome: "Resultados das avaliações" },
-    { id: "cobertura",   icone: "i-escudo",  nome: "Cobertura de alergênicos" }
+    { id: "piloto",      icone: "i-trofeu",  nome: "Relatório do piloto", detalhe: "Visão geral e indicadores" },
+    { id: "relatorio",   icone: "i-grupo",   nome: "Adesão por setor", detalhe: "Participação agregada" },
+    { id: "atendimento", icone: "i-estrela", nome: "Resultados das avaliações", detalhe: "Satisfação e pontos de melhoria" },
+    { id: "cobertura",   icone: "i-escudo",  nome: "Cobertura de alergênicos", detalhe: "Informação e segurança" }
   ];
 
   // Categoria do cardapio -> icone. Sem entrada, o prato usa o talher generico:
@@ -999,20 +1022,16 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     topo.className = "topo marca";
     topo.textContent = "";
     var barra = el("div", "barra");
-    var marca = el("div", "marca-identidade");
-    var simbolo = el("span", "marca-simbolo");
-    simbolo.appendChild(icone("i-talher"));
-    marca.appendChild(simbolo);
-    marca.appendChild(el("div", "", '<div class="marca-nome">apetit</div><span class="marca-legenda">Bem-estar à mesa</span>'));
-    barra.appendChild(marca);
-    var direita = el("div", "direita");
-    var demo = el("button", "demo-badge", "<span>PRÉVIA</span>");
-    demo.setAttribute("aria-label", "Sobre esta demonstração");
-    demo.addEventListener("click", abrirSobre);
-    direita.appendChild(demo);
-    direita.appendChild(botaoIcone("i-share", "Compartilhar o app", compartilhar));
-    barra.appendChild(direita);
+    barra.appendChild(botaoIcone("i-info", "Sobre esta demonstração", abrirSobre));
+    var titulo = el("div", "titulo");
+    titulo.appendChild(el("h1", "", "Apetit"));
+    barra.appendChild(titulo);
+    barra.appendChild(botaoIcone("i-sino", "Notificações", function(){
+      var alvo = alvoDe({id:"avisos", busca:"Avisos"});
+      if (alvo) mostrar(alvo);
+    }));
     topo.appendChild(barra);
+    topo.appendChild(el("p", "apoio", "Alimenta o que te faz bem"));
   }
 
   function cabecalhoInterno(nome, apoio){
@@ -1023,7 +1042,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       mostrar(historico.length ? historico.pop() : "inicio", false);
     }));
     var titulo = el("div", "titulo");
-    titulo.appendChild(el("h1", "", escapar(nome)));
+    titulo.appendChild(el("h1", "", escapar(nome || "Apetit")));
     if (apoio) titulo.appendChild(el("p", "", escapar(apoio)));
     barra.appendChild(titulo);
     barra.appendChild(botaoIcone("i-info", "Sobre esta demonstração", abrirSobre));
@@ -1075,6 +1094,17 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       c.appendChild(el("p", "", "Você está usando o app como a <b>Mariana</b>. " +
         "As telas foram geradas rodando o código real do bot — não são maquete."));
 
+      var compartilharApp = el("button", "cta leve");
+      compartilharApp.appendChild(icone("i-share"));
+      compartilharApp.appendChild(el("b", "", "Compartilhar o app"));
+      compartilharApp.addEventListener("click", compartilhar);
+      c.appendChild(compartilharApp);
+      var verEstados = el("button", "cta leve");
+      verEstados.style.marginTop = "10px";
+      verEstados.appendChild(icone("i-prancheta"));
+      verEstados.appendChild(el("b", "", "Ver estados da interface"));
+      verEstados.addEventListener("click", function(){ folha.close(); mostrar("estados"); });
+      c.appendChild(verEstados);
       c.appendChild(el("h3", "", "Quem você é"));
       var dl = el("dl", "");
       var p = (DADOS && DADOS.perfil) || {};
@@ -1145,27 +1175,29 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     })[nome] || nome;
   }
 
-  function cartaoConquistas(){
-    var p = (DADOS && DADOS.progresso) || { pontos: 0, conquistas: [] };
-    var cartao = el("section", "conquistas");
-    var topoC = el("div", "conq-topo");
-    topoC.appendChild(icone("i-trofeu"));
-    topoC.appendChild(el("h2", "", "Cada escolha conta"));
-    var ver = el("button", "conq-link", "Ver progresso");
-    ver.addEventListener("click", function(){ mostrar("progresso"); });
-    topoC.appendChild(ver);
-    cartao.appendChild(topoC);
-
-    var corpo = el("div", "conq-corpo");
+  // O anel e decorativo: os pontos nao tem teto nem porcentagem de conclusao.
+  function circuloPontos(){
     var pontos = el("div", "pontos");
-    var n = el("span", "n", String(estado.pontos));
-    pontos.appendChild(n);
-    pontos.appendChild(el("span", "l", "pontos acumulados"));
-    corpo.appendChild(pontos);
+    var anel = el("div", "anel");
+    anel.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="none" stroke="rgba(245,217,78,.2)" stroke-width="5"/>' +
+      '<circle cx="50" cy="50" r="40" fill="none" stroke="#F5D94E" stroke-width="5" stroke-linecap="round" stroke-dasharray="226 26" transform="rotate(-92 50 50)"/>' +
+      '<path d="m51 5 1.5 3 3.5.5-2.5 2.4.6 3.5L51 12.8l-3.1 1.6.6-3.5L46 8.5l3.5-.5Z" fill="#F5D94E"/></svg>';
+    anel.appendChild(el("span", "n", String(estado.pontos)));
+    pontos.appendChild(anel);
+    pontos.appendChild(el("span", "l", "Pontos<br>acumulados"));
+    return pontos;
+  }
+
+  function cartaoConquistas(){
+    var p = (DADOS && DADOS.progresso) || {conquistas:[]};
+    var cartao = el("section", "conquistas");
+    var cabeca = el("div", "conq-topo");
+    cabeca.appendChild(chip("i-trofeu"));
+    cabeca.appendChild(el("h2", "", "Minhas conquistas"));
+    cartao.appendChild(cabeca);
+    var corpo = el("div", "conq-corpo");
     var lista = el("div", "conq-lista");
-    var conquistas = estado.registrado
-      ? (((DADOS || {}).registro_previsto || {}).conquistas || [])
-      : (p.conquistas || []);
+    var conquistas = estado.registrado ? (((DADOS || {}).registro_previsto || {}).conquistas || []) : (p.conquistas || []);
     if (conquistas.length){
       conquistas.forEach(function(c){
         var item = el("div", "conq-item" + (estado.conquistaNova === c.nome ? " nova" : ""));
@@ -1175,115 +1207,64 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
         item.appendChild(el("span", "", escapar(nomeConquista(c.nome))));
         lista.appendChild(item);
       });
-    } else {
-      lista.appendChild(el("p", "nota", "Registre seu primeiro almoço para começar a conquistar."));
-    }
+    } else lista.appendChild(el("p", "nota", "Registre seu primeiro almoço para começar a conquistar."));
     corpo.appendChild(lista);
+    var pontos = circuloPontos();
+    corpo.appendChild(pontos);
     cartao.appendChild(corpo);
-    var nota = el("p", "conq-nota");
-    nota.appendChild(icone("i-cadeado"));
-    nota.appendChild(el("span", "", "Seu progresso é só seu. Sem rankings ou comparações."));
-    cartao.appendChild(nota);
-    cartao._contador = n;
+    cartao._contador = pontos.querySelector(".n");
     return cartao;
+  }
+
+  function atalho(item, classe){
+    var b = el("button", classe || "item");
+    var alvo = alvoDe(item);
+    b.appendChild(classe && classe.indexOf("cta") >= 0 ? icone(item.icone) : chip(item.icone));
+    b.appendChild(el("b", "", escapar(item.nome)));
+    b.appendChild(icone("i-seta", "seta"));
+    if (alvo) b.addEventListener("click", function(){mostrar(alvo);}); else b.disabled = true;
+    return b;
   }
 
   function telaInicio(){
     cabecalhoInicio();
-    var p = (DADOS && DADOS.perfil) || {};
-    var saudacao = el("div", "boas-vindas");
-    var texto = el("div", "");
-    texto.appendChild(el("h1", "", p.nome ? "Olá, " + escapar(p.nome.split(" ")[0]) + "." : "Que bom ter você aqui."));
-    texto.appendChild(el("p", "", "Vamos cuidar de você hoje?"));
-    saudacao.appendChild(texto);
-    var avatar = el("button", "avatar-mini", escapar(p.iniciais || "A"));
-    avatar.setAttribute("aria-label", "Abrir meu perfil");
-    avatar.addEventListener("click", function(){ mostrar("perfil"); });
-    saudacao.appendChild(avatar);
-    tela.appendChild(saudacao);
-
-    var hero = el("section", "hero-refeicao");
-    var contexto = el("div", "eyebrow");
-    contexto.appendChild(icone("i-talher"));
-    contexto.appendChild(el("span", "", "Seu momento de cuidar"));
-    hero.appendChild(contexto);
-    hero.appendChild(el("h2", "", "Seu almoço,<br>do seu jeito."));
-    hero.appendChild(el("p", "", "Escolha seu prato e confira os avisos para você."));
-    // Ilustracao vetorial decorativa; nao representa o cardapio nem suas porcoes.
-    hero.insertAdjacentHTML("beforeend", '<svg class="hero-prato" viewBox="0 0 160 160" fill="none" aria-hidden="true">' +
-      '<circle cx="80" cy="80" r="69" stroke="currentColor" stroke-width="1.5" opacity=".65"/>' +
-      '<circle cx="80" cy="80" r="58" fill="white" fill-opacity=".05" stroke="currentColor" stroke-opacity=".35"/>' +
-      '<path d="M80 27v53l45 31M80 80l-43 33" stroke="currentColor" stroke-opacity=".25"/>' +
-      '<path d="M47 47c17-3 25 5 24 24-18 0-26-8-24-24Zm4 5 16 16M98 51c12-2 20 6 17 18-12 3-20-5-17-18Zm3 4 10 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-      '<path d="M61 101c5-10 24-14 37-3 4 4 1 15-6 19-16 7-37-4-31-16Z" stroke="currentColor" stroke-width="2"/>' +
-      '<path d="m70 100 17 8m-12-13 17 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>');
-    var montar = alvoDe({ id: "montar", busca: "Montar" });
-    var principal = el("button", "cta forte");
-    principal.appendChild(icone("i-mais"));
-    principal.appendChild(el("b", "", "Montar meu prato"));
-    principal.appendChild(icone("i-seta", "seta"));
-    if (montar) principal.addEventListener("click", function(){ mostrar(montar); });
-    else principal.disabled = true;
-    hero.appendChild(principal);
-    tela.appendChild(hero);
-
-    var atalhos = el("div", "atalhos");
-    [{ id: "cardapio", icone: "i-calendario", nome: "Cardápio do dia", detalhe: "Veja o que tem hoje" },
-     { id: "quanto", icone: "i-tigela", nome: "Quanto pegar", detalhe: "Confira suas porções" }
-    ].forEach(function(c){
-      var alvo = alvoDe(c), b = el("button", "atalho");
-      b.appendChild(icone(c.icone));
-      b.appendChild(icone("i-seta", "seta"));
-      b.appendChild(el("span", "", "<b>" + c.nome + "</b><small>" + c.detalhe + "</small>"));
-      if (alvo) b.addEventListener("click", function(){ mostrar(alvo); });
-      else b.disabled = true;
-      atalhos.appendChild(b);
-    });
-    tela.appendChild(atalhos);
-
+    tela.appendChild(el("p", "inicio-frase", "Escolhas hoje, um amanhã melhor"));
     var cartao = cartaoConquistas();
     tela.appendChild(cartao);
     if (estado.pontosAnimar != null){
       contarAte(cartao._contador, estado.pontosAnimar, estado.pontos);
       estado.pontosAnimar = null;
     }
+    var principais = el("div", "home-acoes");
+    principais.appendChild(atalho({id:"montar", busca:"Montar", nome:"Montar meu prato", icone:"i-talher"}, "cta forte"));
+    principais.appendChild(atalho({id:"quanto", nome:"Quanto pegar hoje", icone:"i-tigela"}, "cta leve"));
+    tela.appendChild(principais);
+    var cabeca = el("div", "cabeca-secao");
+    cabeca.appendChild(el("h2", "", "Ações rápidas"));
+    cabeca.appendChild(el("span", "", "Facilita o seu dia"));
+    tela.appendChild(cabeca);
+    var grade = el("div", "home-rapidas");
+    grade.appendChild(atalho({id:"cardapio", nome:"Cardápio", icone:"i-calendario"}));
+    grade.appendChild(atalho({id:"avaliar", nome:"Avaliar o refeitório", icone:"i-estrela"}));
+    tela.appendChild(grade);
+  }
 
-    SECOES.forEach(function(secao, indice){
-      var itens = secao.itens.map(function(i){ return { item: i, alvo: alvoDe(i) }; })
-        .filter(function(p){ return p.alvo; });
-      if (!itens.length) return;
-      var cabeca = el("div", "cabeca-secao");
-      cabeca.appendChild(el("h2", "", escapar(secao.titulo)));
-      cabeca.appendChild(el("span", "", escapar(secao.apoio)));
-      tela.appendChild(cabeca);
-      var lista = el("div", "lista-atalhos");
-      itens.forEach(function(p){
-        var b = el("button", "item");
-        b.appendChild(chip(p.item.icone, indice > 0));
-        b.appendChild(el("span", "item-texto", "<b>" + escapar(p.item.nome) + "</b><small>" + escapar(p.item.detalhe) + "</small>"));
-        b.appendChild(icone("i-seta", "seta"));
-        b.addEventListener("click", function(){ mostrar(p.alvo); });
-        lista.appendChild(b);
-      });
-      tela.appendChild(lista);
-      if (indice === 0){
-        var avaliar = el("button", "avaliar-chamada");
-        avaliar.appendChild(chip("i-estrela"));
-        avaliar.appendChild(el("span", "item-texto", "<b>Como foi seu almoço?</b><small>Sua opinião ajuda a melhorar.<br>Avalie o refeitório.</small>"));
-        avaliar.appendChild(icone("i-seta", "seta"));
-        avaliar.addEventListener("click", function(){ mostrar("avaliar"); });
-        tela.appendChild(avaliar);
-      }
-    });
-    var assinatura = el("div", "assinatura");
-    assinatura.appendChild(el("div", "nome", "apetit"));
-    assinatura.appendChild(el("p", "", "Alimenta o que te faz bem"));
-    tela.appendChild(assinatura);
+  var FOTOS = {
+    "carne assada ao molho":"carne", "ovo cozido":"ovo", "macarrao alho e oleo":"macarrao",
+    "arroz parboilizado":"arroz", "feijao preto":"feijao", "mix de alface":"salada"
+  };
+  function fotoPrato(nome, fallback){
+    var normal = String(nome).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    var foto = FOTOS[normal];
+    if (!foto) return chip(fallback || "i-talher", true);
+    var no = el("span", "foto-prato foto-" + foto);
+    no.setAttribute("aria-hidden", "true");
+    return no;
   }
 
   // ---------- 2. cardapio ----------
   function telaCardapio(){
-    cabecalhoInterno("Cardápio", "Escolhas para o seu almoço");
+    cabecalhoInterno("Apetit", DADOS ? DADOS.dia_amigavel : "");
     var grupos = (DADOS && DADOS.cardapio) || [];
 
     tela.appendChild(el("p", "eyebrow", "Cardápio do dia"));
@@ -1292,7 +1273,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     tela.appendChild(el("h1", "h1", corte > 0
       ? escapar(dia.slice(0, corte + 1)) + "<br>" + escapar(dia.slice(corte + 1).trim())
       : escapar(dia)));
-    tela.appendChild(el("p", "sub", "Toque em um prato para ver os detalhes e os avisos de alergênicos."));
+    tela.appendChild(el("p", "sub", "Alimentação equilibrada para um dia melhor."));
 
     if (!grupos.length){
       tela.appendChild(vazio("Nenhum cardápio publicado para hoje.",
@@ -1300,14 +1281,28 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       return;
     }
 
+    var filtros = el("div", "filtros");
+    filtros.setAttribute("role", "group");
+    filtros.setAttribute("aria-label", "Categorias do cardápio");
+    [["todos","Todos"],["proteinas","Proteínas"],["carboidratos","Carboidratos"],["saladas","Saladas"]].forEach(function(f){
+      var b = el("button", "filtro", f[1]);
+      b.setAttribute("aria-pressed", estado.filtroCardapio === f[0] ? "true" : "false");
+      b.addEventListener("click", function(){estado.filtroCardapio = f[0]; redesenhar();});
+      filtros.appendChild(b);
+    });
+    tela.appendChild(filtros);
+    var categorias = {proteinas:["PRATO PRINCIPAL","OPCAO AO PP"], carboidratos:["ARROZ","FEIJAO","GUARNICAO"], saladas:["SALADA","FRUTA"]};
+    var visiveis = grupos.filter(function(g){return estado.filtroCardapio === "todos" || (categorias[estado.filtroCardapio] || []).indexOf(g.codigo) >= 0;});
     var pilha = el("div", "pilha");
-    pilha.style.marginTop = "20px";
-    grupos.forEach(function(g){
+    pilha.style.marginTop = "10px";
+    visiveis.forEach(function(g){
       g.itens.forEach(function(i){
         pilha.appendChild(linhaDoPrato(i, g));
       });
     });
     tela.appendChild(pilha);
+    if (!pilha.childElementCount) tela.appendChild(vazio("Nenhum prato nesta categoria.", "Escolha outra categoria para continuar.", "i-talher"));
+    tela.appendChild(el("p", "fotos-nota", "Fotos ilustrativas. Confira os avisos antes de se servir."));
 
     var contagem = (DADOS && DADOS.contagem) || {};
     if (contagem.atencao){
@@ -1322,7 +1317,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   function linhaDoPrato(i, grupo){
     var no = el("button", "prato " + (i.veredito === "bloqueio" ? "blk"
              : i.veredito === "liberado" ? "okk" : "wrn"));
-    no.appendChild(chip(ICONE_CATEGORIA[grupo.codigo] || "i-talher", true));
+    no.appendChild(fotoPrato(i.nome, ICONE_CATEGORIA[grupo.codigo]));
 
     var corpo = el("div", "corpo");
     corpo.appendChild(el("div", "nome", escapar(i.nome)));
@@ -1336,7 +1331,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     } else if (i.veredito === "liberado"){
       selos.appendChild(selo("Liberado", "verde", "i-liberado"));
     } else {
-      selos.appendChild(selo("Confirme", "laranja", "i-atencao"));
+      selos.appendChild(selo("Confirme alergênicos", "laranja", "i-atencao"));
     }
     corpo.appendChild(selos);
     no.appendChild(corpo);
@@ -1387,11 +1382,11 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   // ---------- 3. quanto pegar hoje ----------
   function telaQuanto(){
-    cabecalhoInterno("Suas porções", "Orientação para se servir");
+    cabecalhoInterno("Apetit", DADOS ? DADOS.dia_amigavel : "");
     var p = (DADOS && DADOS.porcoes) || {};
 
     tela.appendChild(el("h1", "h1", "Quanto pegar hoje"));
-    tela.appendChild(el("p", "sub", escapar(DADOS ? DADOS.dia_amigavel : "")));
+
 
     if (!p.itens || !p.itens.length){
       tela.appendChild(vazio("Ainda não consigo sugerir um prato.",
@@ -1399,26 +1394,26 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       return;
     }
 
-    var resumo = el("div", "resumo");
-    resumo.style.marginTop = "20px";
+    var resumo = el("div", "resumo prato-resumo");
     resumo.appendChild(el("span", "eyebrow", "Seu prato sugerido hoje"));
-    var numeros = el("div", "numeros");
-    [[p.kcal, "kcal"], [p.ptn, "g de proteína"]].forEach(function(par){
-      var n = el("div", "numero");
-      n.appendChild(el("b", "", String(par[0])));
-      n.appendChild(el("span", "", par[1]));
-      numeros.appendChild(n);
-    });
-    resumo.appendChild(numeros);
-    var rodape = el("div", "rodape");
-    rodape.appendChild(icone("i-alvo"));
-    rodape.appendChild(el("span", "", "Objetivo: <b>" +
-      escapar((DADOS.perfil && DADOS.perfil.objetivo) || "") + "</b>"));
-    resumo.appendChild(rodape);
+    var ficha = el("div", "prato-ficha");
+    var foto = el("span", "foto-prato foto-refeicao");
+    foto.setAttribute("aria-hidden", "true");
+    ficha.appendChild(foto);
+    var macros = el("div", "macros");
+    macros.appendChild(el("b", "", escapar(p.kcal) + " kcal"));
+    macros.appendChild(el("span", "", escapar(p.ptn) + " g de proteína"));
+    var objetivo = el("div", "objetivo-resumo");
+    objetivo.appendChild(icone("i-alvo"));
+    objetivo.appendChild(el("div", "", "Objetivo<b>" + escapar(((DADOS || {}).perfil || {}).objetivo || "") + "</b>"));
+    macros.appendChild(objetivo);
+    ficha.appendChild(macros);
+    resumo.appendChild(ficha);
     tela.appendChild(resumo);
+    tela.appendChild(el("p", "secao", "Suas porções"));
 
     var pilha = el("div", "pilha");
-    pilha.style.marginTop = "20px";
+    pilha.style.marginTop = "10px";
     p.itens.forEach(function(i){
       var linha = el("div", "linha-porcao");
       linha.appendChild(el("span", "nome", escapar(i.nome)));
@@ -1427,11 +1422,11 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     });
     tela.appendChild(pilha);
 
-    tela.appendChild(el("p", "legenda",
-      "Estimativa: <b>" + p.kcal + " kcal · " + p.ptn + " g de proteína</b>"));
-    tela.appendChild(el("p", "legenda",
-      "Essa sugestão considera o cardápio de hoje e o objetivo selecionado. " +
-      "Quantidades individuais devem seguir orientação nutricional."));
+    var estimativa = el("div", "estimativa");
+    estimativa.appendChild(el("b", "", "Estimativa: " + escapar(p.kcal) + " kcal · " + escapar(p.ptn) + " g de proteína"));
+    estimativa.appendChild(el("p", "", "A sugestão considera o cardápio e seu objetivo. Quantidades individuais devem seguir orientação nutricional. Foto ilustrativa."));
+    tela.appendChild(estimativa);
+
 
     (p.avisos || []).forEach(function(t){
       var a = el("div", "aviso wrn");
@@ -1506,107 +1501,96 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   // ---------- 4. avaliar ----------
   function telaAvaliar(){
-    cabecalhoInterno("Avaliar o refeitório", "Sua opinião faz diferença");
-    var av = (DADOS && DADOS.avaliacao) || { escala: [], faltas: [] };
-
+    cabecalhoInterno("Apetit", DADOS ? DADOS.dia_amigavel : "");
+    var av = (DADOS && DADOS.avaliacao) || {escala:[], faltas:[]};
     tela.appendChild(el("h1", "h1", "Como foi o almoço de hoje?"));
-
     var explica = el("div", "cartao");
     explica.appendChild(el("h2", "h2", "A comida estava boa?"));
-    explica.appendChild(el("p", "legenda",
-      "Sua avaliação é anônima. Ela ajuda a Apetit a acompanhar a qualidade do refeitório — " +
-      "e vai sem o seu nome, sem a sua empresa e sem o seu setor."));
+    explica.appendChild(el("p", "legenda", "Sua avaliação é anônima. Ela ajuda a Apetit a acompanhar a qualidade do refeitório."));
     tela.appendChild(explica);
-
-    var ROSTO = { 3: ["i-bom", "boa"], 2: ["i-medio", "regular"], 1: ["i-ruim", "ruim"] };
+    var rostos = {3:["i-bom","boa"],2:["i-medio","regular"],1:["i-ruim","ruim"]};
     var notas = el("div", "notas");
     av.escala.forEach(function(e){
-      var cfg = ROSTO[e.nota] || ["i-medio", "regular"];
+      var cfg = rostos[e.nota] || ["i-medio","regular"];
       var b = el("button", "avaliacao-nota " + cfg[1]);
       b.setAttribute("aria-pressed", estado.nota === e.nota ? "true" : "false");
       b.appendChild(icone(cfg[0]));
-      b.appendChild(el("span", "", escapar(e.rotulo)));
-      b.addEventListener("click", function(){
-        estado.nota = e.nota;
-        estado.avaliado = true;
-        redesenhar();
-      });
+      b.appendChild(el("span", "", escapar(e.nota === 3 ? "Boa" : e.rotulo)));
+      b.addEventListener("click", function(){estado.nota=e.nota;estado.avaliado=false;redesenhar();});
       notas.appendChild(b);
     });
     tela.appendChild(notas);
-
-    if (estado.nota == null) return;
-
-    // A segunda pergunta e sobre o que faltou, e nao sobre "o que influenciou":
-    // os motivos sao os que `apetit/feedback.py` ja define, escolhidos pelo que
-    // a operacao consegue corrigir na segunda-feira. Inventar outra lista aqui
-    // criaria uma taxonomia paralela que nenhum relatorio soma.
     var cabeca = el("div", "cabeca-secao");
     cabeca.appendChild(el("h2", "", "Faltou alguma coisa?"));
     cabeca.appendChild(el("span", "", "Opcional"));
     tela.appendChild(cabeca);
-
+    // Os motivos mantem os codigos definidos pelo dominio do refeitorio.
     var marcas = el("div", "marcas");
     av.faltas.forEach(function(f){
-      var ligada = estado.faltas.indexOf(f.codigo) >= 0;
       var b = el("button", "marca-tag");
-      b.setAttribute("aria-pressed", ligada ? "true" : "false");
-      b.appendChild(icone("i-check"));
+      b.setAttribute("aria-pressed", estado.faltas.indexOf(f.codigo) >= 0 ? "true" : "false");
       b.appendChild(el("span", "", escapar(f.rotulo)));
       b.addEventListener("click", function(){
-        var n = estado.faltas.indexOf(f.codigo);
-        if (n >= 0) estado.faltas.splice(n, 1); else estado.faltas.push(f.codigo);
-        redesenhar();
+        var pos=estado.faltas.indexOf(f.codigo);
+        if(pos >= 0) estado.faltas.splice(pos,1); else estado.faltas.push(f.codigo);
+        estado.avaliado=false;redesenhar();
       });
       marcas.appendChild(b);
     });
     tela.appendChild(marcas);
-
-    var obrigado = el("div", "aviso okk");
-    obrigado.appendChild(icone("i-coracao"));
-    obrigado.appendChild(el("span", "", "<b>Obrigado pela sua avaliação.</b> " +
-      "Ela entra no resultado do refeitório sem nada que ligue a resposta a você."));
-    tela.appendChild(obrigado);
-
-    var voltar = el("button", "cta leve");
-    voltar.appendChild(icone("i-casa"));
-    voltar.appendChild(el("b", "", "Voltar ao início"));
-    voltar.addEventListener("click", function(){ mostrar("inicio"); });
-    acoes.appendChild(voltar);
+    var enviar=el("button", "cta " + (estado.avaliado ? "feito" : "forte"));
+    enviar.appendChild(el("b", "", estado.avaliado ? "Avaliação enviada" : "Enviar avaliação"));
+    enviar.style.textAlign="center";
+    enviar.disabled=estado.nota == null || estado.avaliado;
+    enviar.addEventListener("click", function(){estado.avaliado=true;redesenhar();});
+    tela.appendChild(enviar);
+    if(estado.avaliado){
+      var obrigado=el("div","aviso okk");
+      obrigado.setAttribute("role","status");
+      obrigado.appendChild(icone("i-liberado"));
+      obrigado.appendChild(el("span","","<b>Obrigado pela sua avaliação!</b><br>Sua opinião ajuda a melhorar o refeitório a cada dia."));
+      tela.appendChild(obrigado);
+    }
   }
 
   // ---------- 5. progresso ----------
   function telaProgresso(){
-    cabecalhoInterno("Meu progresso", "Pequenas escolhas, grandes conquistas");
+    cabecalhoInterno("Apetit", "");
     var p = (DADOS && DADOS.progresso) || { conquistas: [] };
     var semana = (DADOS && DADOS.semana) || [];
 
-    tela.appendChild(el("p", "eyebrow", "Cada passo importa"));
-    tela.appendChild(el("h1", "h1", "Seu ritmo. Sua evolução."));
-
-    var resumo = el("div", "resumo");
-    resumo.appendChild(el("span", "eyebrow", "Acumulado"));
-    var numeros = el("div", "numeros");
-    var n = el("div", "numero");
-    var valor = el("b", "", String(estado.pontos));
-    n.appendChild(valor);
-    n.appendChild(el("span", "", "pontos acumulados"));
-    numeros.appendChild(n);
-    resumo.appendChild(numeros);
-    var rodape = el("div", "rodape");
-    rodape.appendChild(icone("i-alvo"));
-    rodape.appendChild(el("span", "", escapar(p.resumo_semana || "")));
-    resumo.appendChild(rodape);
+    tela.appendChild(el("h1", "h1", "Meu progresso"));
+    tela.appendChild(el("p", "sub", "Pequenas escolhas, grandes resultados."));
+    var resumo=el("div","resumo resumo-progresso");
+    var anel=circuloPontos();
+    var valor=anel.querySelector(".n");
+    resumo.appendChild(anel);
+    resumo.appendChild(el("span","placar-label","pontos acumulados"));
+    resumo.appendChild(el("p","resumo-mensagem",escapar(p.resumo_semana || "Registre o almoço para acompanhar seu progresso.")));
     tela.appendChild(resumo);
+
+    var periodos=el("div","periodos");
+    periodos.setAttribute("role","group");
+    periodos.setAttribute("aria-label","Período do progresso");
+    [["semana","Semana"],["mes","Mês"],["ano","Ano"]].forEach(function(f){
+      var b=el("button","filtro",f[1]);
+      b.setAttribute("aria-pressed",estado.periodoProgresso === f[0] ? "true" : "false");
+      b.addEventListener("click",function(){estado.periodoProgresso=f[0];redesenhar();});
+      periodos.appendChild(b);
+    });
+    tela.appendChild(periodos);
+    semana = serieProgresso(estado.periodoProgresso);
+
 
     if (semana.length){
       var cabeca = el("div", "cabeca-secao");
-      cabeca.appendChild(el("h2", "", "Últimos 5 dias úteis"));
-      cabeca.appendChild(el("span", "", "kcal por dia"));
+      cabeca.appendChild(el("h2", "", estado.periodoProgresso === "semana" ? "Últimos 5 dias úteis" : estado.periodoProgresso === "mes" ? "Últimos 30 dias" : "Últimos 12 meses"));
+      cabeca.appendChild(el("span", "", estado.periodoProgresso === "ano" ? "kcal por mês" : "kcal registradas"));
       tela.appendChild(cabeca);
 
       var teto = Math.max.apply(null, semana.map(function(d){ return d.kcal || 0; }).concat([1]));
       var grafico = el("div", "semana");
+      grafico.style.gridTemplateColumns="repeat(" + semana.length + ",minmax(0,1fr))";
       semana.forEach(function(d){
         var col = el("div", "dia" + (d.hoje ? " hoje" : "") + (d.registrado ? "" : " sem-registro"));
         var valorDia = el("span", "valor-dia", d.registrado ? escapar(d.kcal) : "—");
@@ -1623,11 +1607,12 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       });
       tela.appendChild(grafico);
       tela.appendChild(el("p", "legenda",
-        "Cada barra é a energia do almoço registrado naquele dia. Dia sem barra é dia sem registro."));
+        "Energia das refeições disponíveis neste período. Sem barra: nenhum registro disponível."));
     }
 
     var vezes = {};
     (p.conquistas || []).forEach(function(c){ vezes[c.nome] = c.vezes; });
+    if (estado.registrado) (((DADOS || {}).registro_previsto || {}).conquistas || []).forEach(function(c){vezes[c.nome]=(vezes[c.nome] || 0) + 1;});
     var registros = ((DADOS && DADOS.meu_dia && DADOS.meu_dia.dias) || []).length + (estado.registrado ? 1 : 0);
 
     var cabeca2 = el("div", "cabeca-secao");
@@ -1682,8 +1667,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
         "Registre o almoço de hoje para começar.", "i-trofeu"));
     }
 
-    tela.appendChild(el("p", "legenda",
-      "Isso é só seu. Não existe ranking, e ninguém compara você com colega nenhum."));
+    tela.appendChild(atalho({id:"meu_dia", busca:"Meu dia", nome:"Ver meu histórico", icone:"i-prancheta"}));
+    tela.appendChild(el("p", "legenda", "Seu progresso é só seu. Sem rankings ou comparações."));
 
     if (estado.pontosAnimar != null){
       contarAte(valor, estado.pontosAnimar, estado.pontos);
@@ -1691,9 +1676,36 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     }
   }
 
+  function serieProgresso(periodo){
+    if(periodo === "semana") return ((DADOS && DADOS.semana) || []).map(function(d){
+      return d.hoje && estado.registrado ? Object.assign({},d,{registrado:true,kcal:DADOS.porcoes.kcal}) : d;
+    });
+    var dia=(DADOS && DADOS.dia) || "", hoje=new Date(dia + "T12:00:00Z");
+    if(!isFinite(hoje.getTime())) return [];
+    var dias=(((DADOS || {}).meu_dia || {}).dias || []).slice();
+    if(estado.registrado) dias.push({data:dia,kcal:DADOS.porcoes.kcal});
+    var mensal=periodo === "mes", numero=mensal ? 5 : 12, partes=[];
+    for(var n=0;n<numero;n++){
+      var inicio, fim;
+      if(mensal){
+        inicio=new Date(hoje);inicio.setUTCDate(inicio.getUTCDate()-29+n*6);
+        fim=new Date(inicio);fim.setUTCDate(fim.getUTCDate()+6);
+      }else{
+        inicio=new Date(Date.UTC(hoje.getUTCFullYear(),hoje.getUTCMonth()-11+n,1,12));
+        fim=new Date(Date.UTC(inicio.getUTCFullYear(),inicio.getUTCMonth()+1,1,12));
+      }
+      var a=inicio.toISOString().slice(0,10),b=fim.toISOString().slice(0,10);
+      var achados=dias.filter(function(d){return d.data >= a && d.data < b && d.data <= dia;});
+      partes.push({sigla:mensal ? String(inicio.getUTCDate()).padStart(2,"0") : ["J","F","M","A","M","J","J","A","S","O","N","D"][inicio.getUTCMonth()],
+        hoje:n===numero-1,registrado:achados.length > 0,kcal:achados.reduce(function(s,d){return s+(d.kcal || 0);},0)});
+    }
+    return partes;
+  }
+
   // ---------- 6. perfil ----------
+
   function telaPerfil(){
-    cabecalhoInterno("Meu perfil", "Tudo sobre você, em um só lugar");
+    cabecalhoInterno("Apetit", "");
     var p = (DADOS && DADOS.perfil) || {};
 
     var cabeca = el("div", "perfil-topo");
@@ -1714,9 +1726,10 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     var alvo = p.alvo || {};
     campos([["Objetivo", p.objetivo],
             ["Alvo do almoço", alvo.kcal ? alvo.kcal + " kcal · " + alvo.ptn + " g ptn" : null]]);
-    tela.appendChild(el("p", "legenda",
-      "Alvo ilustrativo do objetivo que você escolheu. Quem define faixa individual é o " +
-      "nutricionista responsável — se você mandar a sua ficha, o app passa a seguir ela."));
+    var explicaAlvo=el("details","discreto");
+    explicaAlvo.appendChild(el("summary","","Sobre seu objetivo"));
+    explicaAlvo.appendChild(el("p","","O alvo é ilustrativo. A faixa individual deve ser definida pelo nutricionista. Envie sua ficha para seguir as orientações dele."));
+    tela.appendChild(explicaAlvo);
 
     secao("Restrições alimentares");
     var restricoes = (p.restricoes || []).concat(p.restricoes_livres || []);
@@ -1745,23 +1758,13 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       tela.appendChild(el("p", "legenda", "Prefere evitar: bloqueia no nome do prato, sem virar aviso de alergia."));
     }
 
-    secao("Preferências");
-    var favoritos = p.favoritos || [];
-    if (favoritos.length){
-      var tf = el("div", "tags");
-      favoritos.forEach(function(f){
-        var t = el("span", "tag calma");
-        t.appendChild(icone("i-marcador"));
-        t.appendChild(el("span", "", escapar(f.nome)));
-        tf.appendChild(t);
-      });
-      tela.appendChild(tf);
-    } else {
-      tela.appendChild(vazio("Nenhum prato guardado.",
-        "Depois de montar o prato, toque em Guardar um prato.", "i-marcador"));
-    }
+    secao("Preferências e acompanhamento");
+    var atalhos=el("div","lista-atalhos");
+    ACOMPANHAMENTO.forEach(function(a){if(alvoDe(a)) atalhos.appendChild(atalho(a));});
+    tela.appendChild(atalhos);
 
-    secao("Notificações");
+    var notificacoes=el("details","discreto");
+    notificacoes.appendChild(el("summary","","Preferências de notificação"));
     (p.avisos || []).forEach(function(a){
       var b = el("button", "interruptor");
       b.setAttribute("aria-pressed", a.ligado ? "true" : "false");
@@ -1774,8 +1777,9 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
         a.ligado = !a.ligado;
         b.setAttribute("aria-pressed", a.ligado ? "true" : "false");
       });
-      tela.appendChild(b);
+      notificacoes.appendChild(b);
     });
+    tela.appendChild(notificacoes);
 
     secao("Conta");
     var conta = el("div", "pilha");
@@ -1856,36 +1860,46 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 
   // ---------- 7. gestao ----------
   function telaGestao(){
-    cabecalhoInterno("Visão da Apetit", "agregado · sem nomes");
-    tela.appendChild(el("p", "eyebrow", "Gestão"));
-    tela.appendChild(el("h1", "h1", "Visão da Apetit"));
-    tela.appendChild(el("p", "sub", "Como o piloto está indo, em número agregado."));
-
-    var aviso = el("div", "aviso wrn");
-    aviso.appendChild(icone("i-cadeado"));
-    aviso.appendChild(el("span", "", "<b>Nenhum funcionário aparece nominalmente.</b> " +
-      "O que cada pessoa comeu, a meta dela e se ela bateu a meta não entram em relatório " +
-      "nenhum — recorte com menos de cinco pessoas é suprimido."));
-    tela.appendChild(aviso);
-
-    var grade = el("div", "grade uma");
-    grade.style.marginTop = "20px";
+    cabecalhoInterno("Apetit", "Gestão");
+    tela.appendChild(el("h1","h1","Visão da Apetit"));
+    tela.appendChild(el("p","sub","Dados que ajudam a construir um refeitório melhor."));
+    var grade=el("div","grade uma");
+    grade.style.marginTop="22px";
     ADMIN.forEach(function(a){
-      if (!TELAS[a.id]) return;
-      var b = el("button", "item");
+      if(!TELAS[a.id]) return;
+      var b=el("button","item");
       b.appendChild(chip(a.icone));
-      b.appendChild(el("b", "", escapar(a.nome)));
-      b.appendChild(icone("i-seta", "seta"));
-      b.addEventListener("click", function(){ mostrar(a.id); });
+      b.appendChild(el("span","item-texto","<b>"+escapar(a.nome)+"</b><small>"+escapar(a.detalhe)+"</small>"));
+      b.appendChild(icone("i-seta","seta"));
+      b.addEventListener("click",function(){mostrar(a.id);});
       grade.appendChild(b);
     });
     tela.appendChild(grade);
+    tela.appendChild(el("p","gestao-nota","Nenhum funcionário é identificado nominalmente nos relatórios. Refeições e metas individuais não aparecem. Recortes com menos de cinco pessoas são suprimidos."));
+  }
+
+  function telaEstados(){
+    cabecalhoInterno("Apetit", "Demonstração de componentes");
+    tela.appendChild(el("h1","h1","Estados da interface"));
+    tela.appendChild(el("p","sub","Exemplos de componentes e feedbacks."));
+    [["Carregando","loading","i-atualizar","Carregando…",""],
+     ["Vazio","","i-calendario","Nenhum registro ainda.","Suas informações aparecerão aqui."],
+     ["Erro","erro","i-atencao","Não foi possível carregar o cardápio.","Verifique a conexão e tente novamente."],
+     ["Sucesso","sucesso","i-liberado","Refeição registrada com sucesso!","Seu progresso foi atualizado."],
+     ["Offline","erro","i-info","Você está offline.","Algumas funcionalidades podem não estar disponíveis."]
+    ].forEach(function(e){
+      tela.appendChild(el("h2","h2",e[0]));
+      var card=el("div","estado-exemplo "+e[1]);
+      var ic=el("span","estado-icone");ic.appendChild(icone(e[2]));card.appendChild(ic);
+      card.appendChild(el("div","","<b>"+e[3]+"</b>"+(e[4]?"<p>"+e[4]+"</p>":"")));
+      tela.appendChild(card);
+    });
   }
 
   var NATIVAS = {
     inicio: telaInicio, cardapio: telaCardapio, quanto: telaQuanto,
     avaliar: telaAvaliar, progresso: telaProgresso, perfil: telaPerfil,
-    gestao: telaGestao
+    gestao: telaGestao, estados: telaEstados
   };
 
 

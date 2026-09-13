@@ -1,7 +1,7 @@
 """Empacota a demonstracao numa pagina unica, para virar um link.
 
     python scripts/demo_pagina.py saida.html
-    python scripts/demo_pagina.py --documento preview/Apetit-previa-visual-v2.html
+    python scripts/demo_pagina.py --documento --telas preview/Apetit-oito-telas.html preview/Apetit-previa-referencia.html
 
 O `demo/` e um PWA de varios arquivos: instala na tela inicial, guarda o
 shell em cache e busca `telas.json` e `dados.json` por HTTP. Isso exige um
@@ -20,6 +20,7 @@ que o proprio app ja sabe receber por `window.__APETIT__`.
 """
 
 import argparse
+import base64
 import json
 import re
 import subprocess
@@ -98,10 +99,13 @@ def empacotar(documento: bool = False) -> str:
         "regras": json.loads((DEMO / "regras.json").read_text(encoding="utf-8")),
     }
 
+    estilo_final = estilo.group(1)
+    fotos = base64.b64encode((DEMO / "assets" / "pratos.webp").read_bytes()).decode("ascii")
+    estilo_final = estilo_final.replace('url("assets/pratos.webp")', f'url("data:image/webp;base64,{fotos}")')
     cabeca_final = (
         f"<title>{titulo.group(1)}</title>\n"
         f"{externos}\n"
-        f"<style>{estilo.group(1)}</style>\n"
+        f"<style>{estilo_final}</style>\n"
     )
     corpo_final = (
         f"<script>window.__APETIT__ = {escapar_json(dados)};</script>\n"
@@ -127,7 +131,11 @@ def main() -> int:
     parser.add_argument("saida", nargs="?", default="apetit.html")
     parser.add_argument("--documento", action="store_true",
                         help="Gera um HTML completo para abrir diretamente no navegador.")
+    parser.add_argument("--telas", type=Path,
+                        help="Com --documento, gera também uma galeria estática das oito telas.")
     args = parser.parse_args()
+    if args.telas and not args.documento:
+        parser.error("--telas exige --documento")
     saida = Path(args.saida)
     pagina = empacotar(documento=args.documento)
     if args.documento:
@@ -137,15 +145,21 @@ def main() -> int:
             temporario = Path(pasta) / "previa.html"
             temporario.write_text(pagina, encoding="utf-8")
             try:
-                subprocess.run([
-                    "node", str(RAIZ / "scripts" / "demo_previa.cjs"), str(temporario)
-                ], check=True)
-            except (OSError, subprocess.CalledProcessError) as erro:
+                comando = ["node", str(RAIZ / "scripts" / "demo_previa.cjs"), str(temporario)]
+                galeria = Path(pasta) / "telas.html"
+                if args.telas:
+                    comando.append(str(galeria))
+                subprocess.run(comando, check=True)
+            except OSError as erro:
                 raise SystemExit(
                     "Nao foi possivel montar a previa. Instale Node.js e rode "
                     "`npm ci --prefix scripts` antes de tentar novamente."
                 ) from erro
+            except subprocess.CalledProcessError as erro:
+                raise SystemExit("Falha ao montar a previa. Confira a mensagem de erro acima.") from erro
             pagina = temporario.read_text(encoding="utf-8")
+            if args.telas:
+                args.telas.write_text(galeria.read_text(encoding="utf-8"), encoding="utf-8")
     saida.write_text(pagina, encoding="utf-8")
     print(f"{saida}: {len(pagina) / 1024:.0f} KB numa pagina so")
     return 0

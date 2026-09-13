@@ -20,13 +20,15 @@ async function main() {
     virtualConsole: console,
     beforeParse(window) {
       window.matchMedia = () => ({ matches: true });
+      window.HTMLDialogElement.prototype.showModal = function() { this.setAttribute('open', ''); };
+      window.HTMLDialogElement.prototype.close = function() { this.removeAttribute('open'); };
     }
   });
   try {
     await new Promise(resolve => setImmediate(resolve));
     const document = dom.window.document;
     if (errors.length) throw new Error(errors.join('\n'));
-    if (!document.querySelector('.hero-refeicao')) throw new Error('A home nao carregou.');
+    if (!document.querySelector('.conquistas')) throw new Error('A home nao carregou.');
     let output = html;
     for (const [tag, id] of [['header', 'topo'], ['main', 'tela'], ['nav', 'abas']]) {
       const pattern = new RegExp(`<${tag}\\b[^>]*\\bid="${id}"[^>]*>[\\s\\S]*?</${tag}>`);
@@ -39,6 +41,54 @@ async function main() {
     output = output.replace('Prévia interativa · Cardápio e perfil de exemplo',
       'Prévia visual · Cardápio e perfil de exemplo');
     fs.writeFileSync(filename, output);
+    if (process.argv[3]) {
+      const shots = [];
+      const go = name => document.querySelector(`[data-aba="${name}"]`).click();
+      const click = (label, scope = document) => {
+        const button = [...scope.querySelectorAll('button')].find(b => b.textContent.trim() === label || b.querySelector('b')?.textContent === label || b.getAttribute('aria-label') === label);
+        if (!button || button.disabled) throw new Error(`Acao indisponivel: ${label}`);
+        button.click();
+      };
+      const capture = label => {
+        const clone = document.querySelector('.app').cloneNode(true);
+        clone.querySelector('#faixa-instalar').remove();
+        clone.querySelector('#arquivo-pdf').remove();
+        clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+        clone.querySelector('.tela').classList.remove('entrando');
+        clone.querySelector('.tela').removeAttribute('tabindex');
+        shots.push(`<article class="preview-page"><h2 class="preview-label">${label}</h2>${clone.outerHTML}</article>`);
+      };
+      capture('01. Início');
+      go('cardapio'); capture('02. Cardápio');
+      go('inicio'); click('Quanto pegar hoje'); capture('03. Quanto pegar hoje');
+      go('inicio'); click('Avaliar o refeitório');
+      click('Boa'); click('Comida fria'); click('Enviar avaliação'); capture('04. Avaliar o refeitório');
+      go('progresso'); capture('05. Progresso');
+      go('perfil'); capture('06. Perfil');
+      click('Sou da gestão da Apetit'); click('Visão da Apetit'); capture('07. Gestão');
+      click('Sobre esta demonstração', document.querySelector('#topo'));
+      click('Ver estados da interface', document.querySelector('dialog')); capture('08. Estados da interface');
+      if (errors.length) throw new Error(errors.join('\n'));
+      const style = document.querySelector('style').textContent;
+      const symbols = document.querySelector('body > svg').outerHTML;
+      const css = `
+        body{height:auto;background:#090B0D;padding:24px 16px 40px}
+        .preview-heading{max-width:1660px;margin:0 auto 28px}
+        .preview-heading h1{font-size:28px;margin-bottom:8px}
+        .preview-heading p{font-size:13px;color:var(--texto-2);max-width:70ch}
+        .preview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));align-items:start;gap:28px 20px;max-width:1660px;margin:auto}
+        .preview-page{min-width:0}
+        .preview-label{font-size:14px;color:var(--texto-2);margin:0 0 12px 8px}
+        .preview-page .app{height:auto;max-height:none;min-height:800px;max-width:440px;width:100%;margin:0 auto;border:1px solid #33383E;border-radius:26px;overflow:hidden;box-shadow:0 12px 28px #0006}
+        .preview-page .tela{flex:1;overflow:visible;max-height:none}
+        .preview-page .acoes{max-height:none;overflow:visible}
+        .preview-page button{pointer-events:none}
+        .preview-page .estado-exemplo.loading .icone{animation:none}
+        @media(max-width:440px){body{padding:18px 10px}.preview-heading h1{font-size:24px}.preview-page .app{min-height:0}.preview-grid{gap:26px}}
+      `;
+      const gallery = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Apetit · As oito telas</title><style>${style}\n${css}</style></head><body>${symbols}<div class="preview-heading"><h1>Apetit · Novo visual</h1><p>As oito telas do app, com os dados da demonstração. Role para ver todas. Esta galeria é estática; as fotos de comida são ilustrativas.</p></div><div class="preview-grid">${shots.join('\n')}</div></body></html>`;
+      fs.writeFileSync(process.argv[3], gallery.replace(/[ \t]+$/gm, ''));
+    }
     process.stdout.write('Previa pronta: home visivel com ou sem JavaScript.\n');
   } finally {
     dom.window.close();
