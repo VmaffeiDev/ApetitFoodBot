@@ -876,6 +876,23 @@ aparece **na propria confirmacao**, e nao ao recarregar a pagina e ver os pontos
 voltarem. Descobrir assim e a pior forma de saber: a pessoa passa a duvidar de
 tudo que o app confirmou antes.
 
+### A aba nao responde antes de o cardapio chegar
+
+As abas sao montadas na hora, e `dados.json` chega depois. Tocar em **Cardapio**
+nesse intervalo levava para a tela vazia — "nenhum cardapio publicado para hoje"
+— quando o cardapio existia e so nao tinha carregado. A janela era curta no
+desktop e passou de um segundo no celular modesto, depois que o arquivo cresceu
+para suportar as quantidades da montagem.
+
+Botao que responde antes da hora e pior que botao que espera: o primeiro mente
+sobre o cardapio do dia. Agora as abas nascem desabilitadas e sao liberadas
+quando os dados chegam.
+
+O tempo de abertura foi medido com a CPU emulada mais lenta: **142 ms** no
+desktop, **553 ms** num celular mediano (4x) e **1.115 ms** num celular fraco
+(8x). Comprimido o `dados.json` sao 19 KB — o custo esta no `JSON.parse`, nao no
+download.
+
 ### Onde o cadastro fica guardado
 
 Em `localStorage`, como a foto de perfil: esta demonstração não tem servidor, e

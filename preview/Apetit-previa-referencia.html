@@ -555,6 +555,9 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .aba[aria-current="page"]{color:var(--vermelho-alto);font-weight:700}
 .aba[aria-current="page"]::after{content:"";height:3px;width:35px;position:absolute;bottom:-6px;left:calc(50% - 17.5px);background:var(--vermelho);border-radius:3px}
 .aba:focus-visible{outline:2px solid var(--amarelo);outline-offset:-3px;border-radius:8px}
+/* Enquanto o cardapio nao chegou. Sem opacidade: a barra piscando de cinza
+   claro para cinza escuro na abertura chamaria mais atencao que a espera. */
+.aba[disabled]{cursor:default}
 
 /* ---------- convite para instalar ---------- */
 .instalar{flex:none;display:none;align-items:center;flex-wrap:wrap;gap:8px;background:var(--card-2);
@@ -3248,9 +3251,18 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     });
   }
 
+  // As abas sao montadas antes de os dados chegarem, e ficavam clicaveis nesse
+  // intervalo. Tocar em "Cardapio" ali levava para a tela vazia — "nenhum
+  // cardapio publicado para hoje" — quando na verdade ele so nao tinha
+  // carregado ainda. A janela era curta no desktop e passou de um segundo no
+  // celular modesto, depois que `dados.json` cresceu.
+  //
+  // Botao que responde antes da hora e pior que botao que espera: o primeiro
+  // mente sobre o cardapio do dia.
   ABAS.forEach(function(a){
     var b = el("button", "aba");
     b.dataset.aba = a.id;
+    b.disabled = true;
     b.appendChild(icone(a.icone));
     b.appendChild(el("span", "", escapar(a.nome)));
     b.addEventListener("click", function(){
@@ -3261,6 +3273,10 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     });
     abas.appendChild(b);
   });
+
+  function liberarAbas(){
+    abas.querySelectorAll(".aba").forEach(function(b){ b.disabled = false; });
+  }
 
 
   // ---------- ler a ficha que a pessoa anexar ----------
@@ -3476,6 +3492,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     promessa.then(function(par){
       TELAS = par[0];
       DADOS = par[1];
+      liberarAbas();
       estado.pontos = meuHistorico().progresso.pontos;
       // Primeira vez: cadastro. Depois, direto para o app — a boas-vindas some
       // e nao volta a atrapalhar quem ja se cadastrou.

@@ -101,7 +101,12 @@ async def conferir(dados: dict, porta: int) -> list[str]:
 
                 # 1. o veredito de cada prato, como ele chega na tela
                 await pagina.click('.aba:has-text("Cardápio")')
-                await pagina.wait_for_selector(".prato[data-codigo]")
+                # Espera folgada de proposito: `dados.json` passa de um mega, e
+                # o `JSON.parse` dele na carga chega a mais de um segundo num
+                # aparelho modesto. Com o limite padrao, esta conferencia
+                # falhava de vez em quando por lentidao — e teste que falha
+                # sozinho ensina a ignorar teste que falha.
+                await pagina.wait_for_selector(".prato[data-codigo]", timeout=60000)
                 na_tela = await pagina.evaluate(
                     """() => {
                       var saida = {};
@@ -155,7 +160,7 @@ async def abrir_sugestao(pagina):
     await pagina.click('.aba:has-text("Início")')
     await pagina.click('.cta:has-text("Quanto pegar hoje")')
     try:
-        await pagina.wait_for_selector("[data-sugestao]", timeout=8000)
+        await pagina.wait_for_selector("[data-sugestao]", timeout=30000)
     except Exception:
         return None
     return await pagina.evaluate(

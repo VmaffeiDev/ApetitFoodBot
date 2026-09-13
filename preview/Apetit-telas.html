@@ -545,6 +545,9 @@ h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
 .aba[aria-current="page"]{color:var(--vermelho-alto);font-weight:700}
 .aba[aria-current="page"]::after{content:"";height:3px;width:35px;position:absolute;bottom:-6px;left:calc(50% - 17.5px);background:var(--vermelho);border-radius:3px}
 .aba:focus-visible{outline:2px solid var(--amarelo);outline-offset:-3px;border-radius:8px}
+/* Enquanto o cardapio nao chegou. Sem opacidade: a barra piscando de cinza
+   claro para cinza escuro na abertura chamaria mais atencao que a espera. */
+.aba[disabled]{cursor:default}
 
 /* ---------- convite para instalar ---------- */
 .instalar{flex:none;display:none;align-items:center;flex-wrap:wrap;gap:8px;background:var(--card-2);
