@@ -719,6 +719,27 @@ republicacao chegar sem reinstalar.
 — `localhost` no desenvolvimento, e um host com TLS para as 15 pessoas. Servido
 de dentro de um iframe nao instala: a instalacao sai do documento de topo.
 
+Esse endereco e o **GitHub Pages**, publicado por `.github/workflows/pages.yml`:
+
+> **https://vmaffeidev.github.io/ApetitFoodBot/**
+
+O Pages serve numa subpasta (`/ApetitFoodBot/`), e por isso o `demo/` nao tem um
+unico caminho absoluto: `start_url` e `scope` do manifest sao `"."`, o registro
+do service worker e `"sw.js"` relativo, e o `SHELL` do cache usa `"."`. Servido
+na raiz ou em subpasta, o escopo sai certo e o navegador oferece instalar nos
+dois casos.
+
+Sobe **so de `main`**, e so quando `demo/` muda. O endereco e o que as 15 pessoas
+vao abrir: ele segue o que ja passou por revisao, nao o galho da vez. Para
+publicar fora de hora, `workflow_dispatch` na aba Actions.
+
+O workflow **nao gera** as telas nem os dados: sobe o que esta commitado em
+`demo/`. Gerar no CI exigiria a planilha da empresa, que nao entra no
+repositorio, e publicaria um app montado a partir de dado que ninguem conferiu.
+
+Para ligar na primeira vez, uma vez so: **Settings -> Pages -> Source: GitHub
+Actions**.
+
 Os icones sao desenhados em codigo (`scripts/demo_icone.py`) em vez de virarem
 binario solto: da para mudar a cor numa linha, e o `maskable` sai com margem
 folgada porque o Android recorta o icone na forma do lancador.
@@ -878,6 +899,11 @@ APETIT_DB_PATH=apetit.db
 ```
 
 ## Deploy
+
+O bot e o app vao para lugares diferentes, de proposito: o bot e um processo que
+precisa de banco e segredo, e o `demo/` e um punhado de arquivo estatico que so
+precisa de HTTPS. Ver [Demonstracao instalavel no celular](#demonstracao-instalavel-no-celular-demo)
+para o GitHub Pages; o que vem abaixo e o bot.
 
 ```powershell
 docker build -t apetitfoodbot .

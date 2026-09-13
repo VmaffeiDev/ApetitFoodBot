@@ -1,0 +1,63 @@
+# Publica o `demo/` no GitHub Pages.
+#
+# O PWA precisa de HTTPS: instalacao na tela inicial e service worker so
+# funcionam em origem segura. Enquanto nao existe endereco proprio, as 15
+# pessoas do piloto nao conseguem instalar o app — e uma previa dentro de um
+# quadro embutido tambem nao instala, porque a instalacao sai do documento de
+# topo.
+#
+# O que sobe e o que esta commitado em `demo/`, sem gerar nada aqui: as telas e
+# os dados saem de `scripts/demo_telas.py` e `scripts/demo_dados.py`, que
+# precisam da planilha da empresa e nao entram no repositorio. Gerar no CI
+# publicaria um app montado a partir de dados que ninguem conferiu.
+#
+# So publica de `main`. O endereco e o que as pessoas do piloto vao abrir: ele
+# segue o que ja passou por revisao, nao o galho da vez.
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "demo/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Uma publicacao por vez, e sem cancelar a que ja esta no ar: cancelar no meio
+# deixaria o endereco servindo metade de uma versao.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Falha aqui e melhor que um endereco no ar servindo 404. O `index.html`
+      # e o `manifest` sao o minimo para o navegador oferecer instalar.
+      - name: Conferir o que vai subir
+        run: |
+          for arquivo in index.html manifest.webmanifest sw.js icon-192.png icon-512.png; do
+            test -f "demo/$arquivo" || { echo "Falta demo/$arquivo"; exit 1; }
+          done
+          echo "demo/ com $(find demo -type f | wc -l) arquivos"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: demo
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
