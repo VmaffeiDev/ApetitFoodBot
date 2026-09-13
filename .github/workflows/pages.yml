@@ -20,6 +20,7 @@ on:
     branches: [main]
     paths:
       - "demo/**"
+      - "apetit/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -48,16 +49,31 @@ jobs:
       # e o `manifest` sao o minimo para o navegador oferecer instalar.
       - name: Conferir o que vai subir
         run: |
-          for arquivo in index.html manifest.webmanifest sw.js icon-192.png icon-512.png; do
+          for arquivo in index.html cardapio.html manifest.webmanifest sw.js icon-192.png icon-512.png; do
             test -f "demo/$arquivo" || { echo "Falta demo/$arquivo"; exit 1; }
           done
           echo "demo/ com $(find demo -type f | wc -l) arquivos"
+
+      # A pagina de conferencia do cardapio roda o `apetit/` de verdade no
+      # navegador, via Pyodide. Os modulos sobem ao lado dela, copiados na hora
+      # de publicar — commitar copias dentro de `demo/` criaria uma segunda
+      # versao das regras de leitura, que divergiria da primeira no dia em que
+      # alguem corrigisse so um dos lados.
+      - name: Levar as regras do cardapio junto
+        run: |
+          mkdir -p site/apetit
+          cp -r demo/. site/
+          for modulo in model allergens allergy_text validation csv_import preflight; do
+            cp "apetit/$modulo.py" "site/apetit/$modulo.py"
+          done
+          : > site/apetit/__init__.py
+          echo "site/ com $(find site -type f | wc -l) arquivos"
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: demo
+          path: site
 
       - id: deploy
         uses: actions/deploy-pages@v4

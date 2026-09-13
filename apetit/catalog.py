@@ -10,9 +10,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from .allergens import ALLERGENS, Declaration, Restriction, check_item, coverage
-from .csv_import import parse_menu_rows, read_rows
+from .csv_import import read_rows
 from .model import Issue, MenuEntry
-from .validation import validate_item
+from .preflight import ImportResult, decidir
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS menu_item (
@@ -309,54 +309,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-class ImportResult:
-    def __init__(self, batch: str) -> None:
-        self.batch = batch
-        self.published: list[MenuEntry] = []
-        self.blocked: list[MenuEntry] = []
-        self.issues: list[Issue] = []
-
-    @property
-    def blocking_issues(self) -> list[Issue]:
-        return [issue for issue in self.issues if issue.blocking]
-
-    def grouped_issues(self) -> list[tuple[Issue, int, list[str]]]:
-        """Agrupa por ficha tecnica.
-
-        Um mesmo item errado reaparece em varios dias do mes. Quem revisa
-        corrige a ficha uma vez, entao a fila precisa listar item, nao ocorrencia.
-        """
-        grupos: dict[tuple[str, str], tuple[Issue, list[str]]] = {}
-        for issue in self.issues:
-            chave = (issue.code, issue.item_name)
-            if chave not in grupos:
-                grupos[chave] = (issue, [])
-            if issue.service_date:
-                grupos[chave][1].append(issue.service_date)
-        ordenado = sorted(grupos.values(), key=lambda par: (not par[0].blocking, par[0].item_name))
-        return [(issue, len(datas), sorted(datas)) for issue, datas in ordenado]
-
-    def summary(self) -> str:
-        agrupados = self.grouped_issues()
-        bloqueios = sum(1 for issue, *_ in agrupados if issue.blocking)
-        linhas = [
-            f"Lote: {self.batch}",
-            f"Itens publicados: {len(self.published)}",
-            f"Ocorrencias bloqueadas: {len(self.blocked)} (em {bloqueios} ficha(s) tecnica(s))",
-            f"Avisos: {len(agrupados) - bloqueios}",
-        ]
-        if agrupados:
-            linhas.append("")
-            linhas.append("Para revisao do nutricionista:")
-            for issue, vezes, datas in agrupados:
-                marca = "BLOQUEIO" if issue.blocking else "aviso   "
-                nome = issue.item_name or issue.category or "(cardapio)"
-                repete = f" — {vezes}x no periodo (1o em {datas[0]})" if vezes > 1 else ""
-                linhas.append(f"  [{marca}] {nome}{repete}")
-                linhas.append(f"             {issue.detail}")
-        return "\n".join(linhas)
-
-
 def import_menu_csv(
     conn: sqlite3.Connection,
     text: str,
@@ -379,25 +331,13 @@ def import_menu_rows(
     month: int | None = None,
     year: int | None = None,
 ) -> ImportResult:
-    """Mesma importacao, a partir de linhas ja lidas (CSV ou planilha)."""
-    batch = batch or now_iso()
-    result = ImportResult(batch)
+    """Mesma importacao, a partir de linhas ja lidas (CSV ou planilha).
 
-    entries, issues = parse_menu_rows(rows, unit=unit, meal=meal, month=month, year=year)
-    result.issues.extend(issues)
-
-    for entry in entries:
-        entry_issues = validate_item(
-            entry.item,
-            unit=entry.unit,
-            service_date=entry.service_date,
-            category=entry.category,
-        )
-        result.issues.extend(entry_issues)
-        if any(issue.blocking for issue in entry_issues):
-            result.blocked.append(entry)
-            continue
-        result.published.append(entry)
+    Quem decide o que publicar e `preflight.decidir`, que nao toca no banco: a
+    mesma decisao roda na pagina de conferencia da operacao, sem SQLite. Aqui
+    sobra escrever o que ela aprovou.
+    """
+    result = decidir(rows, unit=unit, meal=meal, batch=batch or now_iso(), month=month, year=year)
 
     timestamp = now_iso()
     for entry in result.published:

@@ -229,6 +229,53 @@ Tres protecoes que sobreviveram a mudanca:
 `/importar` explica isso dentro do bot. O caminho por terminal continua valendo
 para carga em lote:
 
+### Conferir antes de mandar (`demo/cardapio.html`)
+
+Quem na operacao exporta a planilha nem sempre quer descobrir um erro **depois**
+de publicar. A pagina de conferencia fica no mesmo endereco do app:
+
+> **https://vmaffeidev.github.io/ApetitFoodBot/cardapio.html**
+
+A pessoa arrasta o `.csv` e ve, antes de qualquer coisa ir para o ar: as datas
+que o importador montou, os itens e categorias de cada dia, o que ficou
+bloqueado por macro inconsistente e o que vai sem informacao nutricional. Depois
+ela manda o mesmo arquivo para o bot, que publica.
+
+**A pagina nao publica** — nao ha servidor para onde mandar nada, e o arquivo
+nao sai do computador de quem abriu. Publicar continua sendo uma acao de admin
+no bot, que e onde ela deve ficar: quem publica define o que as pessoas leem
+sobre alergenico.
+
+**E ela nao reimplementa nada.** `apetit/csv_import.py` tem 524 linhas de
+leitura em tres layouts; uma segunda implementacao em JavaScript discordaria da
+primeira um dia, e a divergencia apareceria como "seu arquivo esta bom" seguido
+de uma publicacao errada. Entao a pagina roda o **proprio `apetit/`** no
+navegador, via [Pyodide](https://pyodide.org): os mesmos `read_rows` e
+`preflight.decidir` que a importacao chama antes de gravar. O Pyodide so e
+baixado quando alguem solta um arquivo — quem abre a pagina para ler as
+instrucoes nao paga por isso.
+
+Foi o que motivou `apetit/preflight.py`: decidir o que publicar e uma coisa,
+gravar e outra, e elas viviam juntas em `import_menu_rows`. A pagina nao tem
+banco — o Pyodide nem traz `sqlite3` —, e as opcoes eram carregar um SQLite para
+joga-lo fora ou reescrever a decisao do lado do navegador. Separar foi melhor
+que as duas: um so lugar decide, e quem grava so grava.
+
+No workflow do Pages, os modulos sao copiados para o lado da pagina na hora de
+publicar. Commitar copias dentro de `demo/` criaria a segunda versao das regras
+que o desenho inteiro existe para evitar.
+
+Para conferir que a pagina continua concordando com o importador:
+
+```bash
+npm install --prefix scripts/pyodide pyodide@0.26.4
+python scripts/conferir_cardapio.py
+```
+
+Ele abre a pagina num Chromium, solta cada cardapio de exemplo nela e compara o
+que aparece na tela com o que `import_menu_rows` devolve em Python para o mesmo
+arquivo. O Pyodide vem do disco, para o teste nao depender de rede.
+
 ## Importacao pelo terminal
 
 O importador aceita os tres layouts observados, com separador `;` ou `,` e

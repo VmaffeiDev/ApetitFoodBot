@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apetit · Conferir o cardápio da semana</title>
+<!--
+  Conferencia do cardapio, para quem na operacao manda a planilha toda semana.
+
+  A pessoa arrasta o CSV e ve **exatamente** o que o app publicaria: as datas
+  que o importador montou, os itens por dia, o que ficou bloqueado por macro
+  inconsistente e o que vai sem informacao nutricional.
+
+  O ponto inteiro desta pagina e ser confiavel, e por isso ela **nao
+  reimplementa nada**. `apetit/csv_import.py` tem 524 linhas de leitura em tres
+  layouts; uma segunda implementacao em JavaScript discordaria da primeira um
+  dia, e a divergencia apareceria como "seu arquivo esta bom" seguido de uma
+  publicacao errada.
+
+  Entao aqui roda o Python de verdade, no navegador, via Pyodide: os mesmos
+  `read_rows` e `preflight.decidir` que a importacao chama antes de gravar. O
+  que muda em `apetit/` muda aqui no mesmo commit, sem ninguem lembrar de
+  sincronizar.
+
+  Nao ha banco nenhum: decidir o que publicar e uma coisa, gravar e outra, e
+  elas foram separadas justamente para esta pagina poder tomar a decisao sem
+  carregar um SQLite para joga-lo fora.
+
+  Nada sai do computador: o arquivo e lido na maquina de quem abriu a pagina, e
+  esta pagina nao tem servidor para onde mandar coisa nenhuma.
+-->
+<style>
+:root{
+  --vermelho:#EC003F; --vermelho-alto:#FF2057; --amarelo:#F5D94E; --amarelo-ink:#121212;
+  --fundo:#0D0F11; --card:#171A1D; --card-2:#1D2024; --card-3:#292D32;
+  --texto:#FFFFFF; --texto-2:#B1B3BC; --texto-3:#989BA5;
+  --verde:#45D490; --verde-fundo:rgba(69,212,144,.12);
+  --laranja:#F4A72C; --laranja-fundo:rgba(244,167,44,.12);
+  --restricao:#FF6B6B; --restricao-fundo:rgba(255,107,107,.12);
+  --linha:rgba(255,255,255,.07); --linha-2:rgba(255,255,255,.12);
+  --r:14px; --curva:cubic-bezier(.22,.61,.36,1);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--texto);
+  font:15px/1.55 "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding:0 16px 64px}
+.folha{max-width:900px;margin:0 auto}
+header{padding:34px 0 8px;border-bottom:1px solid var(--linha);margin-bottom:28px}
+.marca{display:inline-flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.02em;font-size:20px}
+.ponto{width:11px;height:11px;border-radius:50%;background:var(--vermelho)}
+h1{font-size:30px;line-height:1.15;letter-spacing:-.03em;margin:18px 0 8px;text-wrap:balance}
+h2{font-size:17px;letter-spacing:-.01em;margin:30px 0 10px}
+h3{font-size:14px;margin:0 0 6px}
+p{margin:0 0 12px;color:var(--texto-2)}
+p.forte{color:var(--texto)}
+a{color:var(--amarelo)}
+code{background:var(--card-3);border-radius:5px;padding:1px 6px;font-size:13px}
+
+.campos{display:flex;flex-wrap:wrap;gap:14px;margin:18px 0 22px}
+.campo{flex:1 1 150px;min-width:0}
+label{display:block;font-size:12px;font-weight:600;color:var(--texto-2);margin-bottom:6px}
+input,select{width:100%;min-height:46px;font:inherit;font-size:15px;color:var(--texto);
+  background:var(--card);border:1px solid var(--linha-2);border-radius:var(--r);padding:0 13px}
+input:focus,select:focus{outline:2px solid var(--vermelho-alto);outline-offset:1px;border-color:var(--vermelho-alto)}
+.dica{font-size:12px;color:var(--texto-3);margin-top:6px}
+
+.solta{border:2px dashed var(--linha-2);border-radius:18px;padding:40px 24px;text-align:center;
+  background:var(--card);transition:border-color 180ms var(--curva),background 180ms var(--curva)}
+.solta.sobre{border-color:var(--amarelo);background:var(--card-2)}
+.solta b{display:block;font-size:17px;margin-bottom:6px}
+.solta span{color:var(--texto-2);font-size:13.5px}
+.botao{min-height:48px;margin-top:16px;padding:0 22px;font:inherit;font-size:15px;font-weight:700;
+  background:var(--amarelo);color:var(--amarelo-ink);border:0;border-radius:var(--r);cursor:pointer}
+.botao:hover{filter:brightness(1.05)}
+.botao[disabled]{opacity:.45;cursor:default}
+.botao.leve{background:var(--card-2);color:var(--texto);border:1px solid var(--linha-2)}
+
+.cartao{background:var(--card);border:1px solid var(--linha);border-radius:var(--r);padding:18px}
+.cartao + .cartao{margin-top:12px}
+.numeros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.numero{background:var(--card);border:1px solid var(--linha);border-radius:var(--r);padding:15px 16px}
+.numero b{display:block;font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.numero span{display:block;font-size:12.5px;color:var(--texto-2);margin-top:4px}
+.numero.ruim b{color:var(--restricao)}
+.numero.atencao b{color:var(--laranja)}
+.numero.bom b{color:var(--verde)}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--linha)}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--texto-3);font-weight:700}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.rolagem{overflow-x:auto}
+
+.achado{display:flex;gap:12px;align-items:flex-start;border-radius:var(--r);padding:13px 14px;
+  font-size:13.5px;line-height:1.5;border:1px solid transparent}
+.achado + .achado{margin-top:8px}
+.achado .tag{flex:none;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  border-radius:99px;padding:3px 9px;margin-top:1px}
+.achado.blk{background:var(--restricao-fundo);color:var(--restricao);border-color:rgba(255,107,107,.22)}
+.achado.blk .tag{background:var(--restricao);color:#1a0508}
+.achado.wrn{background:var(--laranja-fundo);color:var(--laranja);border-color:rgba(244,167,44,.22)}
+.achado.wrn .tag{background:var(--laranja);color:#1c1204}
+.achado.okk{background:var(--verde-fundo);color:var(--verde);border-color:rgba(69,212,144,.22)}
+.achado b{color:inherit}
+.achado .onde{display:block;color:var(--texto-2);margin-top:3px;font-size:12.5px}
+
+.progresso{height:5px;border-radius:3px;background:var(--card-3);overflow:hidden;margin:18px 0 8px}
+.progresso .feito{height:100%;background:var(--vermelho);width:30%;
+  animation:anda 1.1s linear infinite;border-radius:3px}
+@keyframes anda{from{transform:translateX(-110%)}to{transform:translateX(360%)}}
+#estado{font-size:13.5px;color:var(--texto-2)}
+[hidden]{display:none!important}
+footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--linha);font-size:12.5px;color:var(--texto-3)}
+@media (max-width:560px){h1{font-size:25px}.solta{padding:30px 16px}}
+</style>
+</head>
+<body>
+<div class="folha">
+
+<header>
+  <div class="marca"><span class="ponto"></span> Apetit</div>
+</header>
+
+<h1>Conferir o cardápio da semana</h1>
+<p class="forte">Arraste o arquivo <code>.csv</code> que a operação exporta. Você vê aqui,
+antes de publicar, o que o app entendeu: as datas, os itens de cada dia e o que ficaria
+de fora por erro na ficha técnica.</p>
+<p><b>Nada sai deste computador.</b> O arquivo é lido aqui mesmo, no seu navegador. Esta
+página não tem para onde enviar nada — ela só confere.</p>
+
+<div class="campos">
+  <div class="campo">
+    <label for="unidade">Refeitório</label>
+    <input id="unidade" type="text" value="SM" autocomplete="off">
+    <p class="dica">A unidade da Apetit. Sem ela o cardápio publica para ninguém.</p>
+  </div>
+  <div class="campo">
+    <label for="refeicao">Refeição</label>
+    <select id="refeicao">
+      <option value="almoco">Almoço</option>
+      <option value="jantar">Jantar</option>
+      <option value="lanche">Lanche</option>
+    </select>
+  </div>
+  <div class="campo">
+    <label for="mes">Mês</label>
+    <input id="mes" type="number" min="1" max="12" placeholder="ex.: 9" autocomplete="off">
+    <p class="dica">Só para a planilha de planejamento, que traz o dia sem o mês.</p>
+  </div>
+  <div class="campo">
+    <label for="ano">Ano</label>
+    <input id="ano" type="number" min="2020" max="2100" placeholder="ex.: 2026" autocomplete="off">
+  </div>
+</div>
+
+<div class="solta" id="solta">
+  <b>Arraste o arquivo aqui</b>
+  <span>ou escolha no computador · <code>.csv</code> ou <code>.txt</code></span>
+  <br>
+  <button class="botao" id="escolher" type="button">Escolher arquivo</button>
+  <input id="arquivo" type="file" accept=".csv,.txt,text/csv,text/plain" hidden>
+</div>
+
+<div id="carregando" hidden>
+  <div class="progresso"><div class="feito"></div></div>
+  <p id="estado">Preparando o leitor…</p>
+</div>
+
+<div id="resultado" hidden></div>
+
+<footer>
+  Esta página roda o mesmo código que publica o cardápio de verdade
+  (<code>apetit/csv_import.py</code>, <code>apetit/validation.py</code> e
+  <code>apetit/preflight.py</code>) — a mesma decisão que a importação toma antes de
+  gravar. Conferir aqui não grava nada em lugar nenhum.
+</footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // O Pyodide so e baixado quando alguem solta um arquivo: quem abre a pagina
+  // para ler as instrucoes nao paga 14 MB por isso.
+  var PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/";
+  var MODULOS = ["model", "allergens", "allergy_text", "validation", "csv_import", "preflight"];
+
+  var solta = document.getElementById("solta");
+  var entrada = document.getElementById("arquivo");
+  var carregando = document.getElementById("carregando");
+  var estado = document.getElementById("estado");
+  var saida = document.getElementById("resultado");
+  var py = null;
+
+  document.getElementById("escolher").addEventListener("click", function(){ entrada.click(); });
+  entrada.addEventListener("change", function(){
+    if (entrada.files && entrada.files[0]) conferir(entrada.files[0]);
+    entrada.value = "";
+  });
+  ["dragenter", "dragover"].forEach(function(e){
+    solta.addEventListener(e, function(ev){ ev.preventDefault(); solta.classList.add("sobre"); });
+  });
+  ["dragleave", "drop"].forEach(function(e){
+    solta.addEventListener(e, function(ev){ ev.preventDefault(); solta.classList.remove("sobre"); });
+  });
+  solta.addEventListener("drop", function(ev){
+    var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if (f) conferir(f);
+  });
+
+  function dizer(texto){ estado.textContent = texto; }
+
+  function esperar(){ return new Promise(function(r){ setTimeout(r, 0); }); }
+
+  async function prepararPython(){
+    if (py) return py;
+    dizer("Baixando o leitor do cardápio… (só na primeira vez)");
+    await esperar();
+    await new Promise(function(resolve, reject){
+      var s = document.createElement("script");
+      s.src = PYODIDE + "pyodide.js";
+      s.onload = resolve;
+      s.onerror = function(){ reject(new Error("nao-baixou")); };
+      document.head.appendChild(s);
+    });
+    dizer("Abrindo o leitor…");
+    await esperar();
+    py = await loadPyodide({ indexURL: PYODIDE });
+
+    dizer("Carregando as regras do cardápio…");
+    await esperar();
+    // Os modulos vem do proprio site, ao lado desta pagina: e o mesmo
+    // `apetit/` do repositorio, copiado na hora de publicar.
+    py.FS.mkdir("/apetit");
+    for (var i = 0; i < MODULOS.length; i++){
+      var nome = MODULOS[i];
+      var resp = await fetch("apetit/" + nome + ".py");
+      if (!resp.ok) throw new Error("faltou-modulo:" + nome);
+      py.FS.writeFile("/apetit/" + nome + ".py", await resp.text());
+    }
+    py.FS.writeFile("/apetit/__init__.py", "");
+    py.runPython("import sys; sys.path.insert(0, '/')");
+    py.runPython(PREPARO);
+    return py;
+  }
+
+  // O que roda do lado do Python. E o importador de verdade contra um banco
+  // que evapora: nenhuma regra e reescrita aqui, nem a de ler, nem a de
+  // validar, nem a de agrupar a fila do nutricionista.
+  var PREPARO = [
+    "import json",
+    "from apetit.csv_import import read_rows",
+    "from apetit.preflight import decidir",
+    "",
+    "def _texto(dados):",
+    "    # Export do Windows costuma vir em latin-1, como no import pelo terminal.",
+    "    try:",
+    "        return bytes(dados).decode('utf-8-sig')",
+    "    except UnicodeDecodeError:",
+    "        return bytes(dados).decode('latin-1')",
+    "",
+    "def conferir(dados, unidade, refeicao, mes, ano):",
+    "    linhas = read_rows(_texto(dados))",
+    "    r = decidir(linhas, unit=unidade, meal=refeicao,",
+    "                batch='conferencia', month=mes or None, year=ano or None)",
+    "    por_dia = {}",
+    "    for e in r.published:",
+    "        d = por_dia.setdefault(e.service_date, {'itens': 0, 'sem_macro': 0, 'categorias': set()})",
+    "        d['itens'] += 1",
+    "        d['categorias'].add(e.category)",
+    "        if not e.item.nutrition.complete:",
+    "            d['sem_macro'] += 1",
+    "    dias = [{'data': k, 'itens': v['itens'], 'sem_macro': v['sem_macro'],",
+    "             'categorias': len(v['categorias'])} for k, v in sorted(por_dia.items())]",
+    "    achados = []",
+    "    for issue, vezes, datas in r.grouped_issues():",
+    "        achados.append({'bloqueio': issue.blocking, 'codigo': issue.code,",
+    "                        'item': issue.item_name or issue.category or '',",
+    "                        'detalhe': issue.detail, 'vezes': vezes,",
+    "                        'primeira': datas[0] if datas else ''})",
+    "    return json.dumps({",
+    "        'publicados': len(r.published),",
+    "        'bloqueados': len(r.blocked),",
+    "        'dias': dias,",
+    "        'achados': achados,",
+    "        'resumo': r.summary(),",
+    "        'sem_macro': sum(d['sem_macro'] for d in dias),",
+    "    }, ensure_ascii=False)",
+  ].join("\n");
+
+  async function conferir(arquivo){
+    saida.hidden = true;
+    saida.textContent = "";
+    carregando.hidden = false;
+    try {
+      var python = await prepararPython();
+      dizer("Lendo " + arquivo.name + "…");
+      await esperar();
+      var bytes = new Uint8Array(await arquivo.arrayBuffer());
+      var conferir_py = python.globals.get("conferir");
+      var bruto = conferir_py(
+        bytes,
+        document.getElementById("unidade").value.trim(),
+        document.getElementById("refeicao").value,
+        Number(document.getElementById("mes").value) || 0,
+        Number(document.getElementById("ano").value) || 0
+      );
+      conferir_py.destroy();
+      mostrar(arquivo.name, JSON.parse(bruto));
+    } catch (erro) {
+      falhou(erro);
+    } finally {
+      carregando.hidden = true;
+    }
+  }
+
+  function el(tag, classe, texto){
+    var n = document.createElement(tag);
+    if (classe) n.className = classe;
+    if (texto != null) n.textContent = texto;
+    return n;
+  }
+
+  function achado(classe, tag, titulo, detalhe, onde){
+    var n = el("div", "achado " + classe);
+    n.appendChild(el("span", "tag", tag));
+    var corpo = el("div");
+    corpo.appendChild(el("b", "", titulo));
+    corpo.appendChild(document.createTextNode(" " + detalhe));
+    if (onde) corpo.appendChild(el("span", "onde", onde));
+    n.appendChild(corpo);
+    return n;
+  }
+
+  function dataLonga(iso){
+    var p = String(iso).split("-");
+    if (p.length !== 3) return iso;
+    var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    if (!isFinite(d.getTime())) return iso;
+    return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit",
+                                           month: "long", timeZone: "UTC" });
+  }
+
+  function fimDeSemana(iso){
+    var p = String(iso).split("-");
+    if (p.length !== 3) return false;
+    var dia = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay();
+    return dia === 0 || dia === 6;
+  }
+
+  function mostrar(nome, r){
+    saida.textContent = "";
+    saida.hidden = false;
+    saida.dataset.publicados = r.publicados;
+    saida.dataset.bloqueados = r.bloqueados;
+    saida.dataset.dias = r.dias.length;
+
+    saida.appendChild(el("h2", "", "O que o app publicaria"));
+    saida.appendChild(el("p", "", nome));
+
+    if (!r.publicados){
+      saida.appendChild(achado("blk", "nada",
+        "Não consegui publicar nenhum item deste arquivo.",
+        "Confira os achados abaixo. Se o arquivo estiver certo, mande-o para o bot: ele lê "
+        + ".xlsx também, e esta página lê só .csv."));
+    }
+
+    var numeros = el("div", "numeros");
+    [[r.publicados, "itens publicados", r.publicados ? "bom" : "ruim"],
+     [r.dias.length, r.dias.length === 1 ? "dia no arquivo" : "dias no arquivo", ""],
+     [r.bloqueados, "bloqueados por erro na ficha", r.bloqueados ? "ruim" : "bom"],
+     [r.sem_macro, "sem informação nutricional", r.sem_macro ? "atencao" : "bom"]
+    ].forEach(function(n){
+      var c = el("div", "numero " + (n[2] || ""));
+      c.appendChild(el("b", "", String(n[0])));
+      c.appendChild(el("span", "", n[1]));
+      numeros.appendChild(c);
+    });
+    saida.appendChild(numeros);
+
+    if (r.dias.length){
+      saida.appendChild(el("h2", "", "Os dias que o app entendeu"));
+      saida.appendChild(el("p", "",
+        "Confira as datas antes de publicar. É aqui que aparece o erro mais comum: "
+        + "a planilha traz só o número do dia, e o mês vem de fora."));
+      var caixa = el("div", "rolagem");
+      var t = el("table");
+      var cab = el("tr");
+      ["Data", "Itens", "Categorias", "Sem macro"].forEach(function(x){
+        cab.appendChild(el("th", "", x));
+      });
+      t.appendChild(cab);
+      var temFimDeSemana = false;
+      r.dias.forEach(function(d){
+        var linha = el("tr");
+        var quando = dataLonga(d.data);
+        if (fimDeSemana(d.data)){ temFimDeSemana = true; quando += " · fim de semana"; }
+        linha.appendChild(el("td", "", quando));
+        linha.appendChild(el("td", "num", String(d.itens)));
+        linha.appendChild(el("td", "num", String(d.categorias)));
+        linha.appendChild(el("td", "num", String(d.sem_macro)));
+        t.appendChild(linha);
+      });
+      caixa.appendChild(t);
+      saida.appendChild(caixa);
+      if (temFimDeSemana){
+        var aviso = achado("wrn", "datas",
+          "Tem dia caindo em fim de semana.",
+          "Os dias vêm da planilha, então o que costuma estar errado é o mês ou o ano. "
+          + "Existe refeitório que serve no fim de semana — só confira.");
+        aviso.style.marginTop = "12px";
+        saida.appendChild(aviso);
+      }
+    }
+
+    saida.appendChild(el("h2", "", "Para a revisão do nutricionista"));
+    if (!r.achados.length){
+      saida.appendChild(achado("okk", "limpo", "Nenhum problema encontrado.",
+        "O arquivo está pronto para publicar."));
+    } else {
+      r.achados.forEach(function(a){
+        var onde = a.vezes > 1 ? a.vezes + "× no período, a primeira em " + dataLonga(a.primeira)
+                 : (a.primeira ? dataLonga(a.primeira) : "");
+        saida.appendChild(achado(
+          a.bloqueio ? "blk" : "wrn",
+          a.bloqueio ? "bloqueio" : "aviso",
+          a.item || "(cardápio)", a.detalhe, onde));
+      });
+      saida.appendChild(el("p", "",
+        "Item bloqueado não é publicado: ele vai para a fila de revisão com o motivo. "
+        + "Num app que orienta funcionário, macro errado vira orientação errada."));
+    }
+
+    saida.appendChild(el("h2", "", "Deu certo. E agora?"));
+    var fim = el("div", "cartao");
+    fim.appendChild(el("p", "forte",
+      "Esta página só confere — ela não publica. Para publicar, mande este mesmo arquivo "
+      + "para o bot da Apetit no Telegram: ele mostra as datas de novo e espera a sua "
+      + "confirmação antes de qualquer coisa ir para o ar."));
+    fim.appendChild(el("p", "",
+      "Reenviar o mesmo período substitui o que já estava publicado — é assim que se "
+      + "corrige uma semana."));
+    saida.appendChild(fim);
+
+    var bruto = document.createElement("details");
+    bruto.style.marginTop = "14px";
+    bruto.appendChild(el("summary", "", "Ver o relatório como o terminal imprime"));
+    var pre = el("pre");
+    pre.style.cssText = "overflow-x:auto;background:var(--card);border:1px solid var(--linha);"
+      + "border-radius:14px;padding:14px;font-size:12.5px;line-height:1.6";
+    pre.textContent = r.resumo;
+    bruto.appendChild(pre);
+    saida.appendChild(bruto);
+  }
+
+  function falhou(erro){
+    saida.textContent = "";
+    saida.hidden = false;
+    var motivo = String((erro && erro.message) || erro);
+    if (motivo.indexOf("nao-baixou") >= 0){
+      saida.appendChild(achado("blk", "sem rede",
+        "Não consegui baixar o leitor do cardápio.",
+        "Esta página precisa de internet na primeira vez que confere um arquivo. "
+        + "Tente de novo, ou mande o arquivo direto para o bot."));
+      return;
+    }
+    if (motivo.indexOf("faltou-modulo") >= 0){
+      saida.appendChild(achado("blk", "incompleto",
+        "Faltou um arquivo do próprio site (" + motivo.split(":")[1] + ").",
+        "A publicação da página saiu sem as regras do cardápio. Avise quem cuida do repositório."));
+      return;
+    }
+    saida.appendChild(achado("blk", "erro",
+      "Não consegui ler esse arquivo.",
+      "Confira se é mesmo o CSV do cardápio. Detalhe técnico: " + motivo));
+  }
+})();
+</script>
+</body>
+</html>
