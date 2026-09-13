@@ -68,7 +68,7 @@ def alvo_de(pessoa: Employee, ficha: Prescription | None = None,
     alvos diferentes.
     """
     if ficha is None and conn is not None:
-        ficha = load_prescription(conn, pessoa.telegram_id)
+        ficha = load_prescription(conn, pessoa.pessoa_id)
     alvo = dict(TARGETS.get(pessoa.goal, TARGET_PADRAO))
     if ficha and ficha.tem_alvo and not ficha.implausivel():
         alvo.update(ficha.alvo_almoco())
@@ -96,7 +96,7 @@ def cardapio_de(conn: sqlite3.Connection, pessoa: Employee, dia: str) -> list[di
     um risco de reacao alergica, e tratar como alergia encheria o cardapio de
     aviso onde nao ha perigo nenhum.
     """
-    ficha = load_prescription(conn, pessoa.telegram_id)
+    ficha = load_prescription(conn, pessoa.pessoa_id)
     evitar = list(dict.fromkeys(pessoa.avoid_foods + (ficha.proibidos if ficha else [])))
     return check_menu_for_employee(
         conn, dia, pessoa.restrictions,

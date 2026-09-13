@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS menu_item_allergen (
 );
 
 CREATE TABLE IF NOT EXISTS employee (
-    telegram_id INTEGER PRIMARY KEY,
+    pessoa_id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     apetit_unit TEXT NOT NULL DEFAULT '',
     client_company TEXT NOT NULL DEFAULT '',
@@ -85,7 +85,7 @@ CREATE INDEX IF NOT EXISTS idx_employee_org ON employee (client_company, sector)
 -- repartido perderia a informacao de que a ficha era do dia inteiro, e a
 -- proxima leitura nao saberia mais conferir.
 CREATE TABLE IF NOT EXISTS employee_prescription (
-    telegram_id INTEGER PRIMARY KEY REFERENCES employee(telegram_id),
+    pessoa_id INTEGER PRIMARY KEY REFERENCES employee(pessoa_id),
     kcal REAL,
     ptn_g REAL,
     cho_g REAL,
@@ -99,18 +99,18 @@ CREATE TABLE IF NOT EXISTS employee_prescription (
 );
 
 CREATE TABLE IF NOT EXISTS employee_prescription_term (
-    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
     term TEXT NOT NULL,
     kind TEXT NOT NULL DEFAULT 'proibido',
-    PRIMARY KEY (telegram_id, term, kind)
+    PRIMARY KEY (pessoa_id, term, kind)
 );
 
 CREATE TABLE IF NOT EXISTS employee_restriction (
-    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
     allergen_code TEXT NOT NULL,
     kind TEXT NOT NULL DEFAULT 'alergia',
     created_at TEXT NOT NULL,
-    PRIMARY KEY (telegram_id, allergen_code)
+    PRIMARY KEY (pessoa_id, allergen_code)
 );
 
 -- Alergia que a pessoa escreveu e o app nao sabe conferir ("legumes",
@@ -118,11 +118,11 @@ CREATE TABLE IF NOT EXISTS employee_restriction (
 -- kind separa o que e alergia (avisa sempre que houver duvida) do que a
 -- pessoa so prefere evitar (avisa so quando aparece no nome do prato).
 CREATE TABLE IF NOT EXISTS employee_free_restriction (
-    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
     term TEXT NOT NULL,
     kind TEXT NOT NULL DEFAULT 'alergia',
     created_at TEXT NOT NULL,
-    PRIMARY KEY (telegram_id, term)
+    PRIMARY KEY (pessoa_id, term)
 );
 
 -- Historico do funcionario. Guarda **fotografia**, nao ponteiro: nome,
@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS employee_free_restriction (
 -- porque um item pode sair do cardapio sem apagar a historia de quem comeu.
 CREATE TABLE IF NOT EXISTS consumption (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id INTEGER NOT NULL,
+    pessoa_id INTEGER NOT NULL,
     service_date TEXT NOT NULL,
     meal TEXT NOT NULL DEFAULT 'almoco',
     item_code TEXT NOT NULL,
@@ -147,19 +147,19 @@ CREATE TABLE IF NOT EXISTS consumption (
     source TEXT NOT NULL DEFAULT 'montado',
     logged_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_consumption_pessoa ON consumption (telegram_id, service_date);
+CREATE INDEX IF NOT EXISTS idx_consumption_pessoa ON consumption (pessoa_id, service_date);
 
 -- Avaliacao do refeitorio. Unica parte do app cujo dado existe para a Apetit
 -- ler, e por isso a unica em que reidentificacao vira risco de retaliacao.
 --
 -- Nao ha empresa nem setor aqui de proposito: a avaliacao e sobre o refeitorio,
 -- e guardar o setor criaria o cruzamento que aponta para uma pessoa ("a unica
--- da manutencao que almocou terca"). telegram_id existe so para uma avaliacao
+-- da manutencao que almocou terca"). pessoa_id existe so para uma avaliacao
 -- por dia, para a pessoa rever a propria e para a exclusao a pedido dela —
 -- nenhuma leitura para a gestao seleciona esse campo.
 CREATE TABLE IF NOT EXISTS service_rating (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id INTEGER NOT NULL,
+    pessoa_id INTEGER NOT NULL,
     apetit_unit TEXT NOT NULL,
     service_date TEXT NOT NULL,
     meal TEXT NOT NULL DEFAULT 'almoco',
@@ -168,7 +168,7 @@ CREATE TABLE IF NOT EXISTS service_rating (
     missing_something INTEGER NOT NULL DEFAULT 0,
     comment TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
-    UNIQUE (telegram_id, service_date, meal)
+    UNIQUE (pessoa_id, service_date, meal)
 );
 CREATE INDEX IF NOT EXISTS idx_rating_unidade ON service_rating (apetit_unit, service_date);
 
@@ -179,58 +179,58 @@ CREATE TABLE IF NOT EXISTS service_rating_tag (
 );
 
 CREATE TABLE IF NOT EXISTS favorite (
-    telegram_id INTEGER NOT NULL,
+    pessoa_id INTEGER NOT NULL,
     item_code TEXT NOT NULL REFERENCES menu_item(code),
     created_at TEXT NOT NULL,
-    PRIMARY KEY (telegram_id, item_code)
+    PRIMARY KEY (pessoa_id, item_code)
 );
 
 -- O almoco que o nutricionista prescreveu, alimento por alimento, na medida
 -- que ele escreveu. Fica separado de employee_prescription porque e outra
 -- natureza de ficha: aquela da alvo numerico, esta da lista de alimentos.
 CREATE TABLE IF NOT EXISTS employee_plan_item (
-    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
     posicao INTEGER NOT NULL,
     nome TEXT NOT NULL,
     quantidade REAL,
     medida TEXT NOT NULL DEFAULT '',
     peso TEXT NOT NULL DEFAULT '',
-    PRIMARY KEY (telegram_id, posicao)
+    PRIMARY KEY (pessoa_id, posicao)
 );
 
 -- Quais avisos a pessoa aceita receber. A ausencia de linha vale como o
 -- padrao de apetit/nudges.py, entao quem nunca abriu /avisos nao fica sem
 -- resumo nem passa a receber lembrete que nao pediu.
 CREATE TABLE IF NOT EXISTS employee_notification (
-    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
     kind TEXT NOT NULL,
     enabled INTEGER NOT NULL,
     updated_at TEXT NOT NULL,
-    PRIMARY KEY (telegram_id, kind)
+    PRIMARY KEY (pessoa_id, kind)
 );
 
 -- Marca o envio por periodo, nao por data: assim reiniciar o bot no meio do dia
 -- nao reenvia o resumo que ja saiu, e a chave primaria torna o reenvio
 -- impossivel em vez de improvavel.
 CREATE TABLE IF NOT EXISTS notification_sent (
-    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
     kind TEXT NOT NULL,
     period TEXT NOT NULL,
     sent_at TEXT NOT NULL,
-    PRIMARY KEY (telegram_id, kind, period)
+    PRIMARY KEY (pessoa_id, kind, period)
 );
 
 -- A restricao unica e o que torna a pontuacao idempotente: reavaliar o mesmo
 -- dia nao concede pontos de novo.
 CREATE TABLE IF NOT EXISTS points_event (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id INTEGER NOT NULL,
+    pessoa_id INTEGER NOT NULL,
     rule_code TEXT NOT NULL,
     points INTEGER NOT NULL,
     reference_date TEXT NOT NULL,
     detail TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
-    UNIQUE (telegram_id, rule_code, reference_date)
+    UNIQUE (pessoa_id, rule_code, reference_date)
 );
 """
 
@@ -304,7 +304,40 @@ def _migrate_consumption_snapshot(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_pessoa_id(conn: sqlite3.Connection) -> list[str]:
+    """Renomeia `telegram_id` para `pessoa_id` num banco que ja existe.
+
+    A coluna se chamava assim porque o Telegram era quem identificava a pessoa.
+    Saindo o Telegram, o nome virou mentira — do tipo que faz alguem procurar um
+    chat que nao existe, ou achar que a coluna guarda um id de rede social.
+
+    Roda **antes** do `CREATE TABLE IF NOT EXISTS`: se o esquema novo fosse
+    aplicado primeiro, as tabelas antigas continuariam com a coluna velha (o
+    `IF NOT EXISTS` nao mexe em tabela existente) e toda consulta quebraria com
+    "no such column: pessoa_id" — num banco cheio de gente cadastrada.
+
+    O `RENAME COLUMN` do SQLite atualiza tambem as clausulas `REFERENCES` que
+    apontam para a coluna renomeada, entao as chaves estrangeiras continuam de
+    pe sem tocar em dado nenhum. Banco novo nao entra aqui: sem tabela, nao ha o
+    que renomear.
+    """
+    renomeadas = []
+    tabelas = [
+        linha["name"]
+        for linha in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    ]
+    for tabela in tabelas:
+        colunas = {linha["name"] for linha in conn.execute(f"PRAGMA table_info({tabela})")}
+        if "telegram_id" in colunas and "pessoa_id" not in colunas:
+            conn.execute(f"ALTER TABLE {tabela} RENAME COLUMN telegram_id TO pessoa_id")
+            renomeadas.append(tabela)
+    if renomeadas:
+        conn.commit()
+    return renomeadas
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
+    _migrate_pessoa_id(conn)
     _migrate_consumption_snapshot(conn)
     conn.executescript(SCHEMA)
     conn.commit()

@@ -376,23 +376,23 @@ def lunch_from_plan(plano: dict[str, list[ItemPlano]]) -> list[ItemPlano]:
     return []
 
 
-def save_plan_lunch(conn, telegram_id: int, itens: list[ItemPlano]) -> None:
+def save_plan_lunch(conn, pessoa_id: int, itens: list[ItemPlano]) -> None:
     """Guarda o almoco prescrito. Como sempre, o documento nao entra."""
-    conn.execute("DELETE FROM employee_plan_item WHERE telegram_id = ?", (telegram_id,))
+    conn.execute("DELETE FROM employee_plan_item WHERE pessoa_id = ?", (pessoa_id,))
     for posicao, item in enumerate(itens):
         conn.execute(
-            "INSERT INTO employee_plan_item (telegram_id, posicao, nome, quantidade, medida, peso) "
+            "INSERT INTO employee_plan_item (pessoa_id, posicao, nome, quantidade, medida, peso) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            (telegram_id, posicao, item.nome, item.quantidade, item.medida, item.peso),
+            (pessoa_id, posicao, item.nome, item.quantidade, item.medida, item.peso),
         )
     conn.commit()
 
 
-def load_plan_lunch(conn, telegram_id: int) -> list[ItemPlano]:
+def load_plan_lunch(conn, pessoa_id: int) -> list[ItemPlano]:
     linhas = conn.execute(
         "SELECT nome, quantidade, medida, peso FROM employee_plan_item "
-        "WHERE telegram_id = ? ORDER BY posicao",
-        (telegram_id,),
+        "WHERE pessoa_id = ? ORDER BY posicao",
+        (pessoa_id,),
     ).fetchall()
     return [
         ItemPlano(nome=l["nome"], quantidade=l["quantidade"], medida=l["medida"], peso=l["peso"])
@@ -400,12 +400,12 @@ def load_plan_lunch(conn, telegram_id: int) -> list[ItemPlano]:
     ]
 
 
-def delete_plan_lunch(conn, telegram_id: int) -> None:
-    conn.execute("DELETE FROM employee_plan_item WHERE telegram_id = ?", (telegram_id,))
+def delete_plan_lunch(conn, pessoa_id: int) -> None:
+    conn.execute("DELETE FROM employee_plan_item WHERE pessoa_id = ?", (pessoa_id,))
     conn.commit()
 
 
-def save_prescription(conn, telegram_id: int, ficha: Prescription) -> None:
+def save_prescription(conn, pessoa_id: int, ficha: Prescription) -> None:
     """Guarda os numeros confirmados. O documento nao entra no banco."""
     from datetime import UTC, datetime
 
@@ -413,11 +413,11 @@ def save_prescription(conn, telegram_id: int, ficha: Prescription) -> None:
     conn.execute(
         """
         INSERT INTO employee_prescription (
-            telegram_id, kcal, ptn_g, cho_g, lip_g, escopo, fracao_almoco,
+            pessoa_id, kcal, ptn_g, cho_g, lip_g, escopo, fracao_almoco,
             profissional, fonte, confirmada_em, updated_at
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(telegram_id) DO UPDATE SET
+        ON CONFLICT(pessoa_id) DO UPDATE SET
             kcal = excluded.kcal, ptn_g = excluded.ptn_g,
             cho_g = excluded.cho_g, lip_g = excluded.lip_g,
             escopo = excluded.escopo, fracao_almoco = excluded.fracao_almoco,
@@ -425,34 +425,34 @@ def save_prescription(conn, telegram_id: int, ficha: Prescription) -> None:
             confirmada_em = excluded.confirmada_em, updated_at = excluded.updated_at
         """,
         (
-            telegram_id, ficha.kcal, ficha.ptn_g, ficha.cho_g, ficha.lip_g,
+            pessoa_id, ficha.kcal, ficha.ptn_g, ficha.cho_g, ficha.lip_g,
             ficha.escopo, ficha.fracao_almoco, ficha.profissional, ficha.fonte,
             ficha.confirmada_em or agora, agora,
         ),
     )
-    conn.execute("DELETE FROM employee_prescription_term WHERE telegram_id = ?", (telegram_id,))
+    conn.execute("DELETE FROM employee_prescription_term WHERE pessoa_id = ?", (pessoa_id,))
     for termo in dict.fromkeys(ficha.proibidos):
         conn.execute(
-            "INSERT INTO employee_prescription_term (telegram_id, term, kind) VALUES (?, ?, 'proibido')",
-            (telegram_id, termo),
+            "INSERT INTO employee_prescription_term (pessoa_id, term, kind) VALUES (?, ?, 'proibido')",
+            (pessoa_id, termo),
         )
     for termo in dict.fromkeys(ficha.recomendados):
         conn.execute(
-            "INSERT INTO employee_prescription_term (telegram_id, term, kind) VALUES (?, ?, 'recomendado')",
-            (telegram_id, termo),
+            "INSERT INTO employee_prescription_term (pessoa_id, term, kind) VALUES (?, ?, 'recomendado')",
+            (pessoa_id, termo),
         )
     conn.commit()
 
 
-def load_prescription(conn, telegram_id: int) -> Prescription | None:
+def load_prescription(conn, pessoa_id: int) -> Prescription | None:
     linha = conn.execute(
-        "SELECT * FROM employee_prescription WHERE telegram_id = ?", (telegram_id,)
+        "SELECT * FROM employee_prescription WHERE pessoa_id = ?", (pessoa_id,)
     ).fetchone()
     if not linha:
         return None
     termos = conn.execute(
-        "SELECT term, kind FROM employee_prescription_term WHERE telegram_id = ? ORDER BY term",
-        (telegram_id,),
+        "SELECT term, kind FROM employee_prescription_term WHERE pessoa_id = ? ORDER BY term",
+        (pessoa_id,),
     ).fetchall()
     return Prescription(
         kcal=linha["kcal"],
@@ -469,9 +469,9 @@ def load_prescription(conn, telegram_id: int) -> Prescription | None:
     )
 
 
-def delete_prescription(conn, telegram_id: int) -> None:
-    conn.execute("DELETE FROM employee_prescription_term WHERE telegram_id = ?", (telegram_id,))
-    conn.execute("DELETE FROM employee_prescription WHERE telegram_id = ?", (telegram_id,))
+def delete_prescription(conn, pessoa_id: int) -> None:
+    conn.execute("DELETE FROM employee_prescription_term WHERE pessoa_id = ?", (pessoa_id,))
+    conn.execute("DELETE FROM employee_prescription WHERE pessoa_id = ?", (pessoa_id,))
     conn.commit()
 
 

@@ -134,10 +134,10 @@ def pilot_report(
 
     uso = conn.execute(
         """
-        SELECT telegram_id, COUNT(DISTINCT service_date) AS dias, SUM(quantity) AS itens
+        SELECT pessoa_id, COUNT(DISTINCT service_date) AS dias, SUM(quantity) AS itens
         FROM consumption
         WHERE service_date BETWEEN ? AND ?
-        GROUP BY telegram_id
+        GROUP BY pessoa_id
         """,
         (inicio, fim),
     ).fetchall()
@@ -170,9 +170,9 @@ def pilot_report(
     rel.itens_cardapio, rel.itens_sem_macro, rel.itens_sem_alergenico = _qualidade_do_dado(conn)
     rel.pessoas_com_restricao = conn.execute(
         """
-        SELECT COUNT(DISTINCT telegram_id) AS t FROM (
-            SELECT telegram_id FROM employee_restriction
-            UNION SELECT telegram_id FROM employee_free_restriction
+        SELECT COUNT(DISTINCT pessoa_id) AS t FROM (
+            SELECT pessoa_id FROM employee_restriction
+            UNION SELECT pessoa_id FROM employee_free_restriction
         )
         """
     ).fetchone()["t"]
@@ -185,23 +185,23 @@ def pilot_report(
 def _uso_por_funcao(conn: sqlite3.Connection, inicio: str, fim: str) -> list[Funcao]:
     consultas = [
         ("Registrar a refeição",
-         "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM consumption WHERE service_date BETWEEN ? AND ?",
+         "SELECT COUNT(DISTINCT pessoa_id) p, COUNT(*) u FROM consumption WHERE service_date BETWEEN ? AND ?",
          (inicio, fim)),
         ("Seguir a sugestão de porção",
-         "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM consumption "
+         "SELECT COUNT(DISTINCT pessoa_id) p, COUNT(*) u FROM consumption "
          "WHERE source = 'sugestao' AND service_date BETWEEN ? AND ?",
          (inicio, fim)),
         ("Avaliar o refeitório",
-         "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM service_rating WHERE service_date BETWEEN ? AND ?",
+         "SELECT COUNT(DISTINCT pessoa_id) p, COUNT(*) u FROM service_rating WHERE service_date BETWEEN ? AND ?",
          (inicio, fim)),
         # `created_at`/`updated_at` sao timestamp ISO completo; o corte usa so a
         # data para o periodo pedido valer igual ao das consultas de cima.
         ("Guardar favorito",
-         "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM favorite "
+         "SELECT COUNT(DISTINCT pessoa_id) p, COUNT(*) u FROM favorite "
          "WHERE substr(created_at, 1, 10) BETWEEN ? AND ?",
          (inicio, fim)),
         ("Ficha nutricional",
-         "SELECT COUNT(DISTINCT telegram_id) p, COUNT(*) u FROM employee_prescription "
+         "SELECT COUNT(DISTINCT pessoa_id) p, COUNT(*) u FROM employee_prescription "
          "WHERE substr(updated_at, 1, 10) BETWEEN ? AND ?",
          (inicio, fim)),
     ]
@@ -249,7 +249,7 @@ def daily_activity(conn: sqlite3.Connection, desde: str = "", ate: str = "") -> 
     return [
         (l["service_date"], l["pessoas"])
         for l in conn.execute(
-            "SELECT service_date, COUNT(DISTINCT telegram_id) AS pessoas FROM consumption "
+            "SELECT service_date, COUNT(DISTINCT pessoa_id) AS pessoas FROM consumption "
             "WHERE service_date BETWEEN ? AND ? GROUP BY service_date ORDER BY service_date",
             (inicio, fim),
         ).fetchall()

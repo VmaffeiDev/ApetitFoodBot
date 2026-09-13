@@ -157,7 +157,7 @@ def autorizar(conn: sqlite3.Connection, email: str, unidade: str = "") -> int:
     """Poe um e-mail na lista e devolve o id da pessoa. Chamar de novo nao duplica.
 
     O id nao e sequencial a partir de 1: ele nasce acima de tudo que o banco ja
-    usa, inclusive dos `telegram_id` antigos. Sequencial simples poderia cair em
+    usa, inclusive dos `pessoa_id` antigos. Sequencial simples poderia cair em
     cima de um id de Telegram baixo e emendar o historico de duas pessoas — o
     tipo de defeito que aparece como "meu app diz que eu nao posso comer ovo"
     seis meses depois. Aqui a colisao e impossivel por construcao, e nao
@@ -172,7 +172,7 @@ def autorizar(conn: sqlite3.Connection, email: str, unidade: str = "") -> int:
         return int(ja["pessoa_id"])
 
     usados = [0]
-    for tabela, coluna in (("pessoa_email", "pessoa_id"), ("employee", "telegram_id")):
+    for tabela, coluna in (("pessoa_email", "pessoa_id"), ("employee", "pessoa_id")):
         existe = conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (tabela,)
         ).fetchone()

@@ -40,10 +40,10 @@ class BancoBase(unittest.TestCase):
         self.conn.close()
         Path(self.tmp.name).unlink(missing_ok=True)
 
-    def avaliar(self, telegram_id, dia, food=3, service=3, missing=False, tags=(), comment="", unit="SM"):
+    def avaliar(self, pessoa_id, dia, food=3, service=3, missing=False, tags=(), comment="", unit="SM"):
         save_rating(
             self.conn,
-            telegram_id,
+            pessoa_id,
             Rating(
                 apetit_unit=unit,
                 service_date=dia,
@@ -132,7 +132,7 @@ class NaoIdentificaQuemRespondeuTest(BancoBase):
 
         relatorio = unit_report(self.conn, "SM", "2025-09-01", "2025-09-30")
 
-        self.assertNotIn("telegram_id", vars(relatorio))
+        self.assertNotIn("pessoa_id", vars(relatorio))
         self.assertFalse(any("telegram" in str(v).lower() for v in vars(relatorio).values()))
 
     def test_a_small_sample_is_suppressed(self):
@@ -177,7 +177,7 @@ class NaoIdentificaQuemRespondeuTest(BancoBase):
     def test_deleting_my_data_removes_my_ratings(self):
         save_employee(
             self.conn,
-            Employee(telegram_id=1, name="X", apetit_unit="SM", client_company="Y", sector="Z", consent_accepted=True),
+            Employee(pessoa_id=1, name="X", apetit_unit="SM", client_company="Y", sector="Z", consent_accepted=True),
         )
         self.avaliar(1, "2025-09-01", tags=["acabou"], comment="algo")
 

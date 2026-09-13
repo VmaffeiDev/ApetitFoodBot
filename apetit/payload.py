@@ -40,7 +40,7 @@ from .tracking import history_by_day, log_consumption, score_day, total_points
 # e a montagem precisa voltar a ser uma pergunta ao servidor.
 LIMITE_MONTAGENS = 4096
 
-# Um `telegram_id` so para calcular pontuacao. E negativo porque o Telegram
+# Um `pessoa_id` so para calcular pontuacao. E negativo porque o Telegram
 # nunca emite id negativo para pessoa — ninguem colide com ele.
 CALCULADORA = -1
 
@@ -68,7 +68,7 @@ def _banco_de_calculo(conn: sqlite3.Connection, unidade: str, dia: str, refeicao
             marcas = ", ".join("?" * len(valores))
             calculo.execute(f"INSERT OR REPLACE INTO {tabela} ({colunas}) VALUES ({marcas})", valores)
     save_employee(calculo, Employee(
-        telegram_id=CALCULADORA, name="calculo", apetit_unit=unidade,
+        pessoa_id=CALCULADORA, name="calculo", apetit_unit=unidade,
         client_company="", sector="", goal=next(iter(TARGETS)), consent_accepted=True,
     ))
     calculo.commit()
@@ -76,9 +76,9 @@ def _banco_de_calculo(conn: sqlite3.Connection, unidade: str, dia: str, refeicao
 
 
 def _limpar(conn: sqlite3.Connection, dia: str) -> None:
-    conn.execute("DELETE FROM consumption WHERE telegram_id = ? AND service_date = ?",
+    conn.execute("DELETE FROM consumption WHERE pessoa_id = ? AND service_date = ?",
                  (CALCULADORA, dia))
-    conn.execute("DELETE FROM points_event WHERE telegram_id = ? AND reference_date = ?",
+    conn.execute("DELETE FROM points_event WHERE pessoa_id = ? AND reference_date = ?",
                  (CALCULADORA, dia))
     conn.commit()
 

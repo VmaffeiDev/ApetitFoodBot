@@ -2654,7 +2654,8 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     tela.appendChild(cabeca);
 
     secao("Dados pessoais");
-    // Nao ha e-mail: o app fala por Telegram e nunca pediu endereco nenhum.
+    // Sem e-mail aqui: o cadastro do aparelho nao pede endereco. Ele existe do
+    // outro lado, para entrar no app, que e outra coisa.
     // Campo que o cadastro nao coleta nao vira linha vazia na tela.
     if (cadastroSalvo()){
       var pessoais = el("div", "pilha");

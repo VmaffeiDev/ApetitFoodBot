@@ -75,7 +75,7 @@ def preparar_banco(caminho: Path, receitas: Path | None = None) -> None:
     )
 
     save_employee(conn, Employee(
-        telegram_id=USUARIO, name="Mariana", apetit_unit="SM",
+        pessoa_id=USUARIO, name="Mariana", apetit_unit="SM",
         client_company="Industria Exemplo", sector="Producao",
         goal="Manter o equilibrio", consent_accepted=True,
         restrictions=[Restriction("ovos"), Restriction("leite")],
@@ -97,7 +97,7 @@ def preparar_banco(caminho: Path, receitas: Path | None = None) -> None:
     # funcionario, e o relatorio continua sem citar nenhuma delas.
     for i in range(15):
         save_employee(conn, Employee(
-            telegram_id=900_001 + i, name=f"Teste {i}", apetit_unit="SM",
+            pessoa_id=900_001 + i, name=f"Teste {i}", apetit_unit="SM",
             client_company="Industria Exemplo", sector="Producao" if i % 2 else "Logistica",
             goal="Comer mais leve" if i % 3 else "Manter o equilibrio", consent_accepted=True,
         ))

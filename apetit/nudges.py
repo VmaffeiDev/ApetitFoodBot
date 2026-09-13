@@ -53,48 +53,48 @@ def now_iso() -> str:
 class Nudge:
     """Uma mensagem pronta para uma pessoa. O bot so entrega."""
 
-    telegram_id: int
+    pessoa_id: int
     kind: str
     period: str
     text: str
 
 
-def notification_settings(conn: sqlite3.Connection, telegram_id: int) -> dict[str, bool]:
+def notification_settings(conn: sqlite3.Connection, pessoa_id: int) -> dict[str, bool]:
     escolhas = dict(PADRAO)
     for linha in conn.execute(
-        "SELECT kind, enabled FROM employee_notification WHERE telegram_id = ?", (telegram_id,)
+        "SELECT kind, enabled FROM employee_notification WHERE pessoa_id = ?", (pessoa_id,)
     ).fetchall():
         escolhas[linha["kind"]] = bool(linha["enabled"])
     return escolhas
 
 
-def set_notification(conn: sqlite3.Connection, telegram_id: int, kind: str, enabled: bool) -> None:
+def set_notification(conn: sqlite3.Connection, pessoa_id: int, kind: str, enabled: bool) -> None:
     if kind not in PADRAO:
         raise ValueError(f"Aviso desconhecido: {kind}")
     conn.execute(
         """
-        INSERT INTO employee_notification (telegram_id, kind, enabled, updated_at)
+        INSERT INTO employee_notification (pessoa_id, kind, enabled, updated_at)
         VALUES (?, ?, ?, ?)
-        ON CONFLICT(telegram_id, kind) DO UPDATE SET
+        ON CONFLICT(pessoa_id, kind) DO UPDATE SET
             enabled = excluded.enabled, updated_at = excluded.updated_at
         """,
-        (telegram_id, kind, int(enabled), now_iso()),
+        (pessoa_id, kind, int(enabled), now_iso()),
     )
     conn.commit()
 
 
-def already_sent(conn: sqlite3.Connection, telegram_id: int, kind: str, period: str) -> bool:
+def already_sent(conn: sqlite3.Connection, pessoa_id: int, kind: str, period: str) -> bool:
     return conn.execute(
-        "SELECT 1 FROM notification_sent WHERE telegram_id = ? AND kind = ? AND period = ?",
-        (telegram_id, kind, period),
+        "SELECT 1 FROM notification_sent WHERE pessoa_id = ? AND kind = ? AND period = ?",
+        (pessoa_id, kind, period),
     ).fetchone() is not None
 
 
-def mark_sent(conn: sqlite3.Connection, telegram_id: int, kind: str, period: str) -> None:
+def mark_sent(conn: sqlite3.Connection, pessoa_id: int, kind: str, period: str) -> None:
     conn.execute(
-        "INSERT OR IGNORE INTO notification_sent (telegram_id, kind, period, sent_at) "
+        "INSERT OR IGNORE INTO notification_sent (pessoa_id, kind, period, sent_at) "
         "VALUES (?, ?, ?, ?)",
-        (telegram_id, kind, period, now_iso()),
+        (pessoa_id, kind, period, now_iso()),
     )
     conn.commit()
 
@@ -107,27 +107,27 @@ def week_start(day: str) -> str:
 def _quem_recebe(conn: sqlite3.Connection, kind: str) -> list[int]:
     """Cadastrados com consentimento que nao desligaram este aviso."""
     pessoas = [
-        linha["telegram_id"]
+        linha["pessoa_id"]
         for linha in conn.execute(
-            "SELECT telegram_id FROM employee WHERE consent_accepted = 1 ORDER BY telegram_id"
+            "SELECT pessoa_id FROM employee WHERE consent_accepted = 1 ORDER BY pessoa_id"
         ).fetchall()
     ]
     return [p for p in pessoas if notification_settings(conn, p).get(kind, False)]
 
 
-def _dias_registrados(conn: sqlite3.Connection, telegram_id: int, inicio: str, fim: str) -> int:
+def _dias_registrados(conn: sqlite3.Connection, pessoa_id: int, inicio: str, fim: str) -> int:
     return conn.execute(
         "SELECT COUNT(DISTINCT service_date) AS t FROM consumption "
-        "WHERE telegram_id = ? AND service_date BETWEEN ? AND ?",
-        (telegram_id, inicio, fim),
+        "WHERE pessoa_id = ? AND service_date BETWEEN ? AND ?",
+        (pessoa_id, inicio, fim),
     ).fetchone()["t"]
 
 
-def _conquistas_da_semana(conn: sqlite3.Connection, telegram_id: int, inicio: str, fim: str) -> list[str]:
+def _conquistas_da_semana(conn: sqlite3.Connection, pessoa_id: int, inicio: str, fim: str) -> list[str]:
     linhas = conn.execute(
         "SELECT DISTINCT rule_code FROM points_event "
-        "WHERE telegram_id = ? AND reference_date BETWEEN ? AND ? ORDER BY rule_code",
-        (telegram_id, inicio, fim),
+        "WHERE pessoa_id = ? AND reference_date BETWEEN ? AND ? ORDER BY rule_code",
+        (pessoa_id, inicio, fim),
     ).fetchall()
     return [RULES_BY_CODE[l["rule_code"]].label for l in linhas if l["rule_code"] in RULES_BY_CODE]
 
@@ -141,27 +141,27 @@ def weekly_nudges(conn: sqlite3.Connection, day: str) -> list[Nudge]:
     inicio = week_start(day)
     fim = day
     avisos = []
-    for telegram_id in _quem_recebe(conn, RESUMO_SEMANAL):
-        if already_sent(conn, telegram_id, RESUMO_SEMANAL, inicio):
+    for pessoa_id in _quem_recebe(conn, RESUMO_SEMANAL):
+        if already_sent(conn, pessoa_id, RESUMO_SEMANAL, inicio):
             continue
-        dias = _dias_registrados(conn, telegram_id, inicio, fim)
-        if dias == 0 and _abandonou(conn, telegram_id, inicio):
+        dias = _dias_registrados(conn, pessoa_id, inicio, fim)
+        if dias == 0 and _abandonou(conn, pessoa_id, inicio):
             continue  # ver regra 3 no topo do modulo
-        avisos.append(Nudge(telegram_id, RESUMO_SEMANAL, inicio, _texto_semanal(conn, telegram_id, inicio, fim, dias)))
+        avisos.append(Nudge(pessoa_id, RESUMO_SEMANAL, inicio, _texto_semanal(conn, pessoa_id, inicio, fim, dias)))
     return avisos
 
 
-def _abandonou(conn: sqlite3.Connection, telegram_id: int, inicio_semana: str) -> bool:
+def _abandonou(conn: sqlite3.Connection, pessoa_id: int, inicio_semana: str) -> bool:
     """Semanas seguidas sem registro nenhum, incluindo a que esta acabando."""
     comeco = date.fromisoformat(inicio_semana)
     limite = (comeco - timedelta(weeks=SEMANAS_ATE_CALAR - 1)).isoformat()
     fim = (comeco + timedelta(days=6)).isoformat()
-    return _dias_registrados(conn, telegram_id, limite, fim) == 0
+    return _dias_registrados(conn, pessoa_id, limite, fim) == 0
 
 
-def _texto_semanal(conn: sqlite3.Connection, telegram_id: int, inicio: str, fim: str, dias: int) -> str:
+def _texto_semanal(conn: sqlite3.Connection, pessoa_id: int, inicio: str, fim: str, dias: int) -> str:
     linhas = ["\U0001f4c8 <b>Sua semana</b>", "", week_summary(dias)]
-    conquistas = _conquistas_da_semana(conn, telegram_id, inicio, fim)
+    conquistas = _conquistas_da_semana(conn, pessoa_id, inicio, fim)
     if conquistas:
         linhas.append("")
         linhas.append("<b>Suas conquistas desta semana:</b>")
@@ -186,15 +186,15 @@ def lunch_nudges(conn: sqlite3.Connection, day: str) -> list[Nudge]:
     if date.fromisoformat(day).weekday() >= 5:
         return []  # fim de semana nao tem refeitorio
     avisos = []
-    for telegram_id in _quem_recebe(conn, LEMBRETE_ALMOCO):
-        if already_sent(conn, telegram_id, LEMBRETE_ALMOCO, day):
+    for pessoa_id in _quem_recebe(conn, LEMBRETE_ALMOCO):
+        if already_sent(conn, pessoa_id, LEMBRETE_ALMOCO, day):
             continue
-        if _dias_registrados(conn, telegram_id, day, day):
+        if _dias_registrados(conn, pessoa_id, day, day):
             continue
-        if not _tem_cardapio(conn, telegram_id, day):
+        if not _tem_cardapio(conn, pessoa_id, day):
             continue
         avisos.append(Nudge(
-            telegram_id, LEMBRETE_ALMOCO, day,
+            pessoa_id, LEMBRETE_ALMOCO, day,
             "\U0001f37d️ <b>Ja almocou?</b>\n\n"
             "Registrar leva dois toques e mantem o seu historico em dia.\n\n"
             "<i>Para nao receber mais: /avisos</i>",
@@ -202,9 +202,9 @@ def lunch_nudges(conn: sqlite3.Connection, day: str) -> list[Nudge]:
     return avisos
 
 
-def _tem_cardapio(conn: sqlite3.Connection, telegram_id: int, day: str) -> bool:
+def _tem_cardapio(conn: sqlite3.Connection, pessoa_id: int, day: str) -> bool:
     unidade = conn.execute(
-        "SELECT apetit_unit FROM employee WHERE telegram_id = ?", (telegram_id,)
+        "SELECT apetit_unit FROM employee WHERE pessoa_id = ?", (pessoa_id,)
     ).fetchone()
     if not unidade:
         return False

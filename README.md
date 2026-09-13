@@ -82,7 +82,7 @@ python scripts/autorizar.py --tirar alguem@empresa.com.br
 Testes:
 
 ```bash
-python -m unittest discover -s tests        # 393 testes
+python -m unittest discover -s tests        # 401 testes
 node scripts/conferir_fluxos.cjs            # 67 cenarios em jsdom
 python scripts/conferir_vereditos.py        # 8 alergias x 4 objetivos, num Chromium
 python scripts/conferir_fonte.py            # servidor x fotografia, e a data do cardapio
@@ -698,7 +698,7 @@ Quatro decisoes saem dai, todas com teste:
   refeitorio. Guardar o setor criaria exatamente o cruzamento que reidentifica
   ("a unica pessoa da manutencao que almocou terca"). Nao existe a coluna, entao
   nao ha como consultar por ali depois.
-- **Nenhuma leitura para a gestao seleciona `telegram_id`.** Ele existe na tabela
+- **Nenhuma leitura para a gestao seleciona `pessoa_id`.** Ele existe na tabela
   so para tres coisas: uma avaliacao por dia, a pessoa poder rever e trocar a
   propria, e a exclusao total quando ela pedir.
 - **Abaixo de 5 avaliacoes no periodo, o recorte e suprimido** — media de tres

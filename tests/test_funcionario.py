@@ -113,7 +113,7 @@ class BancoBase(unittest.TestCase):
         save_employee(
             self.conn,
             Employee(
-                telegram_id=self.user,
+                pessoa_id=self.user,
                 name="Funcionario Teste",
                 apetit_unit="SM",
                 client_company="Industria Exemplo",
@@ -140,11 +140,11 @@ class CadastroTest(BancoBase):
         self.assertTrue(pessoa.registered)
 
     def test_registration_is_incomplete_without_sector_or_consent(self):
-        sem_setor = Employee(telegram_id=1, name="X", apetit_unit="SM", client_company="Y", consent_accepted=True)
+        sem_setor = Employee(pessoa_id=1, name="X", apetit_unit="SM", client_company="Y", consent_accepted=True)
         self.assertFalse(sem_setor.registered)
         self.assertIn("setor", sem_setor.missing_fields())
 
-        sem_consent = Employee(telegram_id=2, name="X", apetit_unit="SM", client_company="Y", sector="Z")
+        sem_consent = Employee(pessoa_id=2, name="X", apetit_unit="SM", client_company="Y", sector="Z")
         self.assertFalse(sem_consent.registered)
         self.assertIn("aceite do termo de privacidade", sem_consent.missing_fields())
 
@@ -152,7 +152,7 @@ class CadastroTest(BancoBase):
         with self.assertRaises(ValueError):
             save_employee(
                 self.conn,
-                Employee(telegram_id=9, name="X", restrictions=[Restriction("gluten_falso")]),
+                Employee(pessoa_id=9, name="X", restrictions=[Restriction("gluten_falso")]),
             )
 
     def test_small_sector_is_suppressed_in_aggregate(self):
@@ -189,7 +189,7 @@ class CategoriaNoRegistroTest(BancoBase):
         log_consumption(self.conn, self.user, "2025-08-29", ["sal_mix_de_alface"])
 
         linha = self.conn.execute(
-            "SELECT category FROM consumption WHERE telegram_id = ? AND service_date = ?",
+            "SELECT category FROM consumption WHERE pessoa_id = ? AND service_date = ?",
             (self.user, "2025-08-29"),
         ).fetchone()
 
@@ -264,7 +264,7 @@ class HistoricoEFavoritoTest(BancoBase):
 
         nomes = {linha["item_name"] for linha in voltando}
         self.assertIn("ARROZ PARBOILIZADO", nomes)
-        self.assertEqual(voltando[0]["telegram_id"], self.user)
+        self.assertEqual(voltando[0]["pessoa_id"], self.user)
 
     def test_favorite_not_on_the_menu_does_not_notify(self):
         add_favorite(self.conn, self.user, "sal_vinagrete")
@@ -378,13 +378,13 @@ class HistoricoEFotografiaTest(BancoBase):
             CREATE TABLE menu_entry (id INTEGER PRIMARY KEY AUTOINCREMENT, unit TEXT NOT NULL,
                 service_date TEXT NOT NULL, meal TEXT NOT NULL, category TEXT NOT NULL,
                 slot INTEGER NOT NULL DEFAULT 1, item_code TEXT NOT NULL, created_at TEXT NOT NULL);
-            CREATE TABLE consumption (id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id INTEGER NOT NULL,
+            CREATE TABLE consumption (id INTEGER PRIMARY KEY AUTOINCREMENT, pessoa_id INTEGER NOT NULL,
                 service_date TEXT NOT NULL, meal TEXT NOT NULL DEFAULT 'almoco',
                 item_code TEXT NOT NULL, logged_at TEXT NOT NULL);
             INSERT INTO menu_item VALUES ('feijao_preto', 'FEIJAO PRETO', 80, 29, 4, 0.2, 1.8, '2025-09-01');
             INSERT INTO menu_entry (unit, service_date, meal, category, item_code, created_at)
                 VALUES ('SM', '2025-09-01', 'almoco', 'FEIJAO', 'feijao_preto', '2025-09-01');
-            INSERT INTO consumption (telegram_id, service_date, item_code, logged_at)
+            INSERT INTO consumption (pessoa_id, service_date, item_code, logged_at)
                 VALUES (7, '2025-09-01', 'feijao_preto', '2025-09-01T12:00:00+00:00');
             """
         )

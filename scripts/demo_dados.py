@@ -19,7 +19,6 @@ pontos e os relatorios saem de `apetit/`, nao de texto reescrito a mao.
 """
 
 import json
-import os
 import sys
 import tempfile
 from dataclasses import replace
@@ -29,7 +28,6 @@ from math import prod
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "demo")
 
 from apetit.allergens import ALLERGENS, Declaration, Restriction, Verdict, check_item  # noqa: E402
 from apetit.catalog import item_allergens  # noqa: E402
@@ -204,7 +202,7 @@ def bloqueados_para(pessoa, restricoes: list[str]) -> list[str]:
     )
 
 
-# Um `telegram_id` que nao e o da Mariana. As tabelas de consumo e ponto tem
+# Um `pessoa_id` que nao e o da Mariana. As tabelas de consumo e ponto tem
 # chave estrangeira para `employee`, entao a pessoa sem historico precisa
 # existir no banco — ela so nunca registrou nada.
 NOVATO = 999_000_001
@@ -215,7 +213,7 @@ def sem_historico():
     conn = abrir(_CAMINHO)
     try:
         quem = Employee(
-            telegram_id=NOVATO, name="Novato", apetit_unit="SM",
+            pessoa_id=NOVATO, name="Novato", apetit_unit="SM",
             client_company="Industria Exemplo", sector="Producao",
             goal=next(iter(TARGETS)), consent_accepted=True,
         )
@@ -229,7 +227,7 @@ def sem_historico():
 def meu_dia(pessoa) -> dict:
     conn = abrir(_CAMINHO)
     try:
-        dias = history_by_day(conn, pessoa.telegram_id, days=14)
+        dias = history_by_day(conn, pessoa.pessoa_id, days=14)
     finally:
         conn.close()
     return {
@@ -253,10 +251,10 @@ def meu_dia(pessoa) -> dict:
 def progresso(pessoa) -> dict:
     conn = abrir(_CAMINHO)
     try:
-        pontos = total_points(conn, pessoa.telegram_id)
-        extrato = points_breakdown(conn, pessoa.telegram_id)
+        pontos = total_points(conn, pessoa.pessoa_id)
+        extrato = points_breakdown(conn, pessoa.pessoa_id)
         dias = {l["service_date"] for l in conn.execute(
-            "SELECT service_date FROM consumption WHERE telegram_id = ?", (pessoa.telegram_id,)
+            "SELECT service_date FROM consumption WHERE pessoa_id = ?", (pessoa.pessoa_id,)
         ).fetchall()}
     finally:
         conn.close()
@@ -289,8 +287,8 @@ def semana(pessoa) -> list[dict]:
             for linha in conn.execute(
                 "SELECT service_date, SUM(kcal * quantity) AS kcal, "
                 "SUM(ptn_g * quantity) AS ptn FROM consumption "
-                "WHERE telegram_id = ? GROUP BY service_date",
-                (pessoa.telegram_id,),
+                "WHERE pessoa_id = ? GROUP BY service_date",
+                (pessoa.pessoa_id,),
             ).fetchall()
         }
     finally:
@@ -321,15 +319,16 @@ def semana(pessoa) -> list[dict]:
 def perfil(pessoa) -> dict:
     """O cadastro em campos, para a tela de perfil parar de ser um paragrafo.
 
-    Nao ha e-mail: o app fala por Telegram e nunca pediu endereco nenhum.
-    Campo que o cadastro nao coleta nao vira linha vazia na tela — inventar
-    um lugar para ele seria prometer que existe.
+Sem e-mail: o cadastro do aparelho nao pede endereco. O e-mail existe do outro
+    lado, em `apetit/identidade.py`, para entrar no app — e uma coisa
+    diferente de um campo do perfil. Campo que o cadastro nao coleta nao vira
+    linha vazia na tela; inventar um lugar para ele seria prometer que existe.
     """
     conn = abrir(_CAMINHO)
     try:
         guardados = [
             {"nome": clean_dish_name(f["name"]), "codigo": f["item_code"]}
-            for f in favorites(conn, pessoa.telegram_id)
+            for f in favorites(conn, pessoa.pessoa_id)
         ]
     finally:
         conn.close()
@@ -376,12 +375,12 @@ def registro_previsto(pessoa, codigos=None) -> dict:
 
     conn = abrir(_CAMINHO)
     try:
-        antes = total_points(conn, pessoa.telegram_id)
-        log_consumption(conn, pessoa.telegram_id, DIA, codigos)
-        regras = score_day(conn, pessoa.telegram_id, DIA,
+        antes = total_points(conn, pessoa.pessoa_id)
+        log_consumption(conn, pessoa.pessoa_id, DIA, codigos)
+        regras = score_day(conn, pessoa.pessoa_id, DIA,
                            protein_target_g=alvo_de(pessoa, conn=banco())["ptn"])
-        depois = total_points(conn, pessoa.telegram_id)
-        dia = next(d for d in history_by_day(conn, pessoa.telegram_id, days=36500)
+        depois = total_points(conn, pessoa.pessoa_id)
+        dia = next(d for d in history_by_day(conn, pessoa.pessoa_id, days=36500)
                    if d.service_date == DIA)
         refeicao = {
             "data": DIA, "data_amigavel": friendly_date(DIA),
@@ -395,10 +394,10 @@ def registro_previsto(pessoa, codigos=None) -> dict:
         }
         # O banco e temporario e morre no fim do script, mas desfazer aqui
         # mantem as outras exportacoes lendo o estado de antes do registro.
-        conn.execute("DELETE FROM consumption WHERE telegram_id = ? AND service_date = ?",
-                     (pessoa.telegram_id, DIA))
-        conn.execute("DELETE FROM points_event WHERE telegram_id = ? AND reference_date = ?",
-                     (pessoa.telegram_id, DIA))
+        conn.execute("DELETE FROM consumption WHERE pessoa_id = ? AND service_date = ?",
+                     (pessoa.pessoa_id, DIA))
+        conn.execute("DELETE FROM points_event WHERE pessoa_id = ? AND reference_date = ?",
+                     (pessoa.pessoa_id, DIA))
         conn.commit()
     finally:
         conn.close()

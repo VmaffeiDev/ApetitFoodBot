@@ -326,7 +326,7 @@ class PlanoGuardadoTest(unittest.TestCase):
     def test_deleting_my_data_takes_the_plan_with_it(self):
         from apetit.profile import Employee, delete_employee_data, save_employee
 
-        save_employee(self.conn, Employee(telegram_id=1, name="M", apetit_unit="SM",
+        save_employee(self.conn, Employee(pessoa_id=1, name="M", apetit_unit="SM",
                                           client_company="I", sector="P", consent_accepted=True))
         save_plan_lunch(self.conn, 1, [ItemPlano("Arroz", 4, "colheres")])
 

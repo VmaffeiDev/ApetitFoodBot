@@ -47,7 +47,7 @@ class NudgeBase(unittest.TestCase):
 
     def pessoa(self, uid=1, consentiu=True):
         save_employee(self.conn, Employee(
-            telegram_id=uid, name=f"P{uid}", apetit_unit="SM", client_company="Industria",
+            pessoa_id=uid, name=f"P{uid}", apetit_unit="SM", client_company="Industria",
             sector="Producao", goal="Manter o equilibrio", consent_accepted=consentiu,
         ))
         return uid
@@ -212,10 +212,10 @@ class ExclusaoTest(NudgeBase):
         delete_employee_data(self.conn, uid)
 
         sobrou = self.conn.execute(
-            "SELECT COUNT(*) AS t FROM employee_notification WHERE telegram_id = ?", (uid,)
+            "SELECT COUNT(*) AS t FROM employee_notification WHERE pessoa_id = ?", (uid,)
         ).fetchone()["t"]
         enviados = self.conn.execute(
-            "SELECT COUNT(*) AS t FROM notification_sent WHERE telegram_id = ?", (uid,)
+            "SELECT COUNT(*) AS t FROM notification_sent WHERE pessoa_id = ?", (uid,)
         ).fetchone()["t"]
         self.assertEqual((sobrou, enviados), (0, 0))
 

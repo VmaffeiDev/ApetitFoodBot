@@ -15,7 +15,7 @@ Tres decisoes do modulo saem dai:
 1. **A linha de avaliacao nao guarda empresa nem setor.** Ela e sobre o
    refeitorio. Guardar o setor criaria exatamente o cruzamento que reidentifica
    alguem ("a unica pessoa da manutencao que almocou terca").
-2. **Nenhuma leitura para a gestao seleciona `telegram_id`.** Ele existe na
+2. **Nenhuma leitura para a gestao seleciona `pessoa_id`.** Ele existe na
    tabela so para tres coisas: uma avaliacao por dia, a pessoa poder rever e
    trocar a propria, e a exclusao total quando ela pedir (LGPD).
 3. **Comentario so e liberado com volume.** Um comentario solto num dia de tres
@@ -75,7 +75,7 @@ class Rating:
         return not any((self.food, self.service, self.missing, self.tags, self.comment.strip()))
 
 
-def save_rating(conn: sqlite3.Connection, telegram_id: int, rating: Rating) -> None:
+def save_rating(conn: sqlite3.Connection, pessoa_id: int, rating: Rating) -> None:
     """Grava a avaliacao do dia. Reavaliar o mesmo dia substitui a anterior."""
     if not rating.apetit_unit.strip():
         raise ValueError("Avaliacao precisa do refeitorio: sem ele nao ha o que agregar.")
@@ -87,8 +87,8 @@ def save_rating(conn: sqlite3.Connection, telegram_id: int, rating: Rating) -> N
         raise ValueError(f"Motivo de falta desconhecido: {', '.join(desconhecidas)}")
 
     anterior = conn.execute(
-        "SELECT id FROM service_rating WHERE telegram_id = ? AND service_date = ? AND meal = ?",
-        (telegram_id, rating.service_date, rating.meal),
+        "SELECT id FROM service_rating WHERE pessoa_id = ? AND service_date = ? AND meal = ?",
+        (pessoa_id, rating.service_date, rating.meal),
     ).fetchone()
     if anterior:
         conn.execute("DELETE FROM service_rating_tag WHERE rating_id = ?", (anterior["id"],))
@@ -97,13 +97,13 @@ def save_rating(conn: sqlite3.Connection, telegram_id: int, rating: Rating) -> N
     cursor = conn.execute(
         """
         INSERT INTO service_rating (
-            telegram_id, apetit_unit, service_date, meal,
+            pessoa_id, apetit_unit, service_date, meal,
             food, service, missing_something, comment, created_at
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            telegram_id,
+            pessoa_id,
             rating.apetit_unit,
             rating.service_date,
             rating.meal,
@@ -123,12 +123,12 @@ def save_rating(conn: sqlite3.Connection, telegram_id: int, rating: Rating) -> N
 
 
 def rating_for(
-    conn: sqlite3.Connection, telegram_id: int, service_date: str, meal: str = "almoco"
+    conn: sqlite3.Connection, pessoa_id: int, service_date: str, meal: str = "almoco"
 ) -> Rating | None:
     """A avaliacao que a propria pessoa fez naquele dia."""
     row = conn.execute(
-        "SELECT * FROM service_rating WHERE telegram_id = ? AND service_date = ? AND meal = ?",
-        (telegram_id, service_date, meal),
+        "SELECT * FROM service_rating WHERE pessoa_id = ? AND service_date = ? AND meal = ?",
+        (pessoa_id, service_date, meal),
     ).fetchone()
     if not row:
         return None
@@ -150,17 +150,17 @@ def rating_for(
     )
 
 
-def my_ratings(conn: sqlite3.Connection, telegram_id: int, limit: int = 30) -> list[sqlite3.Row]:
+def my_ratings(conn: sqlite3.Connection, pessoa_id: int, limit: int = 30) -> list[sqlite3.Row]:
     """O historico de avaliacoes da propria pessoa, para ela ver o que mandou."""
     return conn.execute(
         """
         SELECT service_date, apetit_unit, food, service, missing_something, comment
         FROM service_rating
-        WHERE telegram_id = ?
+        WHERE pessoa_id = ?
         ORDER BY service_date DESC
         LIMIT ?
         """,
-        (telegram_id, limit),
+        (pessoa_id, limit),
     ).fetchall()
 
 
@@ -200,7 +200,7 @@ def unit_report(
 ) -> UnitReport:
     """Resumo do refeitorio no periodo, suprimido abaixo do n minimo.
 
-    Nao ha `telegram_id` em lugar nenhum desta consulta, de proposito: o
+    Nao ha `pessoa_id` em lugar nenhum desta consulta, de proposito: o
     relatorio existe para dizer como o refeitorio esta indo, nao quem disse o
     que sobre ele.
     """

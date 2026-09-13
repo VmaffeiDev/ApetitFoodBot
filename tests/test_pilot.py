@@ -35,7 +35,7 @@ class PilotoBase(unittest.TestCase):
 
     def pessoa(self, uid, objetivo="Manter o equilibrio", setor="Producao"):
         save_employee(self.conn, Employee(
-            telegram_id=uid, name=f"P{uid}", apetit_unit="SM", client_company="Industria",
+            pessoa_id=uid, name=f"P{uid}", apetit_unit="SM", client_company="Industria",
             sector=setor, goal=objetivo, consent_accepted=True,
         ))
 
@@ -252,7 +252,7 @@ class QualidadeDoDadoTest(PilotoBase):
         from apetit.allergens import Restriction
 
         save_employee(self.conn, Employee(
-            telegram_id=1, name="A", apetit_unit="SM", client_company="I", sector="P",
+            pessoa_id=1, name="A", apetit_unit="SM", client_company="I", sector="P",
             consent_accepted=True, restrictions=[Restriction("leite")],
         ))
 

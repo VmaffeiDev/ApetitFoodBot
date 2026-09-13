@@ -337,13 +337,13 @@ class ListaTest(Base):
     def test_o_id_novo_nao_cai_em_cima_de_um_id_antigo_do_telegram(self):
         """Colisao aqui emenda o historico de duas pessoas — inclusive a alergia.
 
-        Um id sequencial a partir de 1 encostaria num `telegram_id` baixo de
+        Um id sequencial a partir de 1 encostaria num `pessoa_id` baixo de
         banco antigo. O teste usa o pior caso: um id legado igual a 1.
         """
         agora = datetime.now(UTC).isoformat(timespec="seconds")
         for legado in (1, 2, 500):
             self.conn.execute(
-                "INSERT INTO employee (telegram_id, name, created_at, updated_at)"
+                "INSERT INTO employee (pessoa_id, name, created_at, updated_at)"
                 " VALUES (?, ?, ?, ?)",
                 (legado, f"Legado {legado}", agora, agora),
             )
@@ -352,8 +352,8 @@ class ListaTest(Base):
         novo = self.autorizar()
         self.assertGreater(novo, 500)
         usados = {
-            linha["telegram_id"]
-            for linha in self.conn.execute("SELECT telegram_id FROM employee")
+            linha["pessoa_id"]
+            for linha in self.conn.execute("SELECT pessoa_id FROM employee")
         }
         self.assertNotIn(novo, usados)
 
