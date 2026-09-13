@@ -1,21 +1,16 @@
 {
  "dia": "2025-09-01",
  "dia_amigavel": "segunda-feira, 1 de setembro",
- "pessoa": {
-  "nome": "Mariana",
-  "refeitorio": "SM",
-  "empresa": "Industria Exemplo",
-  "setor": "Producao",
-  "objetivo": "Manter o equilibrio",
-  "restricoes": "Leite e derivados, Ovos"
- },
+ "unidade": "SM",
+ "refeicao": "almoco",
  "cardapio": [
   {
-   "categoria": "Prato principal",
    "codigo": "PRATO PRINCIPAL",
+   "categoria": "Prato principal",
    "itens": [
     {
      "codigo": "carne_assada_ao_molho",
+     "nome": "Carne assada ao molho",
      "declaracoes": {
       "gluten": "nao_declarado",
       "crustaceos": "nao_declarado",
@@ -27,24 +22,21 @@
       "castanhas": "nao_declarado",
       "latex": "nao_declarado"
      },
-     "nome": "Carne assada ao molho",
-     "veredito": "atencao",
-     "etiqueta": "sem declaracao de leite e derivados, ovos",
-     "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
-     "peso": "moderado",
      "papel": "Proteína do prato",
+     "peso": "moderado",
      "dica": "moderado",
-     "kcal": 134.0,
-     "ptn": 12.0
+     "kcal": 134,
+     "ptn": 12
     }
    ]
   },
   {
-   "categoria": "Opcao ao prato principal",
    "codigo": "OPCAO AO PP",
+   "categoria": "Opcao ao prato principal",
    "itens": [
     {
      "codigo": "ovo_cozido",
+     "nome": "Ovo cozido",
      "declaracoes": {
       "gluten": "nao_declarado",
       "crustaceos": "nao_declarado",
@@ -56,24 +48,21 @@
       "castanhas": "nao_declarado",
       "latex": "nao_declarado"
      },
-     "nome": "Ovo cozido",
-     "veredito": "bloqueio",
-     "etiqueta": "contem ovos",
-     "motivo": "Este prato contem Ovos, que voce evita. Nao recomendo pedir.",
-     "peso": "leve",
      "papel": "Proteína do prato",
+     "peso": "leve",
      "dica": "leve",
-     "kcal": 78.0,
-     "ptn": 6.3
+     "kcal": 78,
+     "ptn": 6
     }
    ]
   },
   {
-   "categoria": "Guarnicao",
    "codigo": "GUARNICAO",
+   "categoria": "Guarnicao",
    "itens": [
     {
      "codigo": "macarrao_alho_e_oleo",
+     "nome": "Macarrao alho e oleo",
      "declaracoes": {
       "gluten": "contem",
       "crustaceos": "nao_declarado",
@@ -85,24 +74,21 @@
       "castanhas": "nao_declarado",
       "latex": "nao_declarado"
      },
-     "nome": "Macarrao alho e oleo",
-     "veredito": "atencao",
-     "etiqueta": "sem declaracao de leite e derivados, ovos",
-     "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
-     "peso": "moderado",
      "papel": "Acompanhamento",
+     "peso": "moderado",
      "dica": "moderado",
-     "kcal": 126.0,
-     "ptn": 2.0
+     "kcal": 126,
+     "ptn": 2
     }
    ]
   },
   {
-   "categoria": "Arroz",
    "codigo": "ARROZ",
+   "categoria": "Arroz",
    "itens": [
     {
      "codigo": "arroz_parboilizado",
+     "nome": "Arroz parboilizado",
      "declaracoes": {
       "gluten": "nao_declarado",
       "crustaceos": "nao_declarado",
@@ -114,24 +100,21 @@
       "castanhas": "nao_declarado",
       "latex": "nao_declarado"
      },
-     "nome": "Arroz parboilizado",
-     "veredito": "atencao",
-     "etiqueta": "sem declaracao de leite e derivados, ovos",
-     "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
-     "peso": "moderado",
      "papel": "Energia",
+     "peso": "moderado",
      "dica": "moderado",
-     "kcal": 138.0,
-     "ptn": 2.0
+     "kcal": 138,
+     "ptn": 2
     }
    ]
   },
   {
-   "categoria": "Feijao",
    "codigo": "FEIJAO",
+   "categoria": "Feijao",
    "itens": [
     {
      "codigo": "feijao_preto",
+     "nome": "Feijao preto",
      "declaracoes": {
       "gluten": "nao_declarado",
       "crustaceos": "nao_declarado",
@@ -143,24 +126,21 @@
       "castanhas": "nao_declarado",
       "latex": "nao_declarado"
      },
-     "nome": "Feijao preto",
-     "veredito": "atencao",
-     "etiqueta": "sem declaracao de leite e derivados, ovos",
-     "motivo": "Nao consigo confirmar que este prato e seguro para voce: nao tem declaracao sobre Leite e derivados, Ovos. Confirme no balcao antes de se servir.",
-     "peso": "leve",
      "papel": "Fibras",
+     "peso": "leve",
      "dica": "leve",
-     "kcal": 29.0,
-     "ptn": 2.0
+     "kcal": 29,
+     "ptn": 2
     }
    ]
   },
   {
-   "categoria": "Salada",
    "codigo": "SALADA",
+   "categoria": "Salada",
    "itens": [
     {
      "codigo": "sal_mix_de_alface",
+     "nome": "Mix de alface",
      "declaracoes": {
       "gluten": "nao_declarado",
       "crustaceos": "nao_declarado",
@@ -172,134 +152,13 @@
       "castanhas": "nao_declarado",
       "latex": "nao_declarado"
      },
-     "nome": "Mix de alface",
-     "veredito": "liberado",
-     "etiqueta": "conferido para a sua ficha",
-     "motivo": "Nenhum alergenico da sua ficha aparece neste prato.",
-     "peso": "leve",
      "papel": "Vitaminas e minerais",
+     "peso": "leve",
      "dica": "leve",
-     "kcal": 4.0,
-     "ptn": 0.6
+     "kcal": 4,
+     "ptn": 1
     }
    ]
-  }
- ],
- "contagem": {
-  "total": 6,
-  "bloqueio": 1,
-  "atencao": 4,
-  "liberado": 1
- },
- "conformidade": [
-  {
-   "restricoes": [],
-   "vereditos": {
-    "arroz_parboilizado": "sem_restricao",
-    "feijao_preto": "sem_restricao",
-    "macarrao_alho_e_oleo": "sem_restricao",
-    "ovo_cozido": "sem_restricao",
-    "carne_assada_ao_molho": "sem_restricao",
-    "sal_mix_de_alface": "sem_restricao"
-   }
-  },
-  {
-   "restricoes": [
-    "ovos"
-   ],
-   "vereditos": {
-    "arroz_parboilizado": "atencao",
-    "feijao_preto": "atencao",
-    "macarrao_alho_e_oleo": "atencao",
-    "ovo_cozido": "bloqueio",
-    "carne_assada_ao_molho": "atencao",
-    "sal_mix_de_alface": "liberado"
-   }
-  },
-  {
-   "restricoes": [
-    "leite"
-   ],
-   "vereditos": {
-    "arroz_parboilizado": "atencao",
-    "feijao_preto": "atencao",
-    "macarrao_alho_e_oleo": "atencao",
-    "ovo_cozido": "atencao",
-    "carne_assada_ao_molho": "atencao",
-    "sal_mix_de_alface": "liberado"
-   }
-  },
-  {
-   "restricoes": [
-    "gluten"
-   ],
-   "vereditos": {
-    "arroz_parboilizado": "atencao",
-    "feijao_preto": "atencao",
-    "macarrao_alho_e_oleo": "bloqueio",
-    "ovo_cozido": "atencao",
-    "carne_assada_ao_molho": "atencao",
-    "sal_mix_de_alface": "atencao"
-   }
-  },
-  {
-   "restricoes": [
-    "ovos",
-    "leite"
-   ],
-   "vereditos": {
-    "arroz_parboilizado": "atencao",
-    "feijao_preto": "atencao",
-    "macarrao_alho_e_oleo": "atencao",
-    "ovo_cozido": "bloqueio",
-    "carne_assada_ao_molho": "atencao",
-    "sal_mix_de_alface": "liberado"
-   }
-  },
-  {
-   "restricoes": [
-    "gluten",
-    "ovos"
-   ],
-   "vereditos": {
-    "arroz_parboilizado": "atencao",
-    "feijao_preto": "atencao",
-    "macarrao_alho_e_oleo": "bloqueio",
-    "ovo_cozido": "bloqueio",
-    "carne_assada_ao_molho": "atencao",
-    "sal_mix_de_alface": "atencao"
-   }
-  },
-  {
-   "restricoes": [
-    "gluten",
-    "soja",
-    "leite"
-   ],
-   "vereditos": {
-    "arroz_parboilizado": "atencao",
-    "feijao_preto": "atencao",
-    "macarrao_alho_e_oleo": "bloqueio",
-    "ovo_cozido": "atencao",
-    "carne_assada_ao_molho": "atencao",
-    "sal_mix_de_alface": "atencao"
-   }
-  },
-  {
-   "restricoes": [
-    "amendoim",
-    "castanhas",
-    "peixes",
-    "crustaceos"
-   ],
-   "vereditos": {
-    "arroz_parboilizado": "atencao",
-    "feijao_preto": "atencao",
-    "macarrao_alho_e_oleo": "atencao",
-    "ovo_cozido": "atencao",
-    "carne_assada_ao_molho": "atencao",
-    "sal_mix_de_alface": "atencao"
-   }
   }
  ],
  "alergenicos": [
@@ -370,56 +229,6 @@
    }
   }
  ],
- "porcoes": {
-  "itens": [
-   {
-    "codigo": "carne_assada_ao_molho",
-    "nome": "Carne assada ao molho",
-    "medida": "2 porcoes",
-    "categoria": "Prato principal",
-    "kcal": 268,
-    "ptn": 24
-   },
-   {
-    "codigo": "macarrao_alho_e_oleo",
-    "nome": "Macarrao alho e oleo",
-    "medida": "1 colher",
-    "categoria": "Guarnicao",
-    "kcal": 126,
-    "ptn": 2
-   },
-   {
-    "codigo": "arroz_parboilizado",
-    "nome": "Arroz parboilizado",
-    "medida": "2 colheres",
-    "categoria": "Arroz",
-    "kcal": 276,
-    "ptn": 4
-   },
-   {
-    "codigo": "feijao_preto",
-    "nome": "Feijao preto",
-    "medida": "1 concha",
-    "categoria": "Feijao",
-    "kcal": 29,
-    "ptn": 2
-   },
-   {
-    "codigo": "sal_mix_de_alface",
-    "nome": "Mix de alface",
-    "medida": "a vontade",
-    "categoria": "Salada",
-    "kcal": 4,
-    "ptn": 1
-   }
-  ],
-  "kcal": 703,
-  "ptn": 33,
-  "alvo_kcal": 700,
-  "alvo_ptn": 30,
-  "resumo": "Isso da 703 kcal e 33 g de proteina. E a sua meta do dia.",
-  "avisos": []
- },
  "combinacoes": [
   {
    "bloqueados": [],
@@ -74290,6 +74099,217 @@
    ]
   }
  ],
+ "avaliacao": {
+  "escala": [
+   {
+    "nota": 3,
+    "rotulo": "Bom"
+   },
+   {
+    "nota": 2,
+    "rotulo": "Regular"
+   },
+   {
+    "nota": 1,
+    "rotulo": "Ruim"
+   }
+  ],
+  "faltas": [
+   {
+    "codigo": "acabou",
+    "rotulo": "Acabou antes de eu chegar"
+   },
+   {
+    "codigo": "pouca_quantidade",
+    "rotulo": "Pouca quantidade"
+   },
+   {
+    "codigo": "sem_opcao_restricao",
+    "rotulo": "Nada que eu pudesse comer"
+   },
+   {
+    "codigo": "faltou_utensilio",
+    "rotulo": "Faltou talher, prato ou copo"
+   },
+   {
+    "codigo": "faltou_bebida",
+    "rotulo": "Faltou bebida"
+   },
+   {
+    "codigo": "comida_fria",
+    "rotulo": "Comida fria"
+   }
+  ]
+ },
+ "pessoa": {
+  "nome": "Mariana",
+  "refeitorio": "SM",
+  "empresa": "Industria Exemplo",
+  "setor": "Producao",
+  "objetivo": "Manter o equilibrio",
+  "restricoes": "Leite e derivados, Ovos"
+ },
+ "conformidade": [
+  {
+   "restricoes": [],
+   "vereditos": {
+    "arroz_parboilizado": "sem_restricao",
+    "feijao_preto": "sem_restricao",
+    "macarrao_alho_e_oleo": "sem_restricao",
+    "ovo_cozido": "sem_restricao",
+    "carne_assada_ao_molho": "sem_restricao",
+    "sal_mix_de_alface": "sem_restricao"
+   }
+  },
+  {
+   "restricoes": [
+    "ovos"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "atencao",
+    "ovo_cozido": "bloqueio",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "liberado"
+   }
+  },
+  {
+   "restricoes": [
+    "leite"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "atencao",
+    "ovo_cozido": "atencao",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "liberado"
+   }
+  },
+  {
+   "restricoes": [
+    "gluten"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "bloqueio",
+    "ovo_cozido": "atencao",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "atencao"
+   }
+  },
+  {
+   "restricoes": [
+    "ovos",
+    "leite"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "atencao",
+    "ovo_cozido": "bloqueio",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "liberado"
+   }
+  },
+  {
+   "restricoes": [
+    "gluten",
+    "ovos"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "bloqueio",
+    "ovo_cozido": "bloqueio",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "atencao"
+   }
+  },
+  {
+   "restricoes": [
+    "gluten",
+    "soja",
+    "leite"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "bloqueio",
+    "ovo_cozido": "atencao",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "atencao"
+   }
+  },
+  {
+   "restricoes": [
+    "amendoim",
+    "castanhas",
+    "peixes",
+    "crustaceos"
+   ],
+   "vereditos": {
+    "arroz_parboilizado": "atencao",
+    "feijao_preto": "atencao",
+    "macarrao_alho_e_oleo": "atencao",
+    "ovo_cozido": "atencao",
+    "carne_assada_ao_molho": "atencao",
+    "sal_mix_de_alface": "atencao"
+   }
+  }
+ ],
+ "porcoes": {
+  "itens": [
+   {
+    "codigo": "carne_assada_ao_molho",
+    "nome": "Carne assada ao molho",
+    "medida": "2 porcoes",
+    "categoria": "Prato principal",
+    "kcal": 268,
+    "ptn": 24
+   },
+   {
+    "codigo": "macarrao_alho_e_oleo",
+    "nome": "Macarrao alho e oleo",
+    "medida": "1 colher",
+    "categoria": "Guarnicao",
+    "kcal": 126,
+    "ptn": 2
+   },
+   {
+    "codigo": "arroz_parboilizado",
+    "nome": "Arroz parboilizado",
+    "medida": "2 colheres",
+    "categoria": "Arroz",
+    "kcal": 276,
+    "ptn": 4
+   },
+   {
+    "codigo": "feijao_preto",
+    "nome": "Feijao preto",
+    "medida": "1 concha",
+    "categoria": "Feijao",
+    "kcal": 29,
+    "ptn": 2
+   },
+   {
+    "codigo": "sal_mix_de_alface",
+    "nome": "Mix de alface",
+    "medida": "a vontade",
+    "categoria": "Salada",
+    "kcal": 4,
+    "ptn": 1
+   }
+  ],
+  "kcal": 703,
+  "ptn": 33,
+  "alvo_kcal": 700,
+  "alvo_ptn": 30,
+  "resumo": "Isso da 703 kcal e 33 g de proteina. E a sua meta do dia.",
+  "avisos": []
+ },
  "meu_dia": {
   "dias": [
    {
@@ -74410,48 +74430,6 @@
     "nome": "Lembrete do almoço",
     "detalhe": "Dia útil, 11h, só se você ainda não registrou.",
     "ligado": false
-   }
-  ]
- },
- "avaliacao": {
-  "escala": [
-   {
-    "nota": 3,
-    "rotulo": "Bom"
-   },
-   {
-    "nota": 2,
-    "rotulo": "Regular"
-   },
-   {
-    "nota": 1,
-    "rotulo": "Ruim"
-   }
-  ],
-  "faltas": [
-   {
-    "codigo": "acabou",
-    "rotulo": "Acabou antes de eu chegar"
-   },
-   {
-    "codigo": "pouca_quantidade",
-    "rotulo": "Pouca quantidade"
-   },
-   {
-    "codigo": "sem_opcao_restricao",
-    "rotulo": "Nada que eu pudesse comer"
-   },
-   {
-    "codigo": "faltou_utensilio",
-    "rotulo": "Faltou talher, prato ou copo"
-   },
-   {
-    "codigo": "faltou_bebida",
-    "rotulo": "Faltou bebida"
-   },
-   {
-    "codigo": "comida_fria",
-    "rotulo": "Comida fria"
    }
   ]
  },

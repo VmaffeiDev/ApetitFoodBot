@@ -66,6 +66,22 @@ class Employee:
         return faltando
 
 
+# Alvo do almoco por objetivo escolhido no cadastro. Ilustrativo de proposito:
+# quem prescreve quantidade individual e o nutricionista responsavel, e a ficha
+# dele ganha destes numeros sempre que existir.
+#
+# Mora aqui, e nao no `bot.py`, porque o objetivo e campo do cadastro — e
+# porque o servidor precisa destes alvos sem arrastar junto a camada do
+# Telegram. O `bot.py` continua reexportando, entao nada que ja usava mudou.
+TARGETS: dict[str, dict[str, int]] = {
+    "Comer melhor no dia a dia": {"kcal": 700, "ptn": 30},
+    "Manter o equilibrio": {"kcal": 700, "ptn": 30},
+    "Comer mais leve": {"kcal": 550, "ptn": 25},
+    "Reforcar a proteina": {"kcal": 850, "ptn": 45},
+}
+TARGET_PADRAO: dict[str, int] = {"kcal": 700, "ptn": 30}
+
+
 def save_employee(conn: sqlite3.Connection, employee: Employee) -> None:
     timestamp = now_iso()
     consent_at = employee.consented_at or (timestamp if employee.consent_accepted else "")

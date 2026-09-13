@@ -105,6 +105,12 @@ from apetit.humanize import (
     week_summary,
 )
 from apetit.profile import (
+    TARGET_PADRAO as profile_target_padrao,
+)
+from apetit.profile import (
+    TARGETS as profile_targets,
+)
+from apetit.profile import (
     Employee,
     aggregate_by_sector,
     delete_employee_data,
@@ -153,13 +159,10 @@ GOALS = {
 
 # Alvos ilustrativos. Quem define faixa individual e o nutricionista
 # responsavel: o app informa e acompanha, nao prescreve.
-TARGETS = {
-    "Comer melhor no dia a dia": {"kcal": 700, "ptn": 30},
-    "Manter o equilibrio": {"kcal": 700, "ptn": 30},
-    "Comer mais leve": {"kcal": 550, "ptn": 25},
-    "Reforcar a proteina": {"kcal": 850, "ptn": 45},
-}
-TARGET_PADRAO = {"kcal": 700, "ptn": 30}
+# Os alvos moram em `apetit/profile.py`: o servidor precisa deles sem a camada
+# do Telegram junto. Reexportados aqui porque `bot.TARGETS` ja era usado.
+TARGETS = profile_targets
+TARGET_PADRAO = profile_target_padrao
 
 VERDICT_MARK = {
     Verdict.BLOQUEIO: "⛔",

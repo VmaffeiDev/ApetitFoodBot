@@ -37,6 +37,7 @@ from apetit.humanize import (  # noqa: E402
     category_label, clean_dish_name, dish_hint, dish_role, dish_weight,
     friendly_date, order_categories, week_summary,
 )
+from apetit import payload  # noqa: E402
 from apetit.nudges import LEMBRETE_ALMOCO, RESUMO_SEMANAL  # noqa: E402
 from apetit.profile import Employee, load_employee, save_employee  # noqa: E402
 from apetit.portions import FREE_CATEGORIES, MEASURES, MEDIDA_PADRAO, measure_label  # noqa: E402
@@ -85,34 +86,6 @@ def declaracoes_do_prato(conn, codigo: str) -> dict:
         codigo_alergenico: declarado.get(codigo_alergenico, Declaration.NAO_DECLARADO).value
         for codigo_alergenico in ALLERGENS
     }
-
-
-def cardapio(pessoa) -> list[dict]:
-    """O cardapio do dia, por categoria, com o veredito de cada prato."""
-    conn = bot.db()
-    try:
-        grupos: dict[str, list[dict]] = {}
-        for item in bot.load_menu(pessoa, DIA):
-            check = item["check"]
-            grupos.setdefault(item["category"], []).append({
-                "codigo": item["item_code"],
-                "declaracoes": declaracoes_do_prato(conn, item["item_code"]),
-                "nome": clean_dish_name(item["name"]),
-                "veredito": MARCA.get(check.verdict.value, "atencao"),
-                "etiqueta": etiqueta(check),
-                "motivo": check.message() if check.verdict.value != "sem_restricao" else "",
-                "peso": dish_weight(item.get("kcal")),
-                "papel": dish_role(item["category"]),
-                "dica": dish_hint(item.get("kcal"), item.get("ptn_g")),
-                "kcal": item.get("kcal"),
-                "ptn": item.get("ptn_g"),
-            })
-    finally:
-        conn.close()
-    return [
-        {"categoria": category_label(nome), "codigo": nome, "itens": grupos[nome]}
-        for nome in order_categories(grupos)
-    ]
 
 
 # Combinacoes usadas para provar que o navegador concorda com o Python.
@@ -171,23 +144,6 @@ def conformidade(pessoa) -> list[dict]:
     return casos
 
 
-def contagem(grupos: list[dict]) -> dict:
-    """Quantos pratos em cada veredito, para a tela inicial dizer em um numero.
-
-    `atencao` fica no mesmo balde que tudo que nao da para afirmar, e e de
-    proposito: separar "pode conter" de "ninguem declarou" num contador daria a
-    impressao de que o segundo e mais seguro que o primeiro. Nenhum dos dois e
-    seguro — os dois pedem a mesma pergunta no balcao.
-    """
-    itens = [i for g in grupos for i in g["itens"]]
-    return {
-        "total": len(itens),
-        "bloqueio": sum(1 for i in itens if i["veredito"] == "bloqueio"),
-        "atencao": sum(1 for i in itens if i["veredito"] == "atencao"),
-        "liberado": sum(1 for i in itens if i["veredito"] == "liberado"),
-    }
-
-
 def porcoes(pessoa) -> dict:
     """Quanto pegar, com a medida separada do nome do prato."""
     sugestao = bot.build_suggestion(pessoa, DIA)
@@ -223,49 +179,6 @@ def bloqueados_para(pessoa, restricoes: list[str]) -> list[str]:
         i["item_code"] for i in bot.load_menu(quem, DIA)
         if i["check"].verdict is Verdict.BLOQUEIO
     )
-
-
-def combinacoes() -> list[dict]:
-    """A sugestao de porcoes para **qualquer** cadastro, vinda do Python.
-
-    O cadastro e do proprio funcionario e mora no aparelho dele, entao a
-    sugestao precisa responder a alergia e objetivo que so existem no
-    navegador. Recalcular la seria uma segunda implementacao de
-    `apetit/portions.py` — e essa decide quanto alguem come.
-
-    A saida disso e o que torna desnecessario: a sugestao nao depende da lista
-    de alergias, e sim de **quais pratos sobram**, e das 512 combinacoes de
-    alergia deste cardapio saem so quatro conjuntos de bloqueados. Quatro
-    conjuntos x quatro objetivos = dezesseis respostas, todas calculadas aqui
-    pelo motor de verdade. O navegador escolhe uma; nao calcula nenhuma.
-
-    O `registro` sai com historico vazio, que e a situacao de quem acabou de se
-    cadastrar. As regras de semana (`variedade`, `sequencia`) dependem do que
-    veio antes, e a Mariana tem dois dias registrados: usar a previsao dela
-    para uma pessoa nova prometeria ponto que nao vem.
-    """
-    novato = sem_historico()
-    distintos: dict[tuple[str, ...], list[str]] = {}
-    for tamanho in range(len(ALLERGENS) + 1):
-        for combo in combinations(list(ALLERGENS), tamanho):
-            chave = tuple(bloqueados_para(novato, list(combo)))
-            distintos.setdefault(chave, list(combo))
-
-    saida = []
-    for bloqueados, exemplo in sorted(distintos.items()):
-        for objetivo in bot.TARGETS:
-            quem = replace(
-                novato,
-                restrictions=[Restriction(c) for c in exemplo],
-                goal=objetivo,
-            )
-            saida.append({
-                "bloqueados": list(bloqueados),
-                "objetivo": objetivo,
-                "sugestao": porcoes(quem),
-                "registro": registro_previsto(quem),
-            })
-    return saida
 
 
 # Um `telegram_id` que nao e o da Mariana. As tabelas de consumo e ponto tem
@@ -422,14 +335,6 @@ def perfil(pessoa) -> dict:
     }
 
 
-def avaliacao() -> dict:
-    """As opcoes da avaliacao, como o dominio ja as define."""
-    return {
-        "escala": [{"nota": n, "rotulo": r} for n, r in sorted(SCALE.items(), reverse=True)],
-        "faltas": [{"codigo": c, "rotulo": r} for c, r in MISSING_TAGS.items()],
-    }
-
-
 def registro_previsto(pessoa, codigos=None) -> dict:
     """O que a pessoa ganha se registrar o prato sugerido hoje.
 
@@ -500,6 +405,22 @@ def opcoes_montagem(pessoa) -> list[dict]:
     return saida
 
 
+def com_exemplo(montagens: list[dict], pessoa) -> list[dict]:
+    """Acrescenta, a cada montagem, o que **a Mariana** ganharia.
+
+    O servidor nao devolve isso, e nao devolve de proposito: a previsao com
+    historico depende de quem esta registrando, e o historico nunca sai do
+    aparelho. Aqui e diferente — a Mariana e o exemplo do proprio arquivo, e a
+    tela "So olhar" precisa mostrar um numero que faz sentido para ela.
+    """
+    for item in montagens:
+        for alvo in item["objetivos"]:
+            previsto = registro_previsto(replace(pessoa, goal=alvo["objetivo"]), list(item["codigos"]))
+            previsto.pop("refeicao", None)
+            alvo["exemplo"] = previsto
+    return montagens
+
+
 def montagens(pessoa) -> list[dict]:
     """Calcula no Python todas as quantidades suportadas pelo pequeno demo.
 
@@ -548,36 +469,37 @@ def main() -> int:
         preparar_banco(Path(tmp.name), receitas)
         bot.today = lambda: DIA
         pessoa = bot.current_employee(_FakeUpdate(USUARIO))
-        dados = {
-            "dia": DIA,
-            "dia_amigavel": friendly_date(DIA),
-            "pessoa": {
-                "nome": pessoa.name,
-                "refeitorio": pessoa.apetit_unit,
-                "empresa": pessoa.client_company,
-                "setor": pessoa.sector,
-                "objetivo": pessoa.goal,
-                "restricoes": bot.describe_restrictions(pessoa),
-            },
-            "cardapio": (pratos := cardapio(pessoa)),
-            "contagem": contagem(pratos),
-            "conformidade": conformidade(pessoa),
-            "alergenicos": [{"codigo": c, "nome": n} for c, n in ALLERGENS.items()],
-            "objetivos": [
-                {"nome": nome, "alvo": alvo} for nome, alvo in bot.TARGETS.items()
-            ],
-            "porcoes": porcoes(pessoa),
-            "combinacoes": combinacoes(),
-            "montagens": montagens(pessoa),
-            "opcoes_montagem": opcoes_montagem(pessoa),
-            "meu_dia": meu_dia(pessoa),
-            "progresso": progresso(pessoa),
-            "semana": semana(pessoa),
-            "perfil": perfil(pessoa),
-            "avaliacao": avaliacao(),
-            "registro_previsto": registro_previsto(pessoa),
-            "plano_exemplo": plano_exemplo(ficha),
-        }
+        conn_demo = bot.db()
+        try:
+            dados = {
+                # O que e do dia e igual para todo mundo da unidade sai de
+                # `apetit/payload.py` — o mesmo modulo que o servidor usa para
+                # responder ao app. Duas fontes para a mesma tela e o jeito de o
+                # demo e a producao mostrarem coisas diferentes.
+                **payload.do_dia(conn_demo, pessoa.apetit_unit, DIA),
+                # O que sobra aqui e do **exemplo**: o perfil da Mariana, o
+                # historico dela e a conferencia de veredito. Nada disso o
+                # servidor devolve, porque nada disso e do dia — e de alguem.
+                "pessoa": {
+                    "nome": pessoa.name,
+                    "refeitorio": pessoa.apetit_unit,
+                    "empresa": pessoa.client_company,
+                    "setor": pessoa.sector,
+                    "objetivo": pessoa.goal,
+                    "restricoes": bot.describe_restrictions(pessoa),
+                },
+                "montagens": com_exemplo(payload.do_dia(conn_demo, pessoa.apetit_unit, DIA)["montagens"], pessoa),
+                "conformidade": conformidade(pessoa),
+                "porcoes": porcoes(pessoa),
+                "meu_dia": meu_dia(pessoa),
+                "progresso": progresso(pessoa),
+                "semana": semana(pessoa),
+                "perfil": perfil(pessoa),
+                "registro_previsto": registro_previsto(pessoa),
+                "plano_exemplo": plano_exemplo(ficha),
+            }
+        finally:
+            conn_demo.close()
     finally:
         Path(tmp.name).unlink(missing_ok=True)
 
