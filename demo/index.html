@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Apetit</title>
 <meta name="description" content="Acompanhamento nutricional do refeitório Apetit.">
+<!-- Endereco do servidor da Apetit. Vazio de proposito enquanto nao existe um:
+     o app funciona inteiro com a fotografia publicada ao lado desta pagina, e
+     e assim que o piloto testa hoje. Preenchendo aqui (https://…), o cardapio
+     do dia passa a vir do servidor e a fotografia vira so a rede de seguranca.
+     Para testar sem editar o arquivo: localStorage.setItem('apetit-api', url) -->
+<meta name="apetit-api" content="">
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#EC003F">
@@ -1371,6 +1377,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     cabecalhoInterno("Apetit", DADOS ? DADOS.dia_amigavel : "");
     var grupos = (DADOS && DADOS.cardapio) || [];
 
+    porFonte();
     tela.appendChild(el("p", "eyebrow", "Cardápio do dia"));
     var dia = (DADOS && DADOS.dia_amigavel) || "";
     var corte = dia.indexOf(",");
@@ -1587,6 +1594,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
       tela.appendChild(vazio("Cardápio indisponível.", "Tente novamente quando o cardápio estiver disponível.", "i-talher"));
       return;
     }
+    porFonte();
     var todos = itensDoCardapio();
     var anteriores = estado.montagem.length;
     estado.montagem = estado.montagem.filter(function(c){
@@ -1710,6 +1718,7 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
     var combinacao = combinacaoAtual();
     var p = (combinacao && combinacao.sugestao) || {};
 
+    porFonte();
     tela.appendChild(el("h1", "h1", "Quanto pegar hoje"));
 
     // Sem resposta pronta para este cadastro, o app nao mostra sugestao
@@ -4075,10 +4084,97 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   // o que acontece quando ele vira um link para alguem testar —, os mesmos
   // dados ja chegam embutidos em `window.__APETIT__`. Um caminho de codigo,
   // dois jeitos de entregar.
+  // ---------- de onde vem o cardapio ----------
+  //
+  // O arquivo local e uma fotografia: foi gerado uma vez e publicado junto com
+  // a pagina. Serve para a demonstracao e serve de rede quando o servidor nao
+  // responde, mas *nao e o cardapio de hoje* — e num app de alergia essa
+  // diferenca nao e detalhe de implementacao. Alguem planejando o almoco contra
+  // o cardapio da semana passada esta conferindo alergenico do prato errado.
+  //
+  // Por isso o app nunca apresenta a fotografia como se fosse a de hoje: quando
+  // o dado nao veio do servidor, ou veio de outro dia, a tela diz.
+
+  function enderecoDaApi(){
+    // Ordem: o que a pessoa configurou no aparelho (para testar), depois o que a
+    // pagina declara. Vazio significa que nao ha servidor — e o app inteiro
+    // continua funcionando com a fotografia, que e como o piloto testa hoje.
+    var doAparelho = lido("apetit-api");
+    if (doAparelho) return doAparelho.replace(/\/+$/, "");
+    var marca = document.querySelector('meta[name="apetit-api"]');
+    var declarado = marca ? (marca.getAttribute("content") || "").trim() : "";
+    return declarado.replace(/\/+$/, "");
+  }
+
+  function hojeISO(){
+    var d = new Date();
+    return d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0");
+  }
+
+  function unidadeAtual(local){
+    var salvo = cadastroSalvo();
+    if (salvo && salvo.refeitorio) return salvo.refeitorio;
+    return (local && local.unidade) || "";
+  }
+
+  function buscarDoServidor(local){
+    var base = enderecoDaApi();
+    var unidade = unidadeAtual(local);
+    if (!base || !unidade) return Promise.resolve(null);
+    var url = base + "/api/dia?unidade=" + encodeURIComponent(unidade) +
+              "&dia=" + encodeURIComponent(hojeISO());
+    // Um limite de tempo curto: sem ele, um servidor que aceita a conexao e nao
+    // responde deixa a pessoa olhando o esqueleto — pior que mostrar a
+    // fotografia avisando que e fotografia.
+    var corta = new Promise(function(_, rejeita){
+      setTimeout(function(){ rejeita(new Error("tempo")); }, 6000);
+    });
+    return Promise.race([
+      fetch(url, { headers: { "Accept": "application/json" } }).then(function(r){
+        if (!r.ok) throw new Error("http " + r.status);
+        return r.json();
+      }),
+      corta
+    ]).catch(function(){ return null; });
+  }
+
+  function marcarProcedencia(dados, doServidor){
+    if (!dados) return dados;
+    dados.__fonte__ = doServidor ? "servidor" : "arquivo";
+    // "De hoje" e sobre a data do cardapio, e nao sobre ter vindo da rede: um
+    // servidor pode devolver o cardapio de ontem, e uma fotografia gerada hoje
+    // de manha esta correta. Quem manda e a data.
+    dados.__do_dia__ = dados.dia === hojeISO();
+    return dados;
+  }
+
+  // O aviso que aparece em toda tela que fala de comida. Null quando o cardapio
+  // e de hoje: nesse caso nao ha o que ressalvar, e um aviso permanente ensina
+  // a pessoa a ignorar avisos.
+  function avisoDeFonte(){
+    if (!DADOS || DADOS.__do_dia__) return null;
+    var caixa = el("div", "aviso wrn");
+    caixa.appendChild(icone("i-info"));
+    var quando = DADOS.dia_amigavel || DADOS.dia || "";
+    caixa.appendChild(el("span", "", DADOS.__fonte__ === "servidor"
+      ? "<b>Este não é o cardápio de hoje.</b> O servidor respondeu com o cardápio de " +
+        escapar(quando) + ". Confira no refeitório antes de se servir."
+      : "<b>Este não é o cardápio de hoje.</b> É o cardápio de " + escapar(quando) +
+        ", guardado neste aparelho. Confira no refeitório antes de se servir."));
+    return caixa;
+  }
+
+  function porFonte(){
+    var aviso = avisoDeFonte();
+    if (aviso) tela.appendChild(aviso);
+  }
+
   function carregar(){
     esqueleto();
     var embutido = window.__APETIT__;
-    var promessa = embutido
+    var local = embutido
       ? Promise.resolve([embutido.telas, embutido.dados || null])
       : Promise.all([
           fetch("telas.json").then(function(r){
@@ -4088,14 +4184,26 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
           fetch("dados.json").then(function(r){ return r.json(); }).catch(function(){ return null; })
         ]);
 
-    promessa.then(function(par){
+    local.then(function(par){
       TELAS = par[0];
-      DADOS = par[1];
-      liberarAbas();
-      estado.pontos = meuHistorico().progresso.pontos;
-      // Primeira vez: cadastro. Depois, direto para o app — a boas-vindas some
-      // e nao volta a atrapalhar quem ja se cadastrou.
-      mostrar(cadastroSalvo() ? "inicio" : "boas_vindas", false);
+      var fotografia = par[1];
+      // O servidor so e consultado depois de a fotografia estar em maos: assim
+      // um servidor fora do ar nunca deixa o app sem cardapio nenhum.
+      return buscarDoServidor(fotografia).then(function(doDia){
+        if (doDia && (doDia.cardapio || []).length){
+          // O servidor manda o que e **do dia** e igual para a unidade inteira.
+          // O que e do exemplo — perfil, historico, relatorios — so existe na
+          // fotografia, e continua vindo dela.
+          DADOS = marcarProcedencia(Object.assign({}, fotografia || {}, doDia), true);
+        } else {
+          DADOS = marcarProcedencia(fotografia, false);
+        }
+        liberarAbas();
+        estado.pontos = meuHistorico().progresso.pontos;
+        // Primeira vez: cadastro. Depois, direto para o app — a boas-vindas some
+        // e nao volta a atrapalhar quem ja se cadastrou.
+        mostrar(cadastroSalvo() ? "inicio" : "boas_vindas", false);
+      });
     }).catch(falhou);
   }
 

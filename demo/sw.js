@@ -9,7 +9,10 @@
  * dados das telas, para uma republicacao chegar sem a pessoa reinstalar.
  */
 
-const VERSAO = "apetit-demo-v6";
+// Subir a versao e o que faz o `index.html` novo chegar em quem ja instalou: o
+// shell e servido do cache, entao sem trocar a chave o testador continuaria com
+// a tela antiga por tempo indeterminado.
+const VERSAO = "apetit-demo-v7";
 const SHELL = [
   ".",
   "index.html",
@@ -46,6 +49,10 @@ self.addEventListener("fetch", (evento) => {
   if (requisicao.method !== "GET") return;
 
   const url = new URL(requisicao.url);
+  // O cardapio do dia vem do servidor da Apetit, que e outra origem. Deixar
+  // passar sem tocar nao e so simplicidade: guardar essa resposta em cache
+  // faria o app servir o cardapio de ontem achando que e o de hoje, que e
+  // exatamente o que o aviso de data existe para impedir.
   if (url.origin !== self.location.origin) return;
 
   // Os dados mudam a cada geracao: rede primeiro, cache como rede de seguranca.
