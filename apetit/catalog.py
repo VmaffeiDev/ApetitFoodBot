@@ -161,6 +161,9 @@ CREATE TABLE IF NOT EXISTS service_rating (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     pessoa_id INTEGER NOT NULL,
     apetit_unit TEXT NOT NULL,
+    -- Copiada do cadastro ao gravar, para que a leitura da gestao agregue por
+    -- empresa sem passar pelo `pessoa_id`. Veja `_migrate_client_company`.
+    client_company TEXT NOT NULL DEFAULT '',
     service_date TEXT NOT NULL,
     meal TEXT NOT NULL DEFAULT 'almoco',
     food INTEGER,
@@ -336,9 +339,52 @@ def _migrate_pessoa_id(conn: sqlite3.Connection) -> list[str]:
     return renomeadas
 
 
+def _migrate_client_company(conn: sqlite3.Connection) -> int:
+    """Acrescenta `client_company` a `service_rating` e preenche o que ja existe.
+
+    A empresa passa a morar **na propria linha da avaliacao**, copiada do
+    cadastro na hora de gravar. O motivo nao e desempenho: sem ela, agregar por
+    empresa exigiria juntar `service_rating` com `employee` pelo `pessoa_id` —
+    e a regra do modulo de avaliacao e que nenhuma leitura da gestao seleciona
+    `pessoa_id`. A coluna mantem a regra verdadeira ao pe da letra.
+
+    Copiar tambem congela a empresa do dia: quem troca de contrato nao reescreve
+    a avaliacao que fez quando era servido por outro refeitorio.
+
+    Roda antes do `CREATE TABLE IF NOT EXISTS`, pelo mesmo motivo que
+    `_migrate_pessoa_id`: o `IF NOT EXISTS` nao acrescenta coluna em tabela que
+    ja existe. Banco novo nao entra aqui, e a segunda subida tambem nao.
+    """
+    existe = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'service_rating'"
+    ).fetchone()
+    if not existe:
+        return 0
+    colunas = {linha["name"] for linha in conn.execute("PRAGMA table_info(service_rating)")}
+    if "client_company" in colunas:
+        return 0
+
+    conn.execute("ALTER TABLE service_rating ADD COLUMN client_company TEXT NOT NULL DEFAULT ''")
+    # Linha antiga nao tem de onde tirar a empresa a nao ser do cadastro. E a
+    # unica vez que `pessoa_id` cruza com `employee` para este fim, e acontece
+    # uma vez so, na migracao — nao numa leitura de relatorio.
+    preenchidas = conn.execute(
+        """
+        UPDATE service_rating
+           SET client_company = COALESCE(
+                 (SELECT e.client_company FROM employee e WHERE e.pessoa_id = service_rating.pessoa_id),
+                 '')
+         WHERE client_company = ''
+        """
+    ).rowcount
+    conn.commit()
+    return preenchidas
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     _migrate_pessoa_id(conn)
     _migrate_consumption_snapshot(conn)
+    _migrate_client_company(conn)
     conn.executescript(SCHEMA)
     conn.commit()
     # As tabelas de quem entra moram em `apetit/identidade.py`, junto da regra

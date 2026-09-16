@@ -230,3 +230,113 @@ class MigracaoTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# --- A empresa cliente na linha da avaliacao --------------------------------
+
+# O esquema da avaliacao como era antes do painel por empresa: so `apetit_unit`.
+# Copiado a mao pelo mesmo motivo do `ANTIGO` acima.
+AVALIACAO_ANTIGA = """
+CREATE TABLE employee (
+    pessoa_id INTEGER PRIMARY KEY, name TEXT NOT NULL,
+    apetit_unit TEXT NOT NULL DEFAULT '', client_company TEXT NOT NULL DEFAULT '',
+    sector TEXT NOT NULL DEFAULT '', goal TEXT NOT NULL DEFAULT '',
+    consent_accepted INTEGER NOT NULL DEFAULT 0, consented_at TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE service_rating (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pessoa_id INTEGER NOT NULL,
+    apetit_unit TEXT NOT NULL,
+    service_date TEXT NOT NULL,
+    meal TEXT NOT NULL DEFAULT 'almoco',
+    food INTEGER, service INTEGER,
+    missing_something INTEGER NOT NULL DEFAULT 0,
+    comment TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+    UNIQUE (pessoa_id, service_date, meal)
+);
+"""
+
+
+class EmpresaNaAvaliacaoTest(unittest.TestCase):
+    """Um banco com avaliacoes ja gravadas ganha a coluna sem perder historico.
+
+    O risco nao e erro de coluna: e o painel abrir com meses de avaliacao
+    empilhados numa empresa em branco, e a Apetit concluir que ninguem avaliou.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.NamedTemporaryFile(delete=False)
+        self.tmp.close()
+        self.conn = sqlite3.connect(self.tmp.name)
+        self.conn.row_factory = sqlite3.Row
+        self.conn.executescript(AVALIACAO_ANTIGA)
+        for pessoa, empresa in ((1, "Copel"), (2, "Coca-Cola"), (3, "Sanepar")):
+            self.conn.execute(
+                "INSERT INTO employee (pessoa_id, name, apetit_unit, client_company,"
+                " sector, goal, created_at, updated_at)"
+                " VALUES (?, ?, 'SM', ?, 'Operacao', 'manter', '2025-01-01', '2025-01-01')",
+                (pessoa, f"Pessoa {pessoa}", empresa),
+            )
+        for pessoa in (1, 2, 3):
+            self.conn.execute(
+                "INSERT INTO service_rating (pessoa_id, apetit_unit, service_date, meal,"
+                " food, service, created_at)"
+                " VALUES (?, 'SM', '2025-09-01', 'almoco', 3, 3, '2025-09-01')",
+                (pessoa,),
+            )
+        # Avaliacao de quem nunca completou o cadastro: nao ha empresa para achar.
+        self.conn.execute(
+            "INSERT INTO service_rating (pessoa_id, apetit_unit, service_date, meal,"
+            " food, service, created_at)"
+            " VALUES (99, 'SM', '2025-09-01', 'almoco', 1, 1, '2025-09-01')"
+        )
+        self.conn.commit()
+
+    def tearDown(self):
+        self.conn.close()
+        Path(self.tmp.name).unlink(missing_ok=True)
+
+    def test_a_empresa_e_preenchida_a_partir_do_cadastro(self):
+        init_schema(self.conn)
+
+        de_cada = {
+            linha["pessoa_id"]: linha["client_company"]
+            for linha in self.conn.execute("SELECT pessoa_id, client_company FROM service_rating")
+        }
+        self.assertEqual(de_cada[1], "Copel")
+        self.assertEqual(de_cada[2], "Coca-Cola")
+        self.assertEqual(de_cada[3], "Sanepar")
+
+    def test_avaliacao_sem_cadastro_fica_sem_empresa_e_nao_quebra(self):
+        # `COALESCE` existe por causa desta linha: sem ele o `UPDATE` gravaria
+        # NULL numa coluna `NOT NULL` e a migracao inteira falharia.
+        init_schema(self.conn)
+
+        orfa = self.conn.execute(
+            "SELECT client_company FROM service_rating WHERE pessoa_id = 99"
+        ).fetchone()
+        self.assertEqual(orfa["client_company"], "")
+
+    def test_nenhuma_avaliacao_se_perde(self):
+        antes = self.conn.execute("SELECT COUNT(*) AS t FROM service_rating").fetchone()["t"]
+
+        init_schema(self.conn)
+
+        depois = self.conn.execute("SELECT COUNT(*) AS t FROM service_rating").fetchone()["t"]
+        self.assertEqual(antes, depois)
+        self.assertEqual(depois, 4)
+
+    def test_rodar_de_novo_nao_reescreve_nada(self):
+        init_schema(self.conn)
+        # Alguem trocou de empresa depois da migracao: o historico dela nao pode
+        # ser reescrito na segunda subida do servidor.
+        self.conn.execute("UPDATE employee SET client_company = 'Outra' WHERE pessoa_id = 1")
+        self.conn.commit()
+
+        init_schema(self.conn)
+
+        linha = self.conn.execute(
+            "SELECT client_company FROM service_rating WHERE pessoa_id = 1"
+        ).fetchone()
+        self.assertEqual(linha["client_company"], "Copel")

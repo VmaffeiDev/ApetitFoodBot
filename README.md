@@ -41,6 +41,7 @@ publicado, e o funcionario monta o prato e registra o consumo.
 | `POST /api/codigo` | Confere o codigo e abre a sessao | qualquer um |
 | `GET /api/eu` | De quem e esta sessao | quem tem a sessao |
 | `POST /api/sair` | Encerra a sessao deste aparelho | quem tem a sessao |
+| `GET /api/gestao/feedback` | Avaliacao por empresa cliente | **so o papel de gestao** |
 | `GET /api/saude` | Se o servidor esta de pe | qualquer um |
 
 `GET /api/dia` ser publico nao e descuido: o cardapio e igual para todo mundo da
@@ -77,16 +78,22 @@ Quem entra no app e definido pela lista fechada do piloto:
 python scripts/autorizar.py --unidade SM --arquivo equipe.txt
 python scripts/autorizar.py --listar
 python scripts/autorizar.py --tirar alguem@empresa.com.br
+python scripts/autorizar.py --papel gestao coordenacao@apetit.com.br
 ```
+
+`--papel gestao` da acesso ao painel da Apetit, que le a avaliacao de todas as
+empresas clientes. Sem `--papel`, o papel de quem ja esta na lista **nao muda**:
+rodar a lista do piloto de novo nao pode rebaixar a coordenacao em silencio.
 
 Testes:
 
 ```bash
-python -m unittest discover -s tests        # 401 testes
+python -m unittest discover -s tests        # 430 testes
 node scripts/conferir_fluxos.cjs            # 67 cenarios em jsdom
 python scripts/conferir_vereditos.py        # 8 alergias x 4 objetivos, num Chromium
 python scripts/conferir_fonte.py            # servidor x fotografia, e a data do cardapio
 python scripts/conferir_cardapio.py         # a pagina de conferencia x o importador
+python scripts/conferir_painel.py           # o painel da gestao, entrando pelo navegador
 ```
 
 ## Decisoes de interface
@@ -694,10 +701,11 @@ risco que precisa ser resolvido no desenho, nao na politica de uso:
 
 Quatro decisoes saem dai, todas com teste:
 
-- **A linha de avaliacao nao tem coluna de empresa nem de setor.** Ela e sobre o
-  refeitorio. Guardar o setor criaria exatamente o cruzamento que reidentifica
-  ("a unica pessoa da manutencao que almocou terca"). Nao existe a coluna, entao
-  nao ha como consultar por ali depois.
+- **A linha de avaliacao nao tem coluna de setor.** Guardar o setor criaria
+  exatamente o cruzamento que reidentifica ("a unica pessoa da manutencao que
+  almocou terca"). Nao existe a coluna, entao nao ha como consultar por ali
+  depois. A **empresa** fica na linha, e a secao do painel explica por que as
+  duas nao correm o mesmo risco.
 - **Nenhuma leitura para a gestao seleciona `pessoa_id`.** Ele existe na tabela
   so para tres coisas: uma avaliacao por dia, a pessoa poder rever e trocar a
   propria, e a exclusao total quando ela pedir.
@@ -741,6 +749,75 @@ queda de 100% para 25%.
 
 O percentual ignora quem pulou aquela pergunta: quem nao deu nota de atendimento
 nao conta como atendimento ruim.
+
+
+## O painel da Apetit: avaliacao por empresa cliente
+
+A Apetit opera refeitorio dentro de varias empresas. Saber que a Coca-Cola esta
+reclamando do atendimento e a Copel nao e a diferenca entre mandar alguem na
+unidade certa e mandar um comunicado para todas.
+
+`demo/painel.html` lista as empresas **a pior primeiro**, com quanto do pessoal
+achou a comida boa, quanto achou o atendimento bom, quanto disse que faltou
+algo, os motivos mais citados, a tendencia semana a semana e os comentarios
+escritos.
+
+### A empresa entrou na linha da avaliacao; o setor continua fora
+
+Ate aqui a avaliacao nao guardava nem empresa nem setor. Agora guarda a empresa,
+e essa mudanca merece ser explicada em vez de aparecer so no diff:
+
+- **Empresa e o contrato.** Uma empresa cliente tem centenas de funcionarios, e
+  o recorte ainda passa pelo n minimo antes de virar numero. E a Apetit precisa
+  desse recorte para corrigir o servico que ela mesma presta.
+- **Setor nao tem defesa equivalente.** Ele e pequeno por construcao — num
+  piloto de quinze pessoas, um setor tem duas —, e nenhum n minimo devolve o
+  anonimato de "o unico da manutencao". A coluna continua nao existindo.
+
+A empresa e **copiada do cadastro na hora de gravar**, e nao buscada na hora do
+relatorio. Nao e otimizacao: e o que mantem literal a regra de que nenhuma
+leitura da gestao toca em `pessoa_id`. Um teste le o codigo das cinco funcoes de
+agregacao e reprova qualquer uma que mencione `pessoa_id` ou `employee`.
+
+Copiar tambem congela o contrato do dia: quem troca de empresa nao reescreve a
+avaliacao que fez quando era servido por outro refeitorio.
+
+### A porta que tranca
+
+Ate aqui a gestao morava atras de uma chave no proprio aparelho, lendo numeros
+de demonstracao de um arquivo publico. Isso era aceitavel enquanto o conteudo
+era inventado, e deixa de ser com avaliacao real de tres clientes do outro lado:
+vazar isso nao expoe um funcionario, expoe **o cliente para o concorrente dele**.
+
+Entao `GET /api/gestao/feedback` exige sessao com papel de gestao, concedido por
+`scripts/autorizar.py --papel gestao`. Duas decisoes sustentam a rota:
+
+- **O papel e lido da lista a cada pergunta, nao gravado no token.** Se ficasse
+  na sessao, quem saisse da funcao continuaria lendo avaliacao de cliente por
+  ate trinta dias — o tempo de vida da sessao.
+- **403 e nao 404 para quem esta autenticado e nao pode ver.** Esconder a porta
+  so faria alguem da Apetit achar que o painel esta quebrado.
+
+Nao existe modo de demonstracao no painel, de proposito. Sem servidor
+configurado ele diz que nao ha painel, em vez de mostrar numero inventado:
+grafico falso numa tela de gestao ensina a coordenacao a confiar nele.
+
+### Tres camadas entre recorte pequeno e numero na tela
+
+`_report` zera os valores, a API omite as chaves, e a tela nem desenha o bloco.
+Isso foi descoberto quebrando o `scripts/conferir_painel.py` de proposito:
+derrubar as duas camadas de cima nao faz numero nenhum aparecer, porque a essa
+altura ele ja nao existe. Quem segura de verdade e a primeira.
+
+```bash
+python scripts/conferir_painel.py
+```
+
+Sobe a API de verdade e um Chromium de 430px, e percorre tres caminhos: sem
+servidor, sessao de funcionario (que recebe 403 e **nao ve empresa nenhuma na
+tela**), e sessao de gestao. O segundo e o que justifica o script — um teste de
+Python confirma que a rota recusa, mas so o navegador prova que a tela nao
+desenhou nada antes de olhar o status.
 
 ## Privacidade
 

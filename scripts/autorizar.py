@@ -5,6 +5,7 @@ Uso:
     python scripts/autorizar.py --unidade SM joana@empresa.com.br rafael@empresa.com.br
     python scripts/autorizar.py --unidade SM --arquivo equipe.txt
     python scripts/autorizar.py --tirar joana@empresa.com.br
+    python scripts/autorizar.py --papel gestao coordenacao@apetit.com.br
 
 Por linha de comando, e nao por tela: no piloto quem entra sao quinze pessoas
 definidas pela empresa, e uma tela de "adicionar funcionario" exposta na
@@ -13,6 +14,12 @@ nessa lista escolhe quem le o cardapio de alergenico de quem.
 
 Tirar da lista tambem derruba as sessoes abertas. Sem isso, a pessoa continuaria
 dentro do app por trinta dias depois de sair da empresa.
+
+O `--papel gestao` da acesso ao painel da Apetit, que le a avaliacao de todas as
+empresas clientes. E o privilegio mais alto do sistema depois do token de
+publicacao, e por isso mora aqui e nao numa tela: ninguem se promove sozinho.
+Sem `--papel`, o papel de quem ja esta na lista **nao muda** — rodar a lista do
+piloto de novo nao pode rebaixar a coordenacao em silencio.
 """
 
 import argparse
@@ -46,6 +53,9 @@ def main() -> int:
     parser.add_argument("--unidade", default="", help="Unidade do refeitorio (ex.: SM).")
     parser.add_argument("--tirar", action="append", default=[],
                         help="E-mail a remover da lista (derruba as sessoes).")
+    parser.add_argument("--papel", choices=sorted(identidade.PAPEIS), default=None,
+                        help="Papel de quem entra. 'gestao' abre o painel da Apetit. "
+                             "Omitido, mantem o papel de quem ja esta na lista.")
     parser.add_argument("--listar", action="store_true", help="Apenas mostra a lista e sai.")
     parser.add_argument("--banco", default=os.getenv("APETIT_DB_PATH", "apetit.db"),
                         help="Caminho do banco SQLite.")
@@ -61,7 +71,7 @@ def main() -> int:
                 print("Ninguem autorizado ainda.")
             for linha in linhas:
                 print(f"{linha['email']:<45} id={linha['pessoa_id']:<8} "
-                      f"unidade={linha['apetit_unit'] or '-'}")
+                      f"unidade={linha['apetit_unit'] or '-':<8} papel={linha['papel']}")
             return 0
 
         for email in args.tirar:
@@ -78,15 +88,19 @@ def main() -> int:
 
         for email in novos:
             try:
-                pessoa = identidade.autorizar(conn, email, args.unidade)
+                pessoa = identidade.autorizar(conn, email, args.unidade, args.papel)
             except ValueError:
                 # Uma linha ruim no meio da lista nao pode impedir as outras de
                 # entrar: e mais comum colar um arquivo com lixo do que digitar
                 # um e-mail invalido de proposito.
                 print(f"e-mail invalido, pulei: {email}")
                 continue
-            print(f"autorizado: {email.strip().lower()} (id {pessoa})")
+            sufixo = f", papel {args.papel}" if args.papel else ""
+            print(f"autorizado: {email.strip().lower()} (id {pessoa}{sufixo})")
 
+        if args.papel == identidade.PAPEL_GESTAO and novos:
+            print(f"\nAtencao: {len(novos)} pessoa(s) passam a ler a avaliacao de "
+                  "todas as empresas clientes no painel da Apetit.")
         if not args.unidade and novos:
             print("\nAviso: sem --unidade, essas pessoas entram sem refeitorio definido "
                   "e o app nao sabe qual cardapio mostrar.")

@@ -11,6 +11,7 @@ As rotas:
     POST /api/codigo     confere o codigo e abre a sessao
     GET  /api/eu         de quem e esta sessao
     POST /api/sair       encerra a sessao deste aparelho
+    GET  /api/gestao/feedback  o painel da Apetit, so para sessao de gestao
 
 Nao e um sistema novo: e uma porta para o que ja existe em `apetit/`, com as
 mesmas validacoes que sempre valeram na importacao de cardapio.
@@ -40,7 +41,7 @@ from datetime import UTC, datetime
 from tornado.ioloop import IOLoop
 from tornado.web import Application, HTTPError, RequestHandler
 
-from . import identidade
+from . import feedback, identidade
 from .catalog import connect, import_menu_rows, init_schema
 from .csv_import import read_rows
 from .entrega_email import montar as montar_remetente
@@ -393,6 +394,95 @@ class Sair(Base):
         self.responder({"saiu": True})
 
 
+class GestaoFeedback(Base):
+    """O painel da Apetit: como cada empresa cliente avaliou o servico.
+
+    Esta e a primeira rota do projeto com controle de acesso de verdade, e
+    precisa ser: ate aqui a gestao morava atras de uma chave no proprio
+    aparelho, lendo numeros de demonstracao de um arquivo publico. Com avaliacao
+    real de Copel, Sanepar e Coca-Cola do outro lado, a mesma porta seria
+    entregar a insatisfacao de um cliente para qualquer um que soubesse o
+    endereco — inclusive para o concorrente dele.
+
+    O que sai daqui ja vem suprimido pelo `apetit/feedback.py`: recorte pequeno
+    nao tem numero, e comentario so aparece com volume. A rota nao repete essa
+    regra, e nao pode repetir — quem decide isso e um lugar so.
+    """
+
+    def get(self) -> None:
+        desde = self.get_argument("desde", "").strip()
+        ate = self.get_argument("ate", "").strip()
+        semanas = min(max(int(self.get_argument("semanas", "8") or 8), 1), 26)
+
+        conn = self.abrir()
+        try:
+            dono = identidade.de_sessao(conn, self.portador())
+            if not dono:
+                raise HTTPError(401, log_message="Sessao expirada. Entre de novo.")
+            if dono["papel"] != identidade.PAPEL_GESTAO:
+                # 403 e nao 404: quem esta autenticado e nao pode ver merece
+                # saber que a porta existe e nao e dele. Esconder aqui so faria
+                # alguem da Apetit achar que o painel esta quebrado.
+                raise HTTPError(403, log_message="Este painel e da gestao da Apetit.")
+
+            empresas = []
+            for relatorio in feedback.all_company_reports(conn, desde, ate):
+                empresas.append({
+                    **_recorte_json(relatorio),
+                    "motivos": [
+                        {"codigo": tag, "rotulo": feedback.MISSING_TAGS.get(tag, tag), "vezes": n}
+                        for tag, n in relatorio.tags
+                    ],
+                    "comentarios": feedback.company_comments(conn, relatorio.name, desde, ate),
+                    "semanas": [
+                        _recorte_json(semana)
+                        for semana in feedback.company_trend(conn, relatorio.name, weeks=semanas)
+                    ],
+                })
+            corpo = {
+                "periodo": {"desde": desde, "ate": ate},
+                "n_minimo": feedback.MIN_RATINGS,
+                "escala": feedback.SCALE,
+                "empresas": empresas,
+                "refeitorios": [
+                    _recorte_json(r) for r in feedback.all_unit_reports(conn, desde, ate)
+                ],
+            }
+        finally:
+            conn.close()
+        self.responder(corpo)
+
+
+def _recorte_json(relatorio) -> dict:
+    """Um `ServiceReport` como JSON.
+
+    Recorte suprimido sai **sem os numeros**, e nao com os numeros escondidos:
+    mandar o valor e confiar que nenhuma tela, hoje ou daqui a um ano, vai
+    imprimi-lo.
+    """
+    if relatorio.suppressed:
+        return {
+            "nome": relatorio.name,
+            "avaliacoes": relatorio.total,
+            "suprimido": True,
+            "motivo": relatorio.reason,
+            "semana": relatorio.period_start,
+        }
+    return {
+        "nome": relatorio.name,
+        "avaliacoes": relatorio.total,
+        "suprimido": False,
+        "motivo": "",
+        "semana": relatorio.period_start,
+        "comida_boa_pct": relatorio.food_good_pct,
+        "atendimento_bom_pct": relatorio.service_good_pct,
+        "comida_media": relatorio.food_avg,
+        "atendimento_media": relatorio.service_avg,
+        "faltou_algo": relatorio.missing_count,
+        "faltou_pct": relatorio.missing_pct,
+    }
+
+
 class Saude(Base):
     def get(self) -> None:
         self.responder({"ok": True, "dia": hoje(), "publicacao": bool(self.token)})
@@ -434,6 +524,7 @@ def criar_app(abrir, token: str = "", segredo: str = "", enviar=None) -> Applica
         (r"/api/codigo", Codigo, entrada),
         (r"/api/eu", Eu, contexto),
         (r"/api/sair", Sair, contexto),
+        (r"/api/gestao/feedback", GestaoFeedback, contexto),
     ])
 
 

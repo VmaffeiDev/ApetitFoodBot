@@ -17,7 +17,11 @@ from apetit.feedback import (
     MIN_RATINGS,
     MISSING_TAGS,
     Rating,
+    all_company_reports,
     all_unit_reports,
+    company_comments,
+    company_report,
+    company_trend,
     my_ratings,
     rating_for,
     save_rating,
@@ -118,14 +122,75 @@ class RegistroTest(BancoBase):
 class NaoIdentificaQuemRespondeuTest(BancoBase):
     """A protecao central: a gestao ve o refeitorio, nunca a pessoa."""
 
-    def test_the_rating_row_never_stores_company_or_sector(self):
+    def test_the_rating_row_never_stores_the_sector(self):
         # E o cruzamento que reidentifica: "a unica pessoa da manutencao que
-        # almocou terca". Nao existe coluna para isso, entao nao ha como
-        # alguem consultar por ali depois.
+        # almocou terca". Setor e recorte pequeno por natureza — num piloto de
+        # quinze pessoas, um setor tem duas. Nao existe coluna para isso, entao
+        # nao ha como alguem consultar por ali depois.
         colunas = {c["name"] for c in self.conn.execute("PRAGMA table_info(service_rating)")}
 
-        self.assertNotIn("client_company", colunas)
         self.assertNotIn("sector", colunas)
+
+    def test_the_rating_row_stores_the_company_and_that_is_deliberate(self):
+        """A empresa fica na linha; o setor nao. A diferenca nao e de grau.
+
+        A empresa **e** o contrato: a Apetit precisa saber que a Coca-Cola esta
+        mal atendida e a Copel nao, porque e isso que ela vai corrigir na
+        segunda-feira. Empresa cliente tem centenas de funcionarios, e o recorte
+        ainda passa pelo n minimo antes de virar numero.
+
+        Setor nao tem defesa equivalente: ele e pequeno por construcao, e
+        nenhum n minimo devolve o anonimato de "o unico da manutencao".
+
+        Guardar a empresa na linha, em vez de buscar em `employee` pelo
+        `pessoa_id` na hora do relatorio, e o que mantem a outra regra literal:
+        nenhuma leitura da gestao toca em `pessoa_id`.
+        """
+        colunas = {c["name"] for c in self.conn.execute("PRAGMA table_info(service_rating)")}
+
+        self.assertIn("client_company", colunas)
+
+    def test_the_company_comes_from_the_record_not_from_the_caller(self):
+        # Se a empresa viesse no `Rating`, a tela poderia mandar qualquer nome e
+        # a avaliacao de uma empresa entraria no relatorio de outra.
+        save_employee(self.conn, Employee(
+            pessoa_id=77, name="Alguem", apetit_unit="SM",
+            client_company="Copel", sector="Operacao", goal="manter",
+        ))
+        save_rating(self.conn, 77, Rating(apetit_unit="SM", service_date="2025-09-01", food=3))
+
+        linha = self.conn.execute(
+            "SELECT client_company FROM service_rating WHERE pessoa_id = 77"
+        ).fetchone()
+        self.assertEqual(linha["client_company"], "Copel")
+
+    def test_no_management_query_selects_the_person(self):
+        """A regra que sustenta tudo, cobrada no texto das consultas.
+
+        O teste anterior olha o objeto que volta. Este olha o SQL: uma consulta
+        nova que juntasse `employee` pelo `pessoa_id` para achar a empresa
+        passaria despercebida ali, porque o `pessoa_id` nao apareceria no
+        resultado — mas o cruzamento teria acontecido.
+        """
+        import ast
+        import inspect
+        import textwrap
+
+        from apetit import feedback as modulo
+
+        for nome in ("_report", "_rated", "_all_reports", "_comments", "_trend"):
+            arvore = ast.parse(textwrap.dedent(inspect.getsource(getattr(modulo, nome))))
+            funcao = arvore.body[0]
+            # O docstring fala sobre a regra e cita `pessoa_id` para explicar que
+            # ela nao entra. Quem e cobrado aqui e o codigo, entao ele sai.
+            if (funcao.body and isinstance(funcao.body[0], ast.Expr)
+                    and isinstance(funcao.body[0].value, ast.Constant)
+                    and isinstance(funcao.body[0].value.value, str)):
+                funcao.body = funcao.body[1:]
+            codigo = ast.unparse(funcao)
+
+            self.assertNotIn("pessoa_id", codigo, f"{nome} nao pode tocar em pessoa_id")
+            self.assertNotIn("employee", codigo, f"{nome} nao pode juntar com o cadastro")
 
     def test_the_unit_report_carries_no_person(self):
         self.encher()
@@ -218,7 +283,7 @@ class RelatorioTest(BancoBase):
 
         relatorios = all_unit_reports(self.conn, "2025-09-01", "2025-09-30")
 
-        self.assertEqual(relatorios[0].apetit_unit, "Ruim")
+        self.assertEqual(relatorios[0].name, "Ruim")
 
     def test_suppressed_canteens_go_last(self):
         self.encher(unit="Cheio", food=1)
@@ -226,7 +291,7 @@ class RelatorioTest(BancoBase):
 
         relatorios = all_unit_reports(self.conn, "2025-09-01", "2025-09-30")
 
-        self.assertEqual(relatorios[0].apetit_unit, "Cheio")
+        self.assertEqual(relatorios[0].name, "Cheio")
         self.assertTrue(relatorios[-1].suppressed)
 
     def test_one_canteen_does_not_leak_into_another(self):
@@ -250,6 +315,110 @@ class RelatorioTest(BancoBase):
         # Codigo sem rotulo apareceria como "acabou" cru no relatorio.
         for code, rotulo in MISSING_TAGS.items():
             self.assertTrue(rotulo.strip(), code)
+
+
+class PorEmpresaClienteTest(BancoBase):
+    """O painel da Apetit: qual contrato esta indo bem e qual precisa de atencao.
+
+    A Apetit serve varias empresas no mesmo mercado de refeicao coletiva. Saber
+    que a Coca-Cola esta reclamando do atendimento e a Copel nao e a diferenca
+    entre mandar alguem na unidade certa e mandar um comunicado para todas.
+    """
+
+    def cadastrar(self, pessoa_id, empresa, unidade="SM", setor="Operacao"):
+        save_employee(self.conn, Employee(
+            pessoa_id=pessoa_id, name=f"Pessoa {pessoa_id}", apetit_unit=unidade,
+            client_company=empresa, sector=setor, goal="manter",
+        ))
+
+    def encher_empresa(self, empresa, quantos=MIN_RATINGS, food=3, service=3,
+                       dia="2025-09-01", unidade="SM", inicio=0, **kw):
+        for i in range(quantos):
+            pessoa = hash((empresa, inicio + i)) % 100000 + 1
+            self.cadastrar(pessoa, empresa, unidade)
+            self.avaliar(pessoa, dia, food=food, service=service, unit=unidade, **kw)
+
+    def test_each_company_is_reported_on_its_own(self):
+        self.encher_empresa("Copel", food=3, service=3)
+        self.encher_empresa("Coca-Cola", food=3, service=1)
+
+        copel = company_report(self.conn, "Copel", "2025-09-01", "2025-09-30")
+        coca = company_report(self.conn, "Coca-Cola", "2025-09-01", "2025-09-30")
+
+        self.assertEqual(copel.service_good_pct, 100.0)
+        self.assertEqual(coca.service_good_pct, 0.0)
+        self.assertEqual(copel.dimension, "empresa")
+
+    def test_the_company_that_needs_attention_comes_first(self):
+        # O painel existe para achar o contrato com problema, nao para elogiar
+        # o que esta bem.
+        self.encher_empresa("Copel", food=3)
+        self.encher_empresa("Sanepar", food=2)
+        self.encher_empresa("Coca-Cola", food=1)
+
+        relatorios = all_company_reports(self.conn, "2025-09-01", "2025-09-30")
+
+        self.assertEqual([r.name for r in relatorios], ["Coca-Cola", "Sanepar", "Copel"])
+
+    def test_a_company_with_few_ratings_is_suppressed(self):
+        # Empresa pequena no piloto volta a ser gente identificavel. O n minimo
+        # e o mesmo do resto do arquivo, porque e a mesma regra.
+        self.encher_empresa("Pequena", quantos=MIN_RATINGS - 1)
+
+        relatorio = company_report(self.conn, "Pequena", "2025-09-01", "2025-09-30")
+
+        self.assertTrue(relatorio.suppressed)
+        self.assertIsNone(relatorio.food_good_pct)
+        self.assertIsNone(relatorio.missing_pct)
+
+    def test_comments_only_come_out_with_volume(self):
+        self.encher_empresa("Pequena", quantos=MIN_RATINGS - 1, comment="Faltou comida")
+
+        self.assertEqual(company_comments(self.conn, "Pequena", "2025-09-01", "2025-09-30"), [])
+
+    def test_one_company_does_not_leak_into_another(self):
+        self.encher_empresa("Copel", food=3)
+        self.encher_empresa("Coca-Cola", food=1)
+
+        self.assertEqual(
+            company_report(self.conn, "Copel", "2025-09-01", "2025-09-30").food_good_pct, 100.0)
+
+    def test_two_companies_in_the_same_canteen_are_told_apart(self):
+        # Uma unidade da Apetit pode servir mais de uma empresa. Se o painel
+        # olhasse so a unidade, as duas virariam uma media unica e a empresa
+        # insatisfeita sumiria dentro da satisfeita.
+        self.encher_empresa("Copel", food=3, unidade="Centro")
+        self.encher_empresa("Coca-Cola", food=1, unidade="Centro")
+
+        unidade = unit_report(self.conn, "Centro", "2025-09-01", "2025-09-30")
+        coca = company_report(self.conn, "Coca-Cola", "2025-09-01", "2025-09-30")
+
+        self.assertEqual(unidade.food_good_pct, 50.0)
+        self.assertEqual(coca.food_good_pct, 0.0)
+
+    def test_a_rating_without_a_record_has_no_company(self):
+        # Quem avaliou antes de completar o cadastro nao tem empresa. "" nao e
+        # uma empresa, e nao pode virar coluna sem dono no painel.
+        self.encher(quantos=MIN_RATINGS)
+
+        self.assertEqual(all_company_reports(self.conn, "2025-09-01", "2025-09-30"), [])
+
+    def test_trend_shows_the_week_the_company_dropped(self):
+        self.encher_empresa("Coca-Cola", dia="2025-09-01", food=3)
+        self.encher_empresa("Coca-Cola", dia="2025-09-08", food=1, inicio=50)
+
+        serie = company_trend(self.conn, "Coca-Cola", weeks=3, today="2025-09-12")
+
+        visiveis = [s for s in serie if not s.suppressed]
+        self.assertEqual([s.food_good_pct for s in visiveis], [100.0, 0.0])
+
+    def test_the_missing_reasons_come_per_company(self):
+        self.encher_empresa("Coca-Cola", missing=True, tags=["acabou"])
+
+        relatorio = company_report(self.conn, "Coca-Cola", "2025-09-01", "2025-09-30")
+
+        self.assertEqual(relatorio.tags, [("acabou", MIN_RATINGS)])
+        self.assertEqual(relatorio.missing_pct, 100.0)
 
 
 if __name__ == "__main__":

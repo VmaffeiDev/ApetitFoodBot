@@ -526,7 +526,7 @@ def gestao(pessoa) -> dict:
             for linha in aggregate_by_sector(conn)
         ],
         "refeitorios": [
-            {"unidade": u.apetit_unit, "avaliacoes": u.total,
+            {"unidade": u.name, "avaliacoes": u.total,
              "comida_boa_pct": u.food_good_pct, "atendimento_bom_pct": u.service_good_pct,
              "faltou_algo": u.missing_count, "faltou_pct": u.missing_pct,
              "suprimido": u.suppressed, "motivo": u.reason,

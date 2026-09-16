@@ -75,6 +75,9 @@ CREATE TABLE IF NOT EXISTS pessoa_email (
     email TEXT PRIMARY KEY,
     pessoa_id INTEGER NOT NULL UNIQUE,
     apetit_unit TEXT NOT NULL DEFAULT '',
+    -- 'funcionario' ou 'gestao'. Quem e da gestao le avaliacao de varias
+    -- empresas clientes; o padrao e o papel que nao le nada disso.
+    papel TEXT NOT NULL DEFAULT 'funcionario',
     criado_em TEXT NOT NULL
 );
 
@@ -102,7 +105,36 @@ CREATE INDEX IF NOT EXISTS idx_sessao_pessoa ON sessao (pessoa_id);
 """
 
 
+PAPEL_FUNCIONARIO = "funcionario"
+PAPEL_GESTAO = "gestao"
+PAPEIS = {PAPEL_FUNCIONARIO, PAPEL_GESTAO}
+
+
+def _migrar_papel(conn: sqlite3.Connection) -> bool:
+    """Acrescenta `papel` a uma lista que ja existe.
+
+    Sem isto, um banco do piloto subiria com a coluna faltando e toda consulta
+    de entrada quebraria — `CREATE TABLE IF NOT EXISTS` nao mexe em tabela que
+    ja esta la. Quem ja estava na lista vira funcionario, que e o papel que nao
+    da acesso a nada novo: ninguem ganha leitura de gestao por migracao.
+    """
+    existe = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pessoa_email'"
+    ).fetchone()
+    if not existe:
+        return False
+    colunas = {linha["name"] for linha in conn.execute("PRAGMA table_info(pessoa_email)")}
+    if "papel" in colunas:
+        return False
+    conn.execute(
+        f"ALTER TABLE pessoa_email ADD COLUMN papel TEXT NOT NULL DEFAULT '{PAPEL_FUNCIONARIO}'"
+    )
+    conn.commit()
+    return True
+
+
 def criar_tabelas(conn: sqlite3.Connection) -> None:
+    _migrar_papel(conn)
     conn.executescript(SCHEMA)
     conn.commit()
 
@@ -153,7 +185,9 @@ def _hash_token(token: str) -> str:
 # Quem pode entrar
 # --------------------------------------------------------------------------
 
-def autorizar(conn: sqlite3.Connection, email: str, unidade: str = "") -> int:
+def autorizar(
+    conn: sqlite3.Connection, email: str, unidade: str = "", papel: str | None = None
+) -> int:
     """Poe um e-mail na lista e devolve o id da pessoa. Chamar de novo nao duplica.
 
     O id nao e sequencial a partir de 1: ele nasce acima de tudo que o banco ja
@@ -163,12 +197,20 @@ def autorizar(conn: sqlite3.Connection, email: str, unidade: str = "") -> int:
     seis meses depois. Aqui a colisao e impossivel por construcao, e nao
     improvavel.
     """
+    # `papel=None` quer dizer "nao mexe no papel", e nao "volta a ser
+    # funcionario". A diferenca importa porque rodar a lista do piloto de novo e
+    # rotina: com o padrao rebaixando, uma re-execucao tiraria o acesso da
+    # gestao em silencio e o painel apareceria vazio sem ninguem entender por que.
+    if papel is not None and papel not in PAPEIS:
+        raise ValueError(f"Papel desconhecido: {papel}. Use um de {sorted(PAPEIS)}.")
     limpo = normalizar(email)
     ja = conn.execute("SELECT pessoa_id FROM pessoa_email WHERE email = ?", (limpo,)).fetchone()
     if ja:
         if unidade:
             conn.execute("UPDATE pessoa_email SET apetit_unit = ? WHERE email = ?", (unidade, limpo))
-            conn.commit()
+        if papel is not None:
+            conn.execute("UPDATE pessoa_email SET papel = ? WHERE email = ?", (papel, limpo))
+        conn.commit()
         return int(ja["pessoa_id"])
 
     usados = [0]
@@ -182,8 +224,9 @@ def autorizar(conn: sqlite3.Connection, email: str, unidade: str = "") -> int:
                 usados.append(int(maior["m"]))
     novo = max(usados) + 1
     conn.execute(
-        "INSERT INTO pessoa_email (email, pessoa_id, apetit_unit, criado_em) VALUES (?, ?, ?, ?)",
-        (limpo, novo, unidade, agora_iso()),
+        "INSERT INTO pessoa_email (email, pessoa_id, apetit_unit, papel, criado_em)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (limpo, novo, unidade, papel or PAPEL_FUNCIONARIO, agora_iso()),
     )
     conn.commit()
     return novo
@@ -191,7 +234,7 @@ def autorizar(conn: sqlite3.Connection, email: str, unidade: str = "") -> int:
 
 def autorizados(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT email, pessoa_id, apetit_unit, criado_em FROM pessoa_email ORDER BY email"
+        "SELECT email, pessoa_id, apetit_unit, papel, criado_em FROM pessoa_email ORDER BY email"
     ).fetchall()
 
 
@@ -380,11 +423,24 @@ def de_sessao(conn: sqlite3.Connection, token: str, agora: str | None = None) ->
 
     Sessao vencida e apagada na hora em que aparece: e o unico momento em que se
     sabe com certeza que ela nao serve mais.
+
+    O `papel` vem da lista, e nao da sessao, a cada pergunta. Se ficasse gravado
+    no token, tirar alguem da gestao so teria efeito quando a sessao dele
+    vencesse — ate trinta dias depois, lendo avaliacao de empresa cliente.
+    O `LEFT JOIN` e de proposito: quem foi revogado perde o papel mas a sessao
+    ainda e encontrada e tratada como sessao de ninguem, em vez de sumir com um
+    recado confuso.
     """
     if not token:
         return None
     linha = conn.execute(
-        "SELECT token_hash, pessoa_id, email, expira_em FROM sessao WHERE token_hash = ?",
+        """
+        SELECT s.token_hash, s.pessoa_id, s.email, s.expira_em,
+               COALESCE(p.papel, '') AS papel
+        FROM sessao s
+        LEFT JOIN pessoa_email p ON p.pessoa_id = s.pessoa_id
+        WHERE s.token_hash = ?
+        """,
         (_hash_token(token),),
     ).fetchone()
     if not linha:
