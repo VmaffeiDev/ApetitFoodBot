@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Painel da Apetit — avaliação por empresa</title>
+
+<!-- O endereco do servidor. Vazio significa que nao ha servidor configurado, e
+     a pagina diz isso em vez de mostrar tela vazia.
+     Para testar sem editar o arquivo: localStorage.setItem('apetit-api', url) -->
+<meta name="apetit-api" content="">
+
+<style>
+  :root{
+    --fundo:#F1F3F4;
+    --carta:#FFFFFF;
+    --carta-2:#E7EBED;
+    --tinta:#15191C;
+    --tinta-2:#3A444A;
+    --fraca:#616C73;
+    --linha:#D5DBDE;
+    --linha-2:#BEC7CC;
+    --aco:#2F6F8F;
+    --aco-forte:#22566F;
+    --ruim:#B3242F;
+    --ruim-fundo:#F8E1E2;
+    --atencao:#9C5F0C;
+    --atencao-fundo:#F9ECD8;
+    --bom:#1F7A54;
+    --bom-fundo:#DDEFE6;
+    --sombra:0 1px 2px rgba(21,25,28,.06), 0 10px 26px -14px rgba(21,25,28,.22);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --fundo:#11161A;
+      --carta:#1A2126;
+      --carta-2:#232D33;
+      --tinta:#E7ECEF;
+      --tinta-2:#C2CBD0;
+      --fraca:#8C979E;
+      --linha:#2A343A;
+      --linha-2:#3B474E;
+      --aco:#79B8D9;
+      --aco-forte:#A3D2EA;
+      --ruim:#F0868D;
+      --ruim-fundo:#38191C;
+      --atencao:#E0A64F;
+      --atencao-fundo:#372714;
+      --bom:#6FCBA1;
+      --bom-fundo:#123023;
+      --sombra:0 1px 2px rgba(0,0,0,.4), 0 10px 26px -14px rgba(0,0,0,.6);
+    }
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:var(--fundo);
+    color:var(--tinta);
+    font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  .fora{max-width:920px;margin:0 auto;padding:0 16px;padding-block:24px 48px}
+
+  header h1{font-size:clamp(22px,5vw,30px);line-height:1.15;margin:0 0 4px;letter-spacing:-.02em}
+  header p{margin:0;color:var(--fraca);font-size:14.5px}
+  .barra{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
+
+  label{display:block;font-size:12.5px;color:var(--fraca);margin-bottom:4px}
+  input,select{
+    font:inherit;font-size:15px;padding:10px 12px;min-height:44px;
+    border:1px solid var(--linha-2);border-radius:8px;
+    background:var(--carta);color:var(--tinta);width:100%;
+  }
+  input:focus-visible,select:focus-visible,button:focus-visible{
+    outline:2px solid var(--aco);outline-offset:2px;
+  }
+  button{
+    font:inherit;font-weight:600;font-size:15px;min-height:44px;padding:0 18px;
+    border-radius:8px;border:1px solid var(--aco);background:var(--aco);
+    color:var(--fundo);cursor:pointer;
+  }
+  button:hover:not(:disabled){background:var(--aco-forte);border-color:var(--aco-forte)}
+  button:disabled{opacity:.4;cursor:default}
+  button.leve{background:var(--carta);color:var(--tinta);border-color:var(--linha-2)}
+  button.leve:hover:not(:disabled){background:var(--carta-2);border-color:var(--aco)}
+
+  .cartao{
+    background:var(--carta);border:1px solid var(--linha);border-radius:12px;
+    padding:18px;box-shadow:var(--sombra);
+  }
+  .recado{
+    border-radius:10px;padding:14px 16px;font-size:14.5px;line-height:1.5;
+    border:1px solid var(--linha);background:var(--carta);
+  }
+  .recado.erro{border-color:var(--ruim);background:var(--ruim-fundo);color:var(--tinta)}
+  .recado.aviso{border-color:var(--atencao);background:var(--atencao-fundo);color:var(--tinta)}
+
+  /* --- entrada --- */
+  #entrada{max-width:420px;margin:40px auto 0;display:flex;flex-direction:column;gap:14px}
+  #entrada .campo{display:flex;flex-direction:column}
+  .dica{font-size:13px;color:var(--fraca);line-height:1.45}
+
+  /* --- lista de empresas --- */
+  .empresas{display:flex;flex-direction:column;gap:14px;margin-top:20px}
+  .empresa{
+    background:var(--carta);border:1px solid var(--linha);border-left-width:4px;
+    border-radius:12px;padding:16px 18px;box-shadow:var(--sombra);
+  }
+  .empresa.ruim{border-left-color:var(--ruim)}
+  .empresa.meio{border-left-color:var(--atencao)}
+  .empresa.boa{border-left-color:var(--bom)}
+  .empresa.calada{border-left-color:var(--linha-2)}
+
+  .topo-empresa{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;justify-content:space-between}
+  .topo-empresa h2{margin:0;font-size:19px;letter-spacing:-.01em}
+  .selo{
+    font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    padding:3px 9px;border-radius:99px;white-space:nowrap;
+  }
+  .selo.ruim{background:var(--ruim-fundo);color:var(--ruim)}
+  .selo.meio{background:var(--atencao-fundo);color:var(--atencao)}
+  .selo.boa{background:var(--bom-fundo);color:var(--bom)}
+  .selo.calada{background:var(--carta-2);color:var(--fraca)}
+
+  .medidas{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:14px}
+  .medida{background:var(--carta-2);border-radius:9px;padding:11px 12px}
+  .medida b{display:block;font-size:23px;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .medida span{font-size:12.5px;color:var(--fraca);display:block;margin-top:3px;line-height:1.35}
+
+  .secao{margin-top:14px}
+  .secao h3{
+    margin:0 0 7px;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--fraca);font-weight:700;
+  }
+  .motivos{display:flex;flex-wrap:wrap;gap:7px;margin:0;padding:0;list-style:none}
+  .motivos li{
+    font-size:13px;background:var(--carta-2);border:1px solid var(--linha);
+    border-radius:99px;padding:4px 11px;
+  }
+  .motivos li b{font-variant-numeric:tabular-nums}
+
+  .comentarios{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+  .comentarios li{
+    font-size:14px;color:var(--tinta-2);border-left:2px solid var(--linha-2);
+    padding:2px 0 2px 11px;line-height:1.45;
+  }
+
+  .semanas{display:flex;align-items:flex-end;gap:4px;height:46px}
+  .semana{flex:1;min-width:6px;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+  .semana i{display:block;border-radius:2px 2px 0 0;background:var(--aco);min-height:2px}
+  .semana.vazia i{background:var(--linha-2)}
+  .legenda-semanas{font-size:12px;color:var(--fraca);margin-top:5px}
+
+  .rodape{margin-top:32px;padding-top:16px;border-top:1px solid var(--linha);font-size:13px;color:var(--fraca);line-height:1.55}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="fora">
+
+  <header>
+    <h1>Painel da Apetit</h1>
+    <p id="subtitulo">Como cada empresa cliente avaliou o serviço.</p>
+  </header>
+
+  <!-- ENTRADA ------------------------------------------------------------ -->
+  <section id="entrada" class="cartao">
+    <div>
+      <h2 style="margin:0 0 6px;font-size:17px">Entrar</h2>
+      <p class="dica">Este painel é da coordenação da Apetit. O acesso é o mesmo
+      e-mail e código do app, com o papel de gestão liberado pela lista.</p>
+    </div>
+
+    <div class="campo" id="passo-email">
+      <label for="email">E-mail da Apetit</label>
+      <input id="email" type="email" autocomplete="email" inputmode="email"
+             placeholder="coordenacao@apetit.com.br">
+    </div>
+
+    <div class="campo" id="passo-codigo" hidden>
+      <label for="codigo">Código de 6 dígitos</label>
+      <input id="codigo" type="text" inputmode="numeric" autocomplete="one-time-code"
+             maxlength="6" placeholder="000000">
+    </div>
+
+    <button id="botao-entrar" type="button">Enviar código</button>
+    <p id="recado-entrada" class="recado" hidden></p>
+  </section>
+
+  <!-- PAINEL ------------------------------------------------------------- -->
+  <section id="painel" hidden>
+    <div class="barra">
+      <div style="flex:1 1 150px">
+        <label for="desde">De</label>
+        <input id="desde" type="date">
+      </div>
+      <div style="flex:1 1 150px">
+        <label for="ate">Até</label>
+        <input id="ate" type="date">
+      </div>
+      <div style="align-self:flex-end;display:flex;gap:8px">
+        <button id="atualizar" type="button">Atualizar</button>
+        <button id="sair" type="button" class="leve">Sair</button>
+      </div>
+    </div>
+
+    <p id="recado-painel" class="recado" hidden style="margin-top:16px"></p>
+    <div id="empresas" class="empresas"></div>
+
+    <p class="rodape" id="rodape"></p>
+  </section>
+
+  <!-- SEM SERVIDOR ------------------------------------------------------- -->
+  <section id="sem-servidor" class="recado aviso" hidden style="margin-top:24px">
+    <strong>Não há servidor configurado nesta página.</strong><br>
+    O painel lê avaliação real, então não existe versão de demonstração dele:
+    mostrar números inventados aqui ensinaria a coordenação a confiar num
+    gráfico que não veio de ninguém. Preencha
+    <code>&lt;meta name="apetit-api"&gt;</code> com o endereço da API.
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // O endereco do servidor, na mesma convencao do app do funcionario.
+  function enderecoDaApi(){
+    var doAparelho = "";
+    try { doAparelho = localStorage.getItem("apetit-api") || ""; } catch (e) {}
+    if (doAparelho) return doAparelho.replace(/\/+$/, "");
+    var marca = document.querySelector('meta[name="apetit-api"]');
+    var declarado = marca ? (marca.getAttribute("content") || "").trim() : "";
+    return declarado.replace(/\/+$/, "");
+  }
+
+  var API = enderecoDaApi();
+  var CHAVE_TOKEN = "apetit-painel-token";
+
+  var el = function(id){ return document.getElementById(id); };
+
+  function guardar(chave, valor){
+    try { valor === null ? localStorage.removeItem(chave) : localStorage.setItem(chave, valor); }
+    catch (e) {}
+  }
+  function lido(chave){
+    try { return localStorage.getItem(chave) || ""; } catch (e) { return ""; }
+  }
+
+  function mostrarRecado(alvo, texto, tipo){
+    var p = el(alvo);
+    p.textContent = texto;
+    p.className = "recado" + (tipo ? " " + tipo : "");
+    p.hidden = !texto;
+  }
+
+  // --- rede ---------------------------------------------------------------
+
+  function pedir(rota, opcoes){
+    opcoes = opcoes || {};
+    var cabecalhos = opcoes.headers || {};
+    var token = lido(CHAVE_TOKEN);
+    if (token) cabecalhos["Authorization"] = "Bearer " + token;
+    if (opcoes.body) cabecalhos["Content-Type"] = "application/json";
+    return fetch(API + rota, {
+      method: opcoes.method || "GET",
+      headers: cabecalhos,
+      body: opcoes.body ? JSON.stringify(opcoes.body) : undefined
+    }).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(corpo){
+        return { ok: r.ok, status: r.status, corpo: corpo };
+      });
+    });
+  }
+
+  // --- entrada ------------------------------------------------------------
+
+  var esperandoCodigo = false;
+
+  function entrarClicado(){
+    var email = el("email").value.trim();
+    if (!email){ mostrarRecado("recado-entrada", "Informe o e-mail.", "erro"); return; }
+
+    el("botao-entrar").disabled = true;
+
+    if (!esperandoCodigo){
+      pedir("/api/entrar", { method: "POST", body: { email: email } })
+        .then(function(){
+          // A rota responde igual para e-mail da lista e de fora, de proposito.
+          // A tela repete essa resposta em vez de adivinhar.
+          esperandoCodigo = true;
+          el("passo-codigo").hidden = false;
+          el("botao-entrar").textContent = "Entrar";
+          el("codigo").focus();
+          mostrarRecado("recado-entrada",
+            "Se este e-mail estiver na lista, o código chegou nele. Ele vale por 10 minutos.", "");
+        })
+        .catch(function(){
+          mostrarRecado("recado-entrada", "Não consegui falar com o servidor.", "erro");
+        })
+        .then(function(){ el("botao-entrar").disabled = false; });
+      return;
+    }
+
+    var codigo = el("codigo").value.trim();
+    pedir("/api/codigo", { method: "POST", body: { email: email, codigo: codigo } })
+      .then(function(r){
+        if (!r.ok){
+          mostrarRecado("recado-entrada", r.corpo.erro || "Código não confere.", "erro");
+          return;
+        }
+        guardar(CHAVE_TOKEN, r.corpo.token);
+        mostrarRecado("recado-entrada", "", "");
+        abrirPainel();
+      })
+      .catch(function(){
+        mostrarRecado("recado-entrada", "Não consegui falar com o servidor.", "erro");
+      })
+      .then(function(){ el("botao-entrar").disabled = false; });
+  }
+
+  function sair(){
+    pedir("/api/sair", { method: "POST" }).catch(function(){}).then(function(){
+      guardar(CHAVE_TOKEN, null);
+      el("painel").hidden = true;
+      el("entrada").hidden = false;
+      esperandoCodigo = false;
+      el("passo-codigo").hidden = true;
+      el("codigo").value = "";
+      el("botao-entrar").textContent = "Enviar código";
+    });
+  }
+
+  // --- painel -------------------------------------------------------------
+
+  function faixa(e){
+    // O corte existe para a coordenacao saber onde ir na segunda-feira, e nao
+    // para dar nota. Abaixo de 50% de "bom" na comida, alguem precisa ir la.
+    if (e.suprimido) return "calada";
+    var pior = Math.min(
+      e.comida_boa_pct === null ? 100 : e.comida_boa_pct,
+      e.atendimento_bom_pct === null ? 100 : e.atendimento_bom_pct
+    );
+    if (pior < 50) return "ruim";
+    if (pior < 80) return "meio";
+    return "boa";
+  }
+
+  var ROTULO = { ruim:"precisa de visita", meio:"de olho", boa:"indo bem", calada:"sem dado suficiente" };
+
+  function pct(v){ return v === null || v === undefined ? "—" : Math.round(v) + "%"; }
+
+  function texto(tag, classe, conteudo){
+    var n = document.createElement(tag);
+    if (classe) n.className = classe;
+    if (conteudo !== undefined) n.textContent = conteudo;
+    return n;
+  }
+
+  function medida(valor, rotulo){
+    var d = texto("div", "medida");
+    d.appendChild(texto("b", "", valor));
+    d.appendChild(texto("span", "", rotulo));
+    return d;
+  }
+
+  function desenharSemanas(semanas){
+    var caixa = texto("div", "semanas");
+    semanas.forEach(function(s){
+      var col = texto("div", "semana" + (s.suprimido ? " vazia" : ""));
+      var barra = document.createElement("i");
+      // Recorte suprimido nao tem numero nenhum no corpo: a barra fica rasa e
+      // cinza, e nao em zero — zero diria "ninguem gostou", que e outra coisa.
+      var altura = s.suprimido ? 4 : Math.max(4, Math.round((s.comida_boa_pct || 0) * 0.42));
+      barra.style.height = altura + "px";
+      col.appendChild(barra);
+      col.title = s.semana + (s.suprimido ? " — sem avaliações suficientes"
+                                          : " — " + pct(s.comida_boa_pct) + " acharam a comida boa");
+      caixa.appendChild(col);
+    });
+    return caixa;
+  }
+
+  function desenharEmpresa(e){
+    var f = faixa(e);
+    var cartao = texto("article", "empresa " + f);
+
+    var topo = texto("div", "topo-empresa");
+    topo.appendChild(texto("h2", "", e.nome));
+    topo.appendChild(texto("span", "selo " + f, ROTULO[f]));
+    cartao.appendChild(topo);
+
+    if (e.suprimido){
+      var aviso = texto("p", "dica", "");
+      aviso.style.marginTop = "10px";
+      aviso.textContent = e.avaliacoes + " avaliação(ões) no período — " + e.motivo +
+        ". Com poucas respostas, a média volta a ser a opinião identificável de uma pessoa, " +
+        "então o número não sai daqui.";
+      cartao.appendChild(aviso);
+      return cartao;
+    }
+
+    var medidas = texto("div", "medidas");
+    medidas.appendChild(medida(pct(e.comida_boa_pct), "acharam a comida boa"));
+    medidas.appendChild(medida(pct(e.atendimento_bom_pct), "acharam o atendimento bom"));
+    medidas.appendChild(medida(pct(e.faltou_pct), "disseram que faltou algo"));
+    medidas.appendChild(medida(String(e.avaliacoes), "avaliações no período"));
+    cartao.appendChild(medidas);
+
+    if (e.motivos && e.motivos.length){
+      var sec = texto("div", "secao");
+      sec.appendChild(texto("h3", "", "O que faltou"));
+      var lista = texto("ul", "motivos");
+      e.motivos.forEach(function(m){
+        var li = document.createElement("li");
+        li.appendChild(document.createTextNode(m.rotulo + " "));
+        li.appendChild(texto("b", "", "×" + m.vezes));
+        lista.appendChild(li);
+      });
+      sec.appendChild(lista);
+      cartao.appendChild(sec);
+    }
+
+    if (e.semanas && e.semanas.length){
+      var secS = texto("div", "secao");
+      secS.appendChild(texto("h3", "", "Semana a semana"));
+      secS.appendChild(desenharSemanas(e.semanas));
+      secS.appendChild(texto("p", "legenda-semanas",
+        "Altura = quantos acharam a comida boa. Barra cinza = semana sem avaliações suficientes."));
+      cartao.appendChild(secS);
+    }
+
+    if (e.comentarios && e.comentarios.length){
+      var secC = texto("div", "secao");
+      secC.appendChild(texto("h3", "", "O que escreveram"));
+      var ul = texto("ul", "comentarios");
+      e.comentarios.forEach(function(c){ ul.appendChild(texto("li", "", c)); });
+      secC.appendChild(ul);
+      cartao.appendChild(secC);
+    }
+
+    return cartao;
+  }
+
+  function carregar(){
+    var desde = el("desde").value, ate = el("ate").value;
+    mostrarRecado("recado-painel", "Carregando…", "");
+    el("atualizar").disabled = true;
+
+    pedir("/api/gestao/feedback?desde=" + desde + "&ate=" + ate)
+      .then(function(r){
+        el("atualizar").disabled = false;
+        if (r.status === 401){ guardar(CHAVE_TOKEN, null); sair(); return; }
+        if (r.status === 403){
+          mostrarRecado("recado-painel",
+            "Esta conta entra no app, mas não tem o papel de gestão. " +
+            "Quem libera é a lista, por linha de comando.", "erro");
+          el("empresas").textContent = "";
+          return;
+        }
+        if (!r.ok){
+          mostrarRecado("recado-painel", r.corpo.erro || "Não consegui carregar.", "erro");
+          return;
+        }
+
+        var empresas = r.corpo.empresas || [];
+        var caixa = el("empresas");
+        caixa.textContent = "";
+
+        if (!empresas.length){
+          mostrarRecado("recado-painel",
+            "Nenhuma empresa com avaliação neste período. Avaliação de quem ainda não " +
+            "completou o cadastro não entra aqui, porque não tem empresa.", "aviso");
+          el("rodape").textContent = "";
+          return;
+        }
+
+        mostrarRecado("recado-painel", "", "");
+        empresas.forEach(function(e){ caixa.appendChild(desenharEmpresa(e)); });
+
+        var caladas = empresas.filter(function(e){ return e.suprimido; }).length;
+        el("rodape").textContent =
+          "Ordenado pelo que precisa de atenção primeiro. Recorte com menos de " +
+          r.corpo.n_minimo + " avaliações não vira número" +
+          (caladas ? " — " + caladas + " empresa(s) neste período." : ".") +
+          " O painel nunca mostra quem respondeu o quê: a avaliação não guarda setor, " +
+          "e nenhuma consulta desta tela passa pela pessoa.";
+      })
+      .catch(function(){
+        el("atualizar").disabled = false;
+        mostrarRecado("recado-painel", "Não consegui falar com o servidor.", "erro");
+      });
+  }
+
+  function abrirPainel(){
+    el("entrada").hidden = true;
+    el("painel").hidden = false;
+    carregar();
+  }
+
+  // --- partida ------------------------------------------------------------
+
+  function iso(d){
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") +
+           "-" + String(d.getDate()).padStart(2,"0");
+  }
+
+  function comecar(){
+    var hoje = new Date();
+    var trintaAtras = new Date(hoje.getTime() - 29*24*3600*1000);
+    el("ate").value = iso(hoje);
+    el("desde").value = iso(trintaAtras);
+
+    el("botao-entrar").addEventListener("click", entrarClicado);
+    el("atualizar").addEventListener("click", carregar);
+    el("sair").addEventListener("click", sair);
+    el("codigo").addEventListener("keydown", function(ev){
+      if (ev.key === "Enter") entrarClicado();
+    });
+    el("email").addEventListener("keydown", function(ev){
+      if (ev.key === "Enter") entrarClicado();
+    });
+
+    if (!API){
+      // Sem servidor nao ha painel. Nao existe modo de demonstracao aqui de
+      // proposito: numero inventado num painel de gestao ensina a confiar nele.
+      el("entrada").hidden = true;
+      el("sem-servidor").hidden = false;
+      el("subtitulo").textContent = "Sem servidor configurado.";
+      return;
+    }
+
+    if (lido(CHAVE_TOKEN)){
+      // Ja tem sessao no aparelho: tenta abrir direto, e a rota diz se vale.
+      abrirPainel();
+    }
+  }
+
+  comecar();
+})();
+</script>
+</body>
+</html>

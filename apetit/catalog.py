@@ -9,10 +9,11 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
+from . import identidade
 from .allergens import ALLERGENS, Declaration, Restriction, check_item, coverage
-from .csv_import import parse_menu_rows, read_rows
+from .csv_import import read_rows
 from .model import Issue, MenuEntry
-from .validation import validate_item
+from .preflight import ImportResult, decidir
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS menu_item (
@@ -62,7 +63,7 @@ CREATE TABLE IF NOT EXISTS menu_item_allergen (
 );
 
 CREATE TABLE IF NOT EXISTS employee (
-    telegram_id INTEGER PRIMARY KEY,
+    pessoa_id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     apetit_unit TEXT NOT NULL DEFAULT '',
     client_company TEXT NOT NULL DEFAULT '',
@@ -75,12 +76,41 @@ CREATE TABLE IF NOT EXISTS employee (
 );
 CREATE INDEX IF NOT EXISTS idx_employee_org ON employee (client_company, sector);
 
+-- Ficha de controle nutricional que o proprio funcionario trouxe. Guarda os
+-- numeros ja confirmados por ele, nunca o documento: ficha de nutricionista
+-- carrega peso, diagnostico e historico — dado de saude bem mais sensivel que
+-- o resto do app. O arquivo e lido, confirmado e descartado.
+--
+-- `escopo` e o campo que impede o erro que machuca: guardar so o valor
+-- repartido perderia a informacao de que a ficha era do dia inteiro, e a
+-- proxima leitura nao saberia mais conferir.
+CREATE TABLE IF NOT EXISTS employee_prescription (
+    pessoa_id INTEGER PRIMARY KEY REFERENCES employee(pessoa_id),
+    kcal REAL,
+    ptn_g REAL,
+    cho_g REAL,
+    lip_g REAL,
+    escopo TEXT NOT NULL DEFAULT 'almoco',
+    fracao_almoco REAL,
+    profissional TEXT NOT NULL DEFAULT '',
+    fonte TEXT NOT NULL DEFAULT '',
+    confirmada_em TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS employee_prescription_term (
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
+    term TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'proibido',
+    PRIMARY KEY (pessoa_id, term, kind)
+);
+
 CREATE TABLE IF NOT EXISTS employee_restriction (
-    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
     allergen_code TEXT NOT NULL,
     kind TEXT NOT NULL DEFAULT 'alergia',
     created_at TEXT NOT NULL,
-    PRIMARY KEY (telegram_id, allergen_code)
+    PRIMARY KEY (pessoa_id, allergen_code)
 );
 
 -- Alergia que a pessoa escreveu e o app nao sabe conferir ("legumes",
@@ -88,11 +118,11 @@ CREATE TABLE IF NOT EXISTS employee_restriction (
 -- kind separa o que e alergia (avisa sempre que houver duvida) do que a
 -- pessoa so prefere evitar (avisa so quando aparece no nome do prato).
 CREATE TABLE IF NOT EXISTS employee_free_restriction (
-    telegram_id INTEGER NOT NULL REFERENCES employee(telegram_id),
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
     term TEXT NOT NULL,
     kind TEXT NOT NULL DEFAULT 'alergia',
     created_at TEXT NOT NULL,
-    PRIMARY KEY (telegram_id, term)
+    PRIMARY KEY (pessoa_id, term)
 );
 
 -- Historico do funcionario. Guarda **fotografia**, nao ponteiro: nome,
@@ -103,7 +133,7 @@ CREATE TABLE IF NOT EXISTS employee_free_restriction (
 -- porque um item pode sair do cardapio sem apagar a historia de quem comeu.
 CREATE TABLE IF NOT EXISTS consumption (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id INTEGER NOT NULL,
+    pessoa_id INTEGER NOT NULL,
     service_date TEXT NOT NULL,
     meal TEXT NOT NULL DEFAULT 'almoco',
     item_code TEXT NOT NULL,
@@ -117,20 +147,23 @@ CREATE TABLE IF NOT EXISTS consumption (
     source TEXT NOT NULL DEFAULT 'montado',
     logged_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_consumption_pessoa ON consumption (telegram_id, service_date);
+CREATE INDEX IF NOT EXISTS idx_consumption_pessoa ON consumption (pessoa_id, service_date);
 
 -- Avaliacao do refeitorio. Unica parte do app cujo dado existe para a Apetit
 -- ler, e por isso a unica em que reidentificacao vira risco de retaliacao.
 --
 -- Nao ha empresa nem setor aqui de proposito: a avaliacao e sobre o refeitorio,
 -- e guardar o setor criaria o cruzamento que aponta para uma pessoa ("a unica
--- da manutencao que almocou terca"). telegram_id existe so para uma avaliacao
+-- da manutencao que almocou terca"). pessoa_id existe so para uma avaliacao
 -- por dia, para a pessoa rever a propria e para a exclusao a pedido dela —
 -- nenhuma leitura para a gestao seleciona esse campo.
 CREATE TABLE IF NOT EXISTS service_rating (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id INTEGER NOT NULL,
+    pessoa_id INTEGER NOT NULL,
     apetit_unit TEXT NOT NULL,
+    -- Copiada do cadastro ao gravar, para que a leitura da gestao agregue por
+    -- empresa sem passar pelo `pessoa_id`. Veja `_migrate_client_company`.
+    client_company TEXT NOT NULL DEFAULT '',
     service_date TEXT NOT NULL,
     meal TEXT NOT NULL DEFAULT 'almoco',
     food INTEGER,
@@ -138,7 +171,7 @@ CREATE TABLE IF NOT EXISTS service_rating (
     missing_something INTEGER NOT NULL DEFAULT 0,
     comment TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
-    UNIQUE (telegram_id, service_date, meal)
+    UNIQUE (pessoa_id, service_date, meal)
 );
 CREATE INDEX IF NOT EXISTS idx_rating_unidade ON service_rating (apetit_unit, service_date);
 
@@ -149,23 +182,58 @@ CREATE TABLE IF NOT EXISTS service_rating_tag (
 );
 
 CREATE TABLE IF NOT EXISTS favorite (
-    telegram_id INTEGER NOT NULL,
+    pessoa_id INTEGER NOT NULL,
     item_code TEXT NOT NULL REFERENCES menu_item(code),
     created_at TEXT NOT NULL,
-    PRIMARY KEY (telegram_id, item_code)
+    PRIMARY KEY (pessoa_id, item_code)
+);
+
+-- O almoco que o nutricionista prescreveu, alimento por alimento, na medida
+-- que ele escreveu. Fica separado de employee_prescription porque e outra
+-- natureza de ficha: aquela da alvo numerico, esta da lista de alimentos.
+CREATE TABLE IF NOT EXISTS employee_plan_item (
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
+    posicao INTEGER NOT NULL,
+    nome TEXT NOT NULL,
+    quantidade REAL,
+    medida TEXT NOT NULL DEFAULT '',
+    peso TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (pessoa_id, posicao)
+);
+
+-- Quais avisos a pessoa aceita receber. A ausencia de linha vale como o
+-- padrao de apetit/nudges.py, entao quem nunca abriu /avisos nao fica sem
+-- resumo nem passa a receber lembrete que nao pediu.
+CREATE TABLE IF NOT EXISTS employee_notification (
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
+    kind TEXT NOT NULL,
+    enabled INTEGER NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (pessoa_id, kind)
+);
+
+-- Marca o envio por periodo, nao por data: assim reiniciar o bot no meio do dia
+-- nao reenvia o resumo que ja saiu, e a chave primaria torna o reenvio
+-- impossivel em vez de improvavel.
+CREATE TABLE IF NOT EXISTS notification_sent (
+    pessoa_id INTEGER NOT NULL REFERENCES employee(pessoa_id),
+    kind TEXT NOT NULL,
+    period TEXT NOT NULL,
+    sent_at TEXT NOT NULL,
+    PRIMARY KEY (pessoa_id, kind, period)
 );
 
 -- A restricao unica e o que torna a pontuacao idempotente: reavaliar o mesmo
 -- dia nao concede pontos de novo.
 CREATE TABLE IF NOT EXISTS points_event (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id INTEGER NOT NULL,
+    pessoa_id INTEGER NOT NULL,
     rule_code TEXT NOT NULL,
     points INTEGER NOT NULL,
     reference_date TEXT NOT NULL,
     detail TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
-    UNIQUE (telegram_id, rule_code, reference_date)
+    UNIQUE (pessoa_id, rule_code, reference_date)
 );
 """
 
@@ -239,58 +307,90 @@ def _migrate_consumption_snapshot(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_pessoa_id(conn: sqlite3.Connection) -> list[str]:
+    """Renomeia `telegram_id` para `pessoa_id` num banco que ja existe.
+
+    A coluna se chamava assim porque o Telegram era quem identificava a pessoa.
+    Saindo o Telegram, o nome virou mentira — do tipo que faz alguem procurar um
+    chat que nao existe, ou achar que a coluna guarda um id de rede social.
+
+    Roda **antes** do `CREATE TABLE IF NOT EXISTS`: se o esquema novo fosse
+    aplicado primeiro, as tabelas antigas continuariam com a coluna velha (o
+    `IF NOT EXISTS` nao mexe em tabela existente) e toda consulta quebraria com
+    "no such column: pessoa_id" — num banco cheio de gente cadastrada.
+
+    O `RENAME COLUMN` do SQLite atualiza tambem as clausulas `REFERENCES` que
+    apontam para a coluna renomeada, entao as chaves estrangeiras continuam de
+    pe sem tocar em dado nenhum. Banco novo nao entra aqui: sem tabela, nao ha o
+    que renomear.
+    """
+    renomeadas = []
+    tabelas = [
+        linha["name"]
+        for linha in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    ]
+    for tabela in tabelas:
+        colunas = {linha["name"] for linha in conn.execute(f"PRAGMA table_info({tabela})")}
+        if "telegram_id" in colunas and "pessoa_id" not in colunas:
+            conn.execute(f"ALTER TABLE {tabela} RENAME COLUMN telegram_id TO pessoa_id")
+            renomeadas.append(tabela)
+    if renomeadas:
+        conn.commit()
+    return renomeadas
+
+
+def _migrate_client_company(conn: sqlite3.Connection) -> int:
+    """Acrescenta `client_company` a `service_rating` e preenche o que ja existe.
+
+    A empresa passa a morar **na propria linha da avaliacao**, copiada do
+    cadastro na hora de gravar. O motivo nao e desempenho: sem ela, agregar por
+    empresa exigiria juntar `service_rating` com `employee` pelo `pessoa_id` —
+    e a regra do modulo de avaliacao e que nenhuma leitura da gestao seleciona
+    `pessoa_id`. A coluna mantem a regra verdadeira ao pe da letra.
+
+    Copiar tambem congela a empresa do dia: quem troca de contrato nao reescreve
+    a avaliacao que fez quando era servido por outro refeitorio.
+
+    Roda antes do `CREATE TABLE IF NOT EXISTS`, pelo mesmo motivo que
+    `_migrate_pessoa_id`: o `IF NOT EXISTS` nao acrescenta coluna em tabela que
+    ja existe. Banco novo nao entra aqui, e a segunda subida tambem nao.
+    """
+    existe = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'service_rating'"
+    ).fetchone()
+    if not existe:
+        return 0
+    colunas = {linha["name"] for linha in conn.execute("PRAGMA table_info(service_rating)")}
+    if "client_company" in colunas:
+        return 0
+
+    conn.execute("ALTER TABLE service_rating ADD COLUMN client_company TEXT NOT NULL DEFAULT ''")
+    # Linha antiga nao tem de onde tirar a empresa a nao ser do cadastro. E a
+    # unica vez que `pessoa_id` cruza com `employee` para este fim, e acontece
+    # uma vez so, na migracao — nao numa leitura de relatorio.
+    preenchidas = conn.execute(
+        """
+        UPDATE service_rating
+           SET client_company = COALESCE(
+                 (SELECT e.client_company FROM employee e WHERE e.pessoa_id = service_rating.pessoa_id),
+                 '')
+         WHERE client_company = ''
+        """
+    ).rowcount
+    conn.commit()
+    return preenchidas
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
+    _migrate_pessoa_id(conn)
     _migrate_consumption_snapshot(conn)
+    _migrate_client_company(conn)
     conn.executescript(SCHEMA)
     conn.commit()
-
-
-class ImportResult:
-    def __init__(self, batch: str) -> None:
-        self.batch = batch
-        self.published: list[MenuEntry] = []
-        self.blocked: list[MenuEntry] = []
-        self.issues: list[Issue] = []
-
-    @property
-    def blocking_issues(self) -> list[Issue]:
-        return [issue for issue in self.issues if issue.blocking]
-
-    def grouped_issues(self) -> list[tuple[Issue, int, list[str]]]:
-        """Agrupa por ficha tecnica.
-
-        Um mesmo item errado reaparece em varios dias do mes. Quem revisa
-        corrige a ficha uma vez, entao a fila precisa listar item, nao ocorrencia.
-        """
-        grupos: dict[tuple[str, str], tuple[Issue, list[str]]] = {}
-        for issue in self.issues:
-            chave = (issue.code, issue.item_name)
-            if chave not in grupos:
-                grupos[chave] = (issue, [])
-            if issue.service_date:
-                grupos[chave][1].append(issue.service_date)
-        ordenado = sorted(grupos.values(), key=lambda par: (not par[0].blocking, par[0].item_name))
-        return [(issue, len(datas), sorted(datas)) for issue, datas in ordenado]
-
-    def summary(self) -> str:
-        agrupados = self.grouped_issues()
-        bloqueios = sum(1 for issue, *_ in agrupados if issue.blocking)
-        linhas = [
-            f"Lote: {self.batch}",
-            f"Itens publicados: {len(self.published)}",
-            f"Ocorrencias bloqueadas: {len(self.blocked)} (em {bloqueios} ficha(s) tecnica(s))",
-            f"Avisos: {len(agrupados) - bloqueios}",
-        ]
-        if agrupados:
-            linhas.append("")
-            linhas.append("Para revisao do nutricionista:")
-            for issue, vezes, datas in agrupados:
-                marca = "BLOQUEIO" if issue.blocking else "aviso   "
-                nome = issue.item_name or issue.category or "(cardapio)"
-                repete = f" — {vezes}x no periodo (1o em {datas[0]})" if vezes > 1 else ""
-                linhas.append(f"  [{marca}] {nome}{repete}")
-                linhas.append(f"             {issue.detail}")
-        return "\n".join(linhas)
+    # As tabelas de quem entra moram em `apetit/identidade.py`, junto da regra
+    # que as usa. Criadas aqui porque um banco pela metade — cardapio sim,
+    # identidade nao — seria um banco em que ninguem consegue entrar.
+    identidade.criar_tabelas(conn)
 
 
 def import_menu_csv(
@@ -315,25 +415,13 @@ def import_menu_rows(
     month: int | None = None,
     year: int | None = None,
 ) -> ImportResult:
-    """Mesma importacao, a partir de linhas ja lidas (CSV ou planilha)."""
-    batch = batch or now_iso()
-    result = ImportResult(batch)
+    """Mesma importacao, a partir de linhas ja lidas (CSV ou planilha).
 
-    entries, issues = parse_menu_rows(rows, unit=unit, meal=meal, month=month, year=year)
-    result.issues.extend(issues)
-
-    for entry in entries:
-        entry_issues = validate_item(
-            entry.item,
-            unit=entry.unit,
-            service_date=entry.service_date,
-            category=entry.category,
-        )
-        result.issues.extend(entry_issues)
-        if any(issue.blocking for issue in entry_issues):
-            result.blocked.append(entry)
-            continue
-        result.published.append(entry)
+    Quem decide o que publicar e `preflight.decidir`, que nao toca no banco: a
+    mesma decisao roda na pagina de conferencia da operacao, sem SQLite. Aqui
+    sobra escrever o que ela aprovou.
+    """
+    result = decidir(rows, unit=unit, meal=meal, batch=batch or now_iso(), month=month, year=year)
 
     timestamp = now_iso()
     for entry in result.published:
@@ -430,21 +518,38 @@ def set_item_allergens(
     item_code: str,
     declarations: dict[str, str],
     source: str = "ficha tecnica",
+    deduzida: bool = False,
 ) -> None:
-    """Grava a declaracao de alergenicos de um prato."""
+    """Grava a declaracao de alergenicos de um prato.
+
+    `deduzida` marca o que saiu de inferencia — hoje, a leitura da lista de
+    ingredientes. Deducao **nunca rebaixa declaracao**: se a cozinha ou a
+    nutricionista ja disse `contem leite` sobre um prato, uma releitura da
+    receita que so consegue concluir `pode_conter` nao pode substituir aquela
+    linha. O efeito seria o pior possivel — o prato cairia de ⛔ para ⚠️, a
+    sugestao de porcao voltaria a aceita-lo, e ninguem veria acontecer.
+
+    Uma deducao continua atualizando outra deducao: reimportar a planilha
+    depois de corrigir uma regra tem que valer. O que ela nao faz e passar por
+    cima de quem conferiu o prato.
+    """
     timestamp = now_iso()
+    # So atualiza a linha que veio da mesma fonte. Linha declarada por gente
+    # tem fonte diferente, entao o UPDATE simplesmente nao acontece.
+    guarda = " WHERE menu_item_allergen.source = excluded.source" if deduzida else ""
     for allergen_code, status in declarations.items():
         if allergen_code not in ALLERGENS:
             raise ValueError(f"Alergenico desconhecido: {allergen_code}")
         Declaration(status)  # valida o estado
         conn.execute(
-            """
+            f"""
             INSERT INTO menu_item_allergen (item_code, allergen_code, status, source, updated_at)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(item_code, allergen_code) DO UPDATE SET
                 status = excluded.status,
                 source = excluded.source,
                 updated_at = excluded.updated_at
+            {guarda}
             """,
             (item_code, allergen_code, Declaration(status).value, source, timestamp),
         )

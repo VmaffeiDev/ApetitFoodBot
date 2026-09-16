@@ -24,7 +24,7 @@ def now_iso() -> str:
 
 @dataclass
 class Employee:
-    telegram_id: int
+    pessoa_id: int
     name: str
     apetit_unit: str = ""       # unidade/contrato da Apetit que serve o refeitorio
     client_company: str = ""    # empresa onde a pessoa trabalha
@@ -66,17 +66,33 @@ class Employee:
         return faltando
 
 
+# Alvo do almoco por objetivo escolhido no cadastro. Ilustrativo de proposito:
+# quem prescreve quantidade individual e o nutricionista responsavel, e a ficha
+# dele ganha destes numeros sempre que existir.
+#
+# Mora aqui, e nao no `bot.py`, porque o objetivo e campo do cadastro — e
+# porque o servidor precisa destes alvos sem arrastar junto a camada do
+# Telegram. O `bot.py` continua reexportando, entao nada que ja usava mudou.
+TARGETS: dict[str, dict[str, int]] = {
+    "Comer melhor no dia a dia": {"kcal": 700, "ptn": 30},
+    "Manter o equilibrio": {"kcal": 700, "ptn": 30},
+    "Comer mais leve": {"kcal": 550, "ptn": 25},
+    "Reforcar a proteina": {"kcal": 850, "ptn": 45},
+}
+TARGET_PADRAO: dict[str, int] = {"kcal": 700, "ptn": 30}
+
+
 def save_employee(conn: sqlite3.Connection, employee: Employee) -> None:
     timestamp = now_iso()
     consent_at = employee.consented_at or (timestamp if employee.consent_accepted else "")
     conn.execute(
         """
         INSERT INTO employee (
-            telegram_id, name, apetit_unit, client_company, sector, goal,
+            pessoa_id, name, apetit_unit, client_company, sector, goal,
             consent_accepted, consented_at, created_at, updated_at
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(telegram_id) DO UPDATE SET
+        ON CONFLICT(pessoa_id) DO UPDATE SET
             name = excluded.name,
             apetit_unit = excluded.apetit_unit,
             client_company = excluded.client_company,
@@ -87,7 +103,7 @@ def save_employee(conn: sqlite3.Connection, employee: Employee) -> None:
             updated_at = excluded.updated_at
         """,
         (
-            employee.telegram_id,
+            employee.pessoa_id,
             employee.name,
             employee.apetit_unit,
             employee.client_company,
@@ -99,52 +115,52 @@ def save_employee(conn: sqlite3.Connection, employee: Employee) -> None:
             timestamp,
         ),
     )
-    conn.execute("DELETE FROM employee_restriction WHERE telegram_id = ?", (employee.telegram_id,))
-    conn.execute("DELETE FROM employee_free_restriction WHERE telegram_id = ?", (employee.telegram_id,))
+    conn.execute("DELETE FROM employee_restriction WHERE pessoa_id = ?", (employee.pessoa_id,))
+    conn.execute("DELETE FROM employee_free_restriction WHERE pessoa_id = ?", (employee.pessoa_id,))
     for termo in employee.free_restrictions:
         if termo.strip():
             conn.execute(
-                "INSERT INTO employee_free_restriction (telegram_id, term, kind, created_at) VALUES (?, ?, ?, ?)",
-                (employee.telegram_id, termo.strip(), "alergia", timestamp),
+                "INSERT INTO employee_free_restriction (pessoa_id, term, kind, created_at) VALUES (?, ?, ?, ?)",
+                (employee.pessoa_id, termo.strip(), "alergia", timestamp),
             )
     for termo in employee.avoid_foods:
         if termo.strip():
             conn.execute(
-                "INSERT INTO employee_free_restriction (telegram_id, term, kind, created_at) VALUES (?, ?, ?, ?)",
-                (employee.telegram_id, termo.strip(), "evitar", timestamp),
+                "INSERT INTO employee_free_restriction (pessoa_id, term, kind, created_at) VALUES (?, ?, ?, ?)",
+                (employee.pessoa_id, termo.strip(), "evitar", timestamp),
             )
     for restriction in employee.restrictions:
         if restriction.allergen not in ALLERGENS:
             raise ValueError(f"Alergenico desconhecido: {restriction.allergen}")
         conn.execute(
             """
-            INSERT INTO employee_restriction (telegram_id, allergen_code, kind, created_at)
+            INSERT INTO employee_restriction (pessoa_id, allergen_code, kind, created_at)
             VALUES (?, ?, ?, ?)
             """,
-            (employee.telegram_id, restriction.allergen, restriction.kind.value, timestamp),
+            (employee.pessoa_id, restriction.allergen, restriction.kind.value, timestamp),
         )
     conn.commit()
 
 
-def load_employee(conn: sqlite3.Connection, telegram_id: int) -> Employee | None:
-    row = conn.execute("SELECT * FROM employee WHERE telegram_id = ?", (telegram_id,)).fetchone()
+def load_employee(conn: sqlite3.Connection, pessoa_id: int) -> Employee | None:
+    row = conn.execute("SELECT * FROM employee WHERE pessoa_id = ?", (pessoa_id,)).fetchone()
     if not row:
         return None
     restricoes = [
         Restriction(r["allergen_code"], RestrictionKind(r["kind"]))
         for r in conn.execute(
-            "SELECT allergen_code, kind FROM employee_restriction WHERE telegram_id = ? ORDER BY allergen_code",
-            (telegram_id,),
+            "SELECT allergen_code, kind FROM employee_restriction WHERE pessoa_id = ? ORDER BY allergen_code",
+            (pessoa_id,),
         ).fetchall()
     ]
     linhas_livres = conn.execute(
-        "SELECT term, kind FROM employee_free_restriction WHERE telegram_id = ? ORDER BY term",
-        (telegram_id,),
+        "SELECT term, kind FROM employee_free_restriction WHERE pessoa_id = ? ORDER BY term",
+        (pessoa_id,),
     ).fetchall()
     livres = [r["term"] for r in linhas_livres if r["kind"] != "evitar"]
     evitar = [r["term"] for r in linhas_livres if r["kind"] == "evitar"]
     return Employee(
-        telegram_id=row["telegram_id"],
+        pessoa_id=row["pessoa_id"],
         name=row["name"],
         apetit_unit=row["apetit_unit"],
         client_company=row["client_company"],
@@ -158,23 +174,25 @@ def load_employee(conn: sqlite3.Connection, telegram_id: int) -> Employee | None
     )
 
 
-def delete_employee_data(conn: sqlite3.Connection, telegram_id: int) -> None:
+def delete_employee_data(conn: sqlite3.Connection, pessoa_id: int) -> None:
     """Exclusao completa pedida pelo titular: consumo, pontos e avaliacoes.
 
     As avaliacoes do refeitorio saem junto. Elas ja circulam so agregadas, mas
     quem pede exclusao esta pedindo que nao reste linha ligada a ele — e a
-    linha existe, com telegram_id, mesmo que nenhum relatorio a leia assim.
+    linha existe, com pessoa_id, mesmo que nenhum relatorio a leia assim.
     """
     conn.execute(
         "DELETE FROM service_rating_tag WHERE rating_id IN "
-        "(SELECT id FROM service_rating WHERE telegram_id = ?)",
-        (telegram_id,),
+        "(SELECT id FROM service_rating WHERE pessoa_id = ?)",
+        (pessoa_id,),
     )
     for tabela in (
         "service_rating", "points_event", "favorite", "consumption",
+        "notification_sent", "employee_notification", "employee_plan_item",
+        "employee_prescription_term", "employee_prescription",
         "employee_free_restriction", "employee_restriction", "employee",
     ):
-        conn.execute(f"DELETE FROM {tabela} WHERE telegram_id = ?", (telegram_id,))
+        conn.execute(f"DELETE FROM {tabela} WHERE pessoa_id = ?", (pessoa_id,))
     conn.commit()
 
 

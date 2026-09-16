@@ -54,13 +54,27 @@ def _snapshot(conn: sqlite3.Connection, service_date: str, code: str) -> dict:
     Nome, categoria e macros saem daqui e vao gravados junto do consumo. Sem
     isso, corrigir uma ficha tecnica em novembro mudaria retroativamente o que
     a pessoa comeu em setembro — e historico que muda sozinho nao e historico.
+
+    A categoria procura primeiro o dia do registro e, se aquele dia nao estiver
+    na base, cai na vez mais recente em que o prato saiu. Ela e propriedade do
+    prato — salada e salada em qualquer dia —, e prende-la ao dia tinha um
+    efeito silencioso e ruim: registrar num dia sem cardapio importado gravava
+    categoria vazia, e a regra de "incluiu salada ou fruta" deixava de premiar
+    sem ninguem entender por que o ponto nao veio.
     """
     linha = conn.execute(
         """
         SELECT i.name, i.kcal, i.cho_g, i.lip_g, i.ptn_g,
-               (SELECT e.category FROM menu_entry e
-                 WHERE e.item_code = i.code AND e.service_date = ?
-                 LIMIT 1) AS category
+               COALESCE(
+                   (SELECT e.category FROM menu_entry e
+                     WHERE e.item_code = i.code AND e.service_date = ?
+                     LIMIT 1),
+                   (SELECT e.category FROM menu_entry e
+                     WHERE e.item_code = i.code AND e.category <> ''
+                     ORDER BY e.service_date DESC
+                     LIMIT 1),
+                   ''
+               ) AS category
         FROM menu_item i
         WHERE i.code = ?
         """,
@@ -75,7 +89,7 @@ def _snapshot(conn: sqlite3.Connection, service_date: str, code: str) -> dict:
 
 def log_consumption(
     conn: sqlite3.Connection,
-    telegram_id: int,
+    pessoa_id: int,
     service_date: str,
     item_codes: list[str],
     meal: str = "almoco",
@@ -87,8 +101,8 @@ def log_consumption(
     "duas colheres de arroz", que e como a sugestao de porcao fala.
     """
     conn.execute(
-        "DELETE FROM consumption WHERE telegram_id = ? AND service_date = ? AND meal = ?",
-        (telegram_id, service_date, meal),
+        "DELETE FROM consumption WHERE pessoa_id = ? AND service_date = ? AND meal = ?",
+        (pessoa_id, service_date, meal),
     )
     quantidades: dict[str, int] = {}
     for code in item_codes:
@@ -100,13 +114,13 @@ def log_consumption(
         conn.execute(
             """
             INSERT INTO consumption (
-                telegram_id, service_date, meal, item_code, item_name, category,
+                pessoa_id, service_date, meal, item_code, item_name, category,
                 quantity, kcal, cho_g, lip_g, ptn_g, source, logged_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                telegram_id, service_date, meal, code, foto["name"], foto["category"] or "",
+                pessoa_id, service_date, meal, code, foto["name"], foto["category"] or "",
                 quantidade, foto["kcal"], foto["cho_g"], foto["lip_g"], foto["ptn_g"],
                 source, timestamp,
             ),
@@ -114,7 +128,7 @@ def log_consumption(
     conn.commit()
 
 
-def consumption_totals(conn: sqlite3.Connection, telegram_id: int, service_date: str) -> dict:
+def consumption_totals(conn: sqlite3.Connection, pessoa_id: int, service_date: str) -> dict:
     """Totais do dia, lidos da fotografia — nao da ficha tecnica de hoje."""
     row = conn.execute(
         """
@@ -131,25 +145,25 @@ def consumption_totals(conn: sqlite3.Connection, telegram_id: int, service_date:
             COALESCE(SUM(CASE WHEN kcal IS NULL OR ptn_g IS NULL THEN quantity ELSE 0 END), 0) AS sem_macro,
             COALESCE(SUM(CASE WHEN kcal IS NOT NULL AND ptn_g IS NOT NULL THEN quantity ELSE 0 END), 0) AS com_macro
         FROM consumption
-        WHERE telegram_id = ? AND service_date = ?
+        WHERE pessoa_id = ? AND service_date = ?
         """,
-        (telegram_id, service_date),
+        (pessoa_id, service_date),
     ).fetchone()
     return dict(row) if row else {}
 
 
-def consumption_history(conn: sqlite3.Connection, telegram_id: int, limit: int = 30) -> list[sqlite3.Row]:
+def consumption_history(conn: sqlite3.Connection, pessoa_id: int, limit: int = 30) -> list[sqlite3.Row]:
     """Tudo o que a pessoa ja registrou, do mais recente para o mais antigo."""
     return conn.execute(
         """
         SELECT service_date, meal, item_code, item_name AS name, category,
                quantity, kcal, ptn_g, source, logged_at
         FROM consumption
-        WHERE telegram_id = ?
+        WHERE pessoa_id = ?
         ORDER BY service_date DESC, item_name
         LIMIT ?
         """,
-        (telegram_id, limit),
+        (pessoa_id, limit),
     ).fetchall()
 
 
@@ -188,18 +202,18 @@ class DayRecord:
         return self.unknown_items > 0
 
 
-def history_by_day(conn: sqlite3.Connection, telegram_id: int, days: int = 14) -> list[DayRecord]:
+def history_by_day(conn: sqlite3.Connection, pessoa_id: int, days: int = 14) -> list[DayRecord]:
     """Historico agrupado por dia, do mais recente para o mais antigo."""
     datas = [
         linha["service_date"]
         for linha in conn.execute(
             """
             SELECT DISTINCT service_date FROM consumption
-            WHERE telegram_id = ?
+            WHERE pessoa_id = ?
             ORDER BY service_date DESC
             LIMIT ?
             """,
-            (telegram_id, days),
+            (pessoa_id, days),
         ).fetchall()
     ]
     if not datas:
@@ -210,10 +224,10 @@ def history_by_day(conn: sqlite3.Connection, telegram_id: int, days: int = 14) -
         SELECT service_date, meal, item_code, item_name AS name, category,
                quantity, kcal, ptn_g, source
         FROM consumption
-        WHERE telegram_id = ? AND service_date IN ({marcadores})
+        WHERE pessoa_id = ? AND service_date IN ({marcadores})
         ORDER BY service_date DESC, item_name
         """,
-        [telegram_id, *datas],
+        [pessoa_id, *datas],
     ).fetchall()
     agrupado: dict[str, list[sqlite3.Row]] = {data: [] for data in datas}
     for linha in linhas:
@@ -221,33 +235,33 @@ def history_by_day(conn: sqlite3.Connection, telegram_id: int, days: int = 14) -
     return [DayRecord(data, agrupado[data]) for data in datas]
 
 
-def add_favorite(conn: sqlite3.Connection, telegram_id: int, item_code: str) -> None:
+def add_favorite(conn: sqlite3.Connection, pessoa_id: int, item_code: str) -> None:
     conn.execute(
         """
-        INSERT INTO favorite (telegram_id, item_code, created_at)
+        INSERT INTO favorite (pessoa_id, item_code, created_at)
         VALUES (?, ?, ?)
-        ON CONFLICT(telegram_id, item_code) DO NOTHING
+        ON CONFLICT(pessoa_id, item_code) DO NOTHING
         """,
-        (telegram_id, item_code, now_iso()),
+        (pessoa_id, item_code, now_iso()),
     )
     conn.commit()
 
 
-def remove_favorite(conn: sqlite3.Connection, telegram_id: int, item_code: str) -> None:
-    conn.execute("DELETE FROM favorite WHERE telegram_id = ? AND item_code = ?", (telegram_id, item_code))
+def remove_favorite(conn: sqlite3.Connection, pessoa_id: int, item_code: str) -> None:
+    conn.execute("DELETE FROM favorite WHERE pessoa_id = ? AND item_code = ?", (pessoa_id, item_code))
     conn.commit()
 
 
-def favorites(conn: sqlite3.Connection, telegram_id: int) -> list[sqlite3.Row]:
+def favorites(conn: sqlite3.Connection, pessoa_id: int) -> list[sqlite3.Row]:
     return conn.execute(
         """
         SELECT f.item_code, i.name, i.kcal, i.ptn_g
         FROM favorite f
         JOIN menu_item i ON i.code = f.item_code
-        WHERE f.telegram_id = ?
+        WHERE f.pessoa_id = ?
         ORDER BY i.name
         """,
-        (telegram_id,),
+        (pessoa_id,),
     ).fetchall()
 
 
@@ -269,12 +283,12 @@ def favorites_returning(
         params.append(apetit_unit)
     return conn.execute(
         f"""
-        SELECT f.telegram_id, emp.name AS employee_name, i.name AS item_name,
+        SELECT f.pessoa_id, emp.name AS employee_name, i.name AS item_name,
                e.service_date, e.unit
         FROM favorite f
         JOIN menu_entry e ON e.item_code = f.item_code
         JOIN menu_item i ON i.code = f.item_code
-        JOIN employee emp ON emp.telegram_id = f.telegram_id
+        JOIN employee emp ON emp.pessoa_id = f.pessoa_id
         WHERE {' AND '.join(where)}
         ORDER BY e.service_date, emp.name
         """,
@@ -282,22 +296,22 @@ def favorites_returning(
     ).fetchall()
 
 
-def _award(conn: sqlite3.Connection, telegram_id: int, rule: Rule, reference: str, detail: str = "") -> bool:
+def _award(conn: sqlite3.Connection, pessoa_id: int, rule: Rule, reference: str, detail: str = "") -> bool:
     """Concede a regra uma unica vez por periodo. Devolve se pontuou agora."""
     cursor = conn.execute(
         """
-        INSERT INTO points_event (telegram_id, rule_code, points, reference_date, detail, created_at)
+        INSERT INTO points_event (pessoa_id, rule_code, points, reference_date, detail, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(telegram_id, rule_code, reference_date) DO NOTHING
+        ON CONFLICT(pessoa_id, rule_code, reference_date) DO NOTHING
         """,
-        (telegram_id, rule.code, rule.points, reference, detail, now_iso()),
+        (pessoa_id, rule.code, rule.points, reference, detail, now_iso()),
     )
     return cursor.rowcount > 0
 
 
 def score_day(
     conn: sqlite3.Connection,
-    telegram_id: int,
+    pessoa_id: int,
     service_date: str,
     protein_target_g: float | None = None,
 ) -> list[Rule]:
@@ -306,35 +320,35 @@ def score_day(
         """
         SELECT category, quantity, ptn_g
         FROM consumption
-        WHERE telegram_id = ? AND service_date = ?
+        WHERE pessoa_id = ? AND service_date = ?
         """,
-        (telegram_id, service_date),
+        (pessoa_id, service_date),
     ).fetchall()
     if not itens:
         return []
 
     concedidas: list[Rule] = []
 
-    if _award(conn, telegram_id, RULES_BY_CODE["registro"], service_date):
+    if _award(conn, pessoa_id, RULES_BY_CODE["registro"], service_date):
         concedidas.append(RULES_BY_CODE["registro"])
 
     categorias = {(linha["category"] or "").upper() for linha in itens}
     if categorias & CATEGORIAS_FRESCAS:
-        if _award(conn, telegram_id, RULES_BY_CODE["composicao"], service_date):
+        if _award(conn, pessoa_id, RULES_BY_CODE["composicao"], service_date):
             concedidas.append(RULES_BY_CODE["composicao"])
 
     if protein_target_g:
         total_ptn = sum((linha["ptn_g"] or 0) * linha["quantity"] for linha in itens)
         if total_ptn >= protein_target_g:
             detalhe = f"{total_ptn:.1f} g de {protein_target_g:.0f} g"
-            if _award(conn, telegram_id, RULES_BY_CODE["proteina"], service_date, detalhe):
+            if _award(conn, pessoa_id, RULES_BY_CODE["proteina"], service_date, detalhe):
                 concedidas.append(RULES_BY_CODE["proteina"])
 
     conn.commit()
     return concedidas
 
 
-def score_week(conn: sqlite3.Connection, telegram_id: int, week_start: str) -> list[Rule]:
+def score_week(conn: sqlite3.Connection, pessoa_id: int, week_start: str) -> list[Rule]:
     """Regras semanais: variedade e semana registrada por inteiro."""
     inicio = date.fromisoformat(week_start)
     fim = inicio + timedelta(days=6)
@@ -342,9 +356,9 @@ def score_week(conn: sqlite3.Connection, telegram_id: int, week_start: str) -> l
         """
         SELECT DISTINCT service_date, item_code
         FROM consumption
-        WHERE telegram_id = ? AND service_date BETWEEN ? AND ?
+        WHERE pessoa_id = ? AND service_date BETWEEN ? AND ?
         """,
-        (telegram_id, inicio.isoformat(), fim.isoformat()),
+        (pessoa_id, inicio.isoformat(), fim.isoformat()),
     ).fetchall()
     if not linhas:
         return []
@@ -355,35 +369,35 @@ def score_week(conn: sqlite3.Connection, telegram_id: int, week_start: str) -> l
 
     if len(itens_distintos) >= 6:
         detalhe = f"{len(itens_distintos)} pratos diferentes"
-        if _award(conn, telegram_id, RULES_BY_CODE["variedade"], week_start, detalhe):
+        if _award(conn, pessoa_id, RULES_BY_CODE["variedade"], week_start, detalhe):
             concedidas.append(RULES_BY_CODE["variedade"])
 
     uteis = {(inicio + timedelta(days=d)).isoformat() for d in range(5)}
     if uteis <= dias_registrados:
-        if _award(conn, telegram_id, RULES_BY_CODE["sequencia"], week_start):
+        if _award(conn, pessoa_id, RULES_BY_CODE["sequencia"], week_start):
             concedidas.append(RULES_BY_CODE["sequencia"])
 
     conn.commit()
     return concedidas
 
 
-def total_points(conn: sqlite3.Connection, telegram_id: int) -> int:
+def total_points(conn: sqlite3.Connection, pessoa_id: int) -> int:
     row = conn.execute(
-        "SELECT COALESCE(SUM(points), 0) AS total FROM points_event WHERE telegram_id = ?",
-        (telegram_id,),
+        "SELECT COALESCE(SUM(points), 0) AS total FROM points_event WHERE pessoa_id = ?",
+        (pessoa_id,),
     ).fetchone()
     return int(row["total"])
 
 
-def points_breakdown(conn: sqlite3.Connection, telegram_id: int) -> list[sqlite3.Row]:
+def points_breakdown(conn: sqlite3.Connection, pessoa_id: int) -> list[sqlite3.Row]:
     """Extrato dos pontos: a pessoa tem que conseguir ver por que ganhou."""
     return conn.execute(
         """
         SELECT rule_code, SUM(points) AS pontos, COUNT(*) AS vezes
         FROM points_event
-        WHERE telegram_id = ?
+        WHERE pessoa_id = ?
         GROUP BY rule_code
         ORDER BY pontos DESC
         """,
-        (telegram_id,),
+        (pessoa_id,),
     ).fetchall()

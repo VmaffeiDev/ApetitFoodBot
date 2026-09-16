@@ -1,0 +1,21 @@
+{
+ "refeicoes": "(Caf[eé] da manh[ãa]|Cola[çc][ãa]o|Almo[çc]o|Lanche(?:\\s*-\\s*Op[çc][ãa]o\\s*\\d+)?|Jantar|Ceia)",
+ "rodape": "Digitally signed by.*?NUTRI[ÇC][ÃA]O",
+ "ancora": "\\((\\d+(?:[.,]\\d+)?)\\s*(g|ml)\\)|(À\\s*vontade|A\\s*vontade)|(\\d+(?:[.,]\\d+)?)\\s*ml",
+ "quantidade": "^(?P<nome>.*?)\\s*(?P<qtd>\\d+(?:[.,]\\d+)?)\\s*(?P<medida>.*)$",
+ "rotulos": {
+  "kcal": "(?:vet|get|valor energetico(?: total)?|energia|calorias?|kcal|kilocalorias?)",
+  "ptn_g": "(?:ptn|proteinas?|prot\\b\\.?)",
+  "cho_g": "(?:cho|carboidratos?|carbo\\.?|gliciacids?)",
+  "lip_g": "(?:lip|lipideos?|lipidios?|gorduras?)"
+ },
+ "por_dia": "(?:/\\s*dia|por dia|ao dia|diari[oa]|total diari[oa]|/d\\b|24\\s*h)",
+ "do_almoco": "(?:almoco|refeicao principal|jantar/almoco)",
+ "limites": {
+  "kcal_max": 1500,
+  "kcal_min": 100,
+  "ptn_max": 150,
+  "ptn_min": 5,
+  "fracao_almoco": 0.35
+ }
+}

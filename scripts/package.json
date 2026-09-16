@@ -1,0 +1,8 @@
+{
+  "name": "apetit-preview-tools",
+  "private": true,
+  "description": "Pré-renderização da demonstração para leitores de HTML sem JavaScript",
+  "devDependencies": {
+    "jsdom": "^28.1.0"
+  }
+}

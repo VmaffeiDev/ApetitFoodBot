@@ -113,7 +113,7 @@ class BancoBase(unittest.TestCase):
         save_employee(
             self.conn,
             Employee(
-                telegram_id=self.user,
+                pessoa_id=self.user,
                 name="Funcionario Teste",
                 apetit_unit="SM",
                 client_company="Industria Exemplo",
@@ -140,11 +140,11 @@ class CadastroTest(BancoBase):
         self.assertTrue(pessoa.registered)
 
     def test_registration_is_incomplete_without_sector_or_consent(self):
-        sem_setor = Employee(telegram_id=1, name="X", apetit_unit="SM", client_company="Y", consent_accepted=True)
+        sem_setor = Employee(pessoa_id=1, name="X", apetit_unit="SM", client_company="Y", consent_accepted=True)
         self.assertFalse(sem_setor.registered)
         self.assertIn("setor", sem_setor.missing_fields())
 
-        sem_consent = Employee(telegram_id=2, name="X", apetit_unit="SM", client_company="Y", sector="Z")
+        sem_consent = Employee(pessoa_id=2, name="X", apetit_unit="SM", client_company="Y", sector="Z")
         self.assertFalse(sem_consent.registered)
         self.assertIn("aceite do termo de privacidade", sem_consent.missing_fields())
 
@@ -152,7 +152,7 @@ class CadastroTest(BancoBase):
         with self.assertRaises(ValueError):
             save_employee(
                 self.conn,
-                Employee(telegram_id=9, name="X", restrictions=[Restriction("gluten_falso")]),
+                Employee(pessoa_id=9, name="X", restrictions=[Restriction("gluten_falso")]),
             )
 
     def test_small_sector_is_suppressed_in_aggregate(self):
@@ -173,6 +173,34 @@ class CadastroTest(BancoBase):
         self.assertEqual(consumption_history(self.conn, self.user), [])
         self.assertEqual(favorites(self.conn, self.user), [])
         self.assertEqual(total_points(self.conn, self.user), 0)
+
+
+class CategoriaNoRegistroTest(BancoBase):
+    """A categoria do prato sobrevive a um dia sem cardapio importado.
+
+    Ela e propriedade do prato, nao do dia: salada e salada em qualquer data.
+    Prende-la ao dia do registro tinha um efeito silencioso e ruim — registrar
+    num dia fora do cardapio gravava categoria vazia, e a regra de "incluiu
+    salada ou fruta" parava de premiar sem a pessoa entender por que.
+    """
+
+    def test_category_falls_back_to_the_last_day_the_dish_was_served(self):
+        # 2025-08-29 nao esta no cardapio de exemplo, que comeca em 01/09.
+        log_consumption(self.conn, self.user, "2025-08-29", ["sal_mix_de_alface"])
+
+        linha = self.conn.execute(
+            "SELECT category FROM consumption WHERE pessoa_id = ? AND service_date = ?",
+            (self.user, "2025-08-29"),
+        ).fetchone()
+
+        self.assertEqual(linha["category"], "SALADA")
+
+    def test_the_salad_rule_still_awards_on_a_day_outside_the_menu(self):
+        log_consumption(self.conn, self.user, "2025-08-29", ["sal_mix_de_alface"])
+
+        concedidas = score_day(self.conn, self.user, "2025-08-29")
+
+        self.assertIn("composicao", {regra.code for regra in concedidas})
 
 
 class AvisoNoCardapioTest(BancoBase):
@@ -236,7 +264,7 @@ class HistoricoEFavoritoTest(BancoBase):
 
         nomes = {linha["item_name"] for linha in voltando}
         self.assertIn("ARROZ PARBOILIZADO", nomes)
-        self.assertEqual(voltando[0]["telegram_id"], self.user)
+        self.assertEqual(voltando[0]["pessoa_id"], self.user)
 
     def test_favorite_not_on_the_menu_does_not_notify(self):
         add_favorite(self.conn, self.user, "sal_vinagrete")
@@ -350,13 +378,13 @@ class HistoricoEFotografiaTest(BancoBase):
             CREATE TABLE menu_entry (id INTEGER PRIMARY KEY AUTOINCREMENT, unit TEXT NOT NULL,
                 service_date TEXT NOT NULL, meal TEXT NOT NULL, category TEXT NOT NULL,
                 slot INTEGER NOT NULL DEFAULT 1, item_code TEXT NOT NULL, created_at TEXT NOT NULL);
-            CREATE TABLE consumption (id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id INTEGER NOT NULL,
+            CREATE TABLE consumption (id INTEGER PRIMARY KEY AUTOINCREMENT, pessoa_id INTEGER NOT NULL,
                 service_date TEXT NOT NULL, meal TEXT NOT NULL DEFAULT 'almoco',
                 item_code TEXT NOT NULL, logged_at TEXT NOT NULL);
             INSERT INTO menu_item VALUES ('feijao_preto', 'FEIJAO PRETO', 80, 29, 4, 0.2, 1.8, '2025-09-01');
             INSERT INTO menu_entry (unit, service_date, meal, category, item_code, created_at)
                 VALUES ('SM', '2025-09-01', 'almoco', 'FEIJAO', 'feijao_preto', '2025-09-01');
-            INSERT INTO consumption (telegram_id, service_date, item_code, logged_at)
+            INSERT INTO consumption (pessoa_id, service_date, item_code, logged_at)
                 VALUES (7, '2025-09-01', 'feijao_preto', '2025-09-01T12:00:00+00:00');
             """
         )
