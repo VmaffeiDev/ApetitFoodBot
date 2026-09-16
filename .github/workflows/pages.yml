@@ -49,7 +49,7 @@ jobs:
       # e o `manifest` sao o minimo para o navegador oferecer instalar.
       - name: Conferir o que vai subir
         run: |
-          for arquivo in index.html cardapio.html manifest.webmanifest sw.js icon-192.png icon-512.png; do
+          for arquivo in index.html cardapio.html painel.html manifest.webmanifest sw.js icon-192.png icon-512.png; do
             test -f "demo/$arquivo" || { echo "Falta demo/$arquivo"; exit 1; }
           done
           echo "demo/ com $(find demo -type f | wc -l) arquivos"
