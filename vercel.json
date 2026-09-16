@@ -1,0 +1,75 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+
+  "//": [
+    "O app do refeitorio e estatico: HTML, um service worker e os dados gerados.",
+    "Nao ha build — `demo/` ja e o que vai para o ar, e o mesmo diretorio que o",
+    "workflow do GitHub Pages publica. Servir dos dois lugares e de proposito:",
+    "o Pages nao tem restricao de uso comercial e o Vercel tem (plano Hobby),",
+    "entao o Pages continua sendo o endereco do piloto ate isso ser resolvido.",
+    "",
+    "A API em Python NAO sobe aqui. O Vercel e serverless e nao tem disco que",
+    "sobreviva ao deploy; o servidor guarda cadastro, historico, avaliacoes e",
+    "sessoes num SQLite. Ela mora no `render.yaml`, que tem disco persistente."
+  ],
+
+  "outputDirectory": "demo",
+  "framework": null,
+  "buildCommand": null,
+  "installCommand": null,
+
+  "cleanUrls": false,
+  "trailingSlash": false,
+
+  "headers": [
+    {
+      "//": "O service worker decide o que fica em cache. Se ele proprio ficar em cache, uma correcao no app nao chega em quem ja instalou — e o app do refeitorio fala de alergenico.",
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
+        { "key": "Content-Type", "value": "text/javascript; charset=utf-8" }
+      ]
+    },
+    {
+      "//": "Sem o tipo certo o navegador ignora o manifest e nao oferece instalar.",
+      "source": "/manifest.webmanifest",
+      "headers": [
+        { "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "//": "A fotografia do cardapio. Revalidar e barato e mantem o app honesto: cardapio de outro dia apresentado como o de hoje e conferir o prato errado.",
+      "source": "/(dados|regras).json",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "//": "As telas mudam a cada publicacao; o cache de verdade e o do service worker.",
+      "source": "/(.*).html",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "//": "Icones e imagem de prato sao imutaveis dentro de uma publicacao.",
+      "source": "/(.*).(png|webp)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "same-origin" },
+        {
+          "//": "O app nao e para ser embutido por ninguem: ele mostra alergia e ficha de nutricionista.",
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        }
+      ]
+    }
+  ]
+}
