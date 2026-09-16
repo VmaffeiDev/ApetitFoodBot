@@ -1178,6 +1178,32 @@ de HTTPS.
 
 Para ligar, uma vez so: Settings → Pages → Source: **GitHub Actions**.
 
+O workflow so roda depois que o `pages.yml` estiver **no `main`**: o GitHub
+executa workflow do branch padrao, entao enquanto ele vive num galho de PR o
+Pages nunca publica — e isso nao aparece como erro, aparece como nada
+acontecendo.
+
+### Vercel, se for usado (`vercel.json`)
+
+O mesmo `demo/` sobe no Vercel sem build: `outputDirectory` aponta para ele e
+nao ha nada a compilar. Os cabecalhos que importam sao o do service worker
+(que **nao pode ficar em cache**, senao uma correcao no app nao chega em quem ja
+instalou) e o tipo do manifest (sem ele o navegador nao oferece instalar).
+
+Duas coisas para saber antes:
+
+- **O `vercel.json` valida contra esquema estrito.** Chave desconhecida — uma
+  linha `"//"` de comentario, por exemplo — reprova o deploy inteiro. E por isso
+  que a explicacao mora aqui e nao la dentro.
+- **O plano Hobby e so para uso pessoal ou nao comercial**, e o Vercel reserva o
+  direito de desligar o projeto sem aviso. Um piloto de empresa e uso comercial.
+  O GitHub Pages nao tem essa restricao, e por isso continua sendo o endereco do
+  piloto.
+
+**A API em Python nao sobe no Vercel.** Ele e serverless e nao tem disco que
+sobreviva ao deploy; o servidor guarda cadastro, historico, avaliacoes e sessoes
+num SQLite. Ela precisa de um lugar com volume — veja a tabela abaixo.
+
 **O servidor** roda em qualquer lugar que aceite um container:
 
 ```bash
